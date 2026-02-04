@@ -1,0 +1,78 @@
+{
+  "name": "restaurant-pos",
+  "version": "1.0.0",
+  "description": "Offline-first Restaurant POS System",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build": "vite build && electron-builder",
+    "build:win": "vite build && electron-builder --win",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:unit": "vitest run",
+    "lint": "eslint src electron --ext .js,.jsx"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.0",
+    "zustand": "^4.4.7",
+    "sql.js": "^1.10.0",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.0",
+    "escpos": "^3.0.0-alpha.6",
+    "escpos-usb": "^3.0.0-alpha.4",
+    "node-machine-id": "^1.1.12",
+    "electron-updater": "^6.1.7",
+    "electron-log": "^5.0.3", 
+    "recharts": "^2.10.3",
+    "lucide-react": "^0.303.0",
+    "date-fns": "^3.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.10",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.2.0",
+    "vitest": "^1.1.3",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0"
+  },
+  "build": {
+    "appId": "com.restaurant.pos",
+    "productName": "Restaurant POS",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "electron/database",
+        "to": "database"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico"
+    }
+  },
+  "author": "Restaurant POS Team",
+  "license": "MIT"
+}

@@ -1,0 +1,39 @@
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+dist-electron/
+out/
+
+# Development
+.vite/
+*.log
+npm-debug.log*
+
+# Database files
+*.db
+*.db-journal
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
