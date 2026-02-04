@@ -170,11 +170,20 @@ class Database {
 
   // ===== Sync Queue Operations =====
   addToSyncQueue(entityType, entityId, operation, data) {
+    // Map operation names to valid SQL operations
+    const operationMap = {
+      'create': 'INSERT',
+      'insert': 'INSERT',
+      'update': 'UPDATE',
+      'delete': 'DELETE',
+    };
+    const sqlOperation = operationMap[operation.toLowerCase()] || operation.toUpperCase();
+    
     return this.insert('sync_queue', {
       id: uuidv4(),
       table_name: entityType,
       record_id: entityId,
-      operation: operation.toUpperCase(),
+      operation: sqlOperation,
       payload: JSON.stringify(data),
       status: 'pending',
       retry_count: 0,
@@ -297,42 +306,50 @@ class Database {
 
   // ===== Order Operations =====
   createOrder(order, items, userId) {
+    console.log('Creating order with:', JSON.stringify({ order, items, userId }, null, 2));
+    
     const orderId = uuidv4();
     const orderNumber = this.getNextOrderNumber();
     const now = new Date().toISOString();
 
-    // Insert order
-    this.insert('orders', {
+    // Insert order - ensure no undefined values
+    const orderData = {
       id: orderId,
       order_number: orderNumber,
       order_type: order.order_type || 'dine_in',
-      table_number: order.table_number,
-      customer_name: order.customer_name,
-      customer_phone: order.customer_phone,
-      subtotal: order.subtotal,
-      tax_amount: order.tax_amount,
+      table_number: order.table_number || '',
+      customer_name: order.customer_name || '',
+      customer_phone: order.customer_phone || '',
+      subtotal: order.subtotal || 0,
+      tax_amount: order.tax_amount || 0,
       discount_amount: order.discount_amount || 0,
-      total_amount: order.total_amount,
+      total_amount: order.total_amount || 0,
+      notes: order.notes || '',
       status: 'active',
-      cashier_id: userId,
+      cashier_id: userId || null,
       created_at: now,
       updated_at: now,
-    });
+    };
+    
+    console.log('Order data:', JSON.stringify(orderData, null, 2));
+    this.insert('orders', orderData);
 
     // Insert order items
-    for (const item of items) {
-      this.insert('order_items', {
+    for (const item of items || []) {
+      const itemData = {
         id: uuidv4(),
         order_id: orderId,
-        menu_item_id: item.menu_item_id,
-        item_name: item.name,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        item_total: item.quantity * item.unit_price,
-        special_instructions: item.special_instructions,
+        menu_item_id: item.menu_item_id || '',
+        item_name: item.name || 'Unknown Item',
+        quantity: item.quantity || 1,
+        unit_price: item.unit_price || 0,
+        item_total: (item.quantity || 1) * (item.unit_price || 0),
+        special_instructions: item.special_instructions || '',
         kot_status: 'pending',
         created_at: now,
-      });
+      };
+      console.log('Item data:', JSON.stringify(itemData, null, 2));
+      this.insert('order_items', itemData);
     }
 
     // Add to sync queue
@@ -589,7 +606,7 @@ class Database {
     const sales = this.execute(`SELECT * FROM daily_sales WHERE date = ?`, [date]);
     const orders = this.execute(`SELECT * FROM orders WHERE DATE(created_at) = ? ORDER BY created_at DESC`, [date]);
     const topItems = this.execute(`
-      SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.total_price) as total_revenue
+      SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE DATE(o.created_at) = ? AND o.status = 'completed'

@@ -326,14 +326,25 @@ const POSPage = () => {
   );
 };
 
-// Payment Modal Component
+// Payment Modal Component with Customer Info Step
 const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
+  const [step, setStep] = useState('customer'); // 'customer' or 'payment'
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderNumber, setOrderNumber] = useState(null);
 
   const cart = useCartStore();
+
+  const handleProceedToPayment = () => {
+    // Update cart with customer info
+    cart.setCustomerName(customerName);
+    cart.setCustomerPhone(customerPhone);
+    setStep('payment');
+  };
 
   const handlePayment = async (method) => {
     setPaymentMethod(method);
@@ -395,12 +406,98 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
     );
   }
 
+  // Customer Info Step
+  if (step === 'customer') {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3 className="modal-title">Customer Information</h3>
+            <button className="btn btn-ghost btn-icon" onClick={onClose}>
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="modal-body">
+            <div style={{
+              textAlign: 'center',
+              padding: 'var(--spacing-3)',
+              background: 'var(--gray-50)',
+              borderRadius: 'var(--radius-lg)',
+              marginBottom: 'var(--spacing-4)',
+            }}>
+              <div style={{ color: 'var(--gray-500)', fontSize: 'var(--font-size-sm)' }}>
+                Total Amount
+              </div>
+              <div style={{ 
+                fontSize: 'var(--font-size-2xl)', 
+                fontWeight: 700, 
+                color: 'var(--primary-600)' 
+              }}>
+                ₹{total.toFixed(2)}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-3)' }}>
+              <div>
+                <label className="label">Customer Name *</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Enter customer name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="label">Phone Number *</label>
+                <input
+                  type="tel"
+                  className="input"
+                  placeholder="Enter phone number"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="label">Email (Optional)</label>
+                <input
+                  type="email"
+                  className="input"
+                  placeholder="Enter email address"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="modal-footer" style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
+            <button className="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button 
+              className="btn btn-primary" 
+              style={{ flex: 1 }}
+              onClick={handleProceedToPayment}
+              disabled={!customerName.trim() || !customerPhone.trim()}
+            >
+              Proceed to Payment
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Payment Step
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">Payment</h3>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>
+          <button className="btn btn-ghost btn-icon" onClick={() => setStep('customer')}>
             <X size={20} />
           </button>
         </div>
@@ -411,9 +508,12 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
             padding: 'var(--spacing-4)',
             background: 'var(--gray-50)',
             borderRadius: 'var(--radius-lg)',
-            marginBottom: 'var(--spacing-6)',
+            marginBottom: 'var(--spacing-4)',
           }}>
-            <div style={{ color: 'var(--gray-500)', fontSize: 'var(--font-size-sm)' }}>
+            <div style={{ color: 'var(--gray-600)', fontSize: 'var(--font-size-sm)' }}>
+              {customerName} • {customerPhone}
+            </div>
+            <div style={{ color: 'var(--gray-500)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-1)' }}>
               Total Amount
             </div>
             <div style={{ 
