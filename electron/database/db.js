@@ -637,20 +637,36 @@ class Database {
 
   // ===== Reports =====
   getDailyReport(date) {
-    const sales = this.execute(`SELECT * FROM daily_sales WHERE date = ?`, [date]);
+    // Calculate sales directly from orders table for accuracy
+    const sales = this.execute(`
+      SELECT 
+        ? as date,
+        COUNT(*) as total_orders,
+        COALESCE(SUM(total_amount), 0) as total_revenue,
+        COALESCE(SUM(tax_amount), 0) as total_tax,
+        COALESCE(SUM(discount_amount), 0) as total_discount,
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END), 0) as cash_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total_amount ELSE 0 END), 0) as card_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' THEN total_amount ELSE 0 END), 0) as upi_amount
+      FROM orders 
+      WHERE DATE(created_at) = ? 
+        AND status = 'completed'
+        AND is_deleted = 0
+    `, [date, date]);
+    
     const orders = this.execute(`SELECT * FROM orders WHERE DATE(created_at) = ? AND is_deleted = 0 ORDER BY created_at DESC`, [date]);
     const topItems = this.execute(`
       SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
-      WHERE DATE(o.created_at) = ? AND o.status = 'completed' AND o.is_deleted = 0
+      WHERE DATE(o.created_at) = ? AND o.status = 'completed' AND o.is_deleted = 0 AND oi.is_deleted = 0
       GROUP BY oi.item_name
       ORDER BY total_quantity DESC
       LIMIT 10
     `, [date]);
 
     return {
-      sales: sales[0] || null,
+      sales: sales[0] || { total_orders: 0, total_revenue: 0, cash_amount: 0, card_amount: 0, upi_amount: 0 },
       orders,
       topItems,
     };
