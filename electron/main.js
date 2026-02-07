@@ -309,6 +309,33 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('order:getHeld', async () => {
+    try {
+      return db.getHeldOrders();
+    } catch (error) {
+      log.error('Get held orders error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('order:resume', async (event, { id }) => {
+    try {
+      return db.resumeHeldOrder(id);
+    } catch (error) {
+      log.error('Resume order error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('order:getByPhone', async (event, { phone }) => {
+    try {
+      return db.getOrdersByPhone(phone);
+    } catch (error) {
+      log.error('Get orders by phone error:', error);
+      return [];
+    }
+  });
+
   ipcMain.handle('order:delete', async (event, { id }) => {
     try {
       // First get the order details to subtract from daily_sales

@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS menu_items (
     image_path TEXT,
     preparation_time INTEGER,
     display_order INTEGER DEFAULT 0,
+    variants TEXT, -- JSON array of {name, price}
+    addons TEXT, -- JSON array of {name, price, type}
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
     synced_at TEXT,
@@ -91,7 +93,8 @@ CREATE TABLE IF NOT EXISTS orders (
     total_amount REAL NOT NULL,
     payment_method TEXT CHECK(payment_method IN ('cash', 'card', 'upi', 'mixed')),
     payment_status TEXT CHECK(payment_status IN ('pending', 'partial', 'completed')) DEFAULT 'pending',
-    status TEXT CHECK(status IN ('active', 'completed', 'cancelled')) DEFAULT 'active',
+    status TEXT CHECK(status IN ('active', 'completed', 'cancelled', 'held')) DEFAULT 'active',
+    is_hold INTEGER DEFAULT 0, -- 1 for held orders
     notes TEXT,
     cashier_id TEXT REFERENCES users(id),
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -110,6 +113,8 @@ CREATE TABLE IF NOT EXISTS order_items (
     quantity INTEGER NOT NULL,
     unit_price REAL NOT NULL,
     item_total REAL NOT NULL,
+    variant TEXT, -- JSON {name, price}
+    addons TEXT, -- JSON array of {name, price}
     special_instructions TEXT,
     kot_status TEXT CHECK(kot_status IN ('pending', 'preparing', 'ready', 'served')) DEFAULT 'pending',
     kot_printed_at TEXT,

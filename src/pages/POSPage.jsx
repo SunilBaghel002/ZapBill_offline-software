@@ -14,7 +14,10 @@ import {
   Check,
   Search,
   Leaf,
-  FileText
+  FileText,
+  PauseCircle,
+  PlayCircle,
+  Clock
 } from 'lucide-react';
 
 const POSPage = () => {
@@ -24,6 +27,12 @@ const POSPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPayment, setShowPayment] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // New States for Add-ons and Hold Order
+  const [showAddonModal, setShowAddonModal] = useState(false);
+  const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
+  const [showHeldOrders, setShowHeldOrders] = useState(false);
+  const [heldOrders, setHeldOrders] = useState([]);
 
   const { user } = useAuthStore();
   const cart = useCartStore();
@@ -31,6 +40,7 @@ const POSPage = () => {
   // Load categories and menu items
   useEffect(() => {
     loadData();
+    loadHeldOrders();
   }, []);
 
   const loadData = async () => {
@@ -51,7 +61,16 @@ const POSPage = () => {
     }
   };
 
-  // Filter menu items by category and search
+  const loadHeldOrders = async () => {
+    try {
+      const orders = await window.electronAPI.invoke('order:getHeld');
+      setHeldOrders(Array.isArray(orders) ? orders : []);
+    } catch (error) {
+      console.error('Failed to load held orders:', error);
+      setHeldOrders([]);
+    }
+  };
+
   const filteredItems = menuItems.filter(item => {
     const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
     const matchesSearch = !searchQuery || 
@@ -60,12 +79,62 @@ const POSPage = () => {
   });
 
   const handleAddToCart = (item) => {
-    cart.addItem(item);
+    // Parse variants/addons if they are strings
+    const variants = item.variants ? (typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants) : [];
+    const addons = item.addons ? (typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons) : [];
+
+    if (variants.length > 0 || addons.length > 0) {
+      setSelectedItemForAddon({ ...item, parsedVariants: variants, parsedAddons: addons });
+      setShowAddonModal(true);
+    } else {
+      cart.addItem(item);
+    }
   };
 
   const handleCheckout = () => {
     if (cart.items.length > 0) {
       setShowPayment(true);
+    }
+  };
+
+  const handleHoldOrder = async () => {
+    if (cart.items.length === 0) return;
+    
+    if (window.confirm('Hold this order and clear cart?')) {
+      try {
+        const result = await cart.holdOrder(user.id);
+        if (result.success) {
+          loadHeldOrders(); // Refresh held orders list
+          // Cart is already cleared by holdOrder
+        } else {
+          alert('Failed to hold order: ' + result.error);
+        }
+      } catch (error) {
+        console.error('Hold order error:', error);
+        alert('Error holding order');
+      }
+    }
+  };
+
+  const handleResumeOrder = async (order) => {
+    if (cart.items.length > 0) {
+      if (!window.confirm('Current cart will be cleared. Continue?')) {
+        return;
+      }
+    }
+    
+    try {
+      // Resume order (populates cart)
+      cart.resumeOrder(order);
+      
+      // Mark the held order as deleted so it doesn't appear in held list
+      await window.electronAPI.invoke('order:resume', { id: order.id });
+      
+      setShowHeldOrders(false);
+      loadHeldOrders();
+    } catch (error) {
+      console.error('Resume order error:', error);
+      alert('Error resuming order');
     }
   };
 
@@ -175,9 +244,24 @@ const POSPage = () => {
               <ShoppingCart size={20} />
               <span style={{ fontWeight: 600 }}>Current Order</span>
             </div>
-            <span className="badge" style={{ background: 'rgba(255,255,255,0.2)' }}>
-              {cart.getItemCount()} items
-            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                className="btn btn-sm btn-ghost" 
+                onClick={() => setShowHeldOrders(true)} 
+                title="View Held Orders"
+                style={{ position: 'relative' }}
+              >
+                <Clock size={18} />
+                {heldOrders.length > 0 && (
+                  <span className="badge badge-error" style={{ position: 'absolute', top: -5, right: -5, padding: '2px 5px', fontSize: '10px' }}>
+                    {heldOrders.length}
+                  </span>
+                )}
+              </button>
+              <span className="badge" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                {cart.getItemCount()} items
+              </span>
+            </div>
           </div>
 
           {/* Order Type Selection */}
@@ -222,6 +306,28 @@ const POSPage = () => {
               style={{ marginTop: 'var(--spacing-2)' }}
             />
           )}
+
+          {/* Customer Name input for Takeaway/Delivery for better Hold Order tracking */}
+          {(cart.orderType === 'takeaway' || cart.orderType === 'delivery') && (
+             <input
+              type="text"
+              className="input"
+              placeholder="Customer Name"
+              value={cart.customerName}
+              onChange={(e) => cart.setCustomerName(e.target.value)}
+              style={{ marginTop: 'var(--spacing-2)' }}
+            />
+          )}
+          
+          {/* Order Notes / Special Comments */}
+          <textarea
+            className="input"
+            placeholder="Order notes (e.g., Special delivery instructions, allergies...)"
+            value={cart.notes}
+            onChange={(e) => cart.setNotes(e.target.value)}
+            rows={2}
+            style={{ marginTop: 'var(--spacing-2)', resize: 'none' }}
+          />
         </div>
 
         {/* Cart Items */}
@@ -230,7 +336,20 @@ const POSPage = () => {
             cart.items.map(item => (
               <div key={item.id} className="cart-item">
                 <div className="cart-item-info">
-                  <div className="cart-item-name">{item.name}</div>
+                  <div className="cart-item-name">
+                    {item.name}
+                    {item.variant && <span className="text-xs text-muted"> ({item.variant.name})</span>}
+                  </div>
+                  {item.addons && item.addons.length > 0 && (
+                     <div className="text-xs text-muted" style={{ lineHeight: 1.2 }}>
+                       + {item.addons.map(a => a.name).join(', ')}
+                     </div>
+                  )}
+                  {item.specialInstructions && (
+                    <div className="text-xs text-muted" style={{ fontStyle: 'italic' }}>
+                      Note: {item.specialInstructions}
+                    </div>
+                  )}
                   <div className="cart-item-price">₹{item.unitPrice.toFixed(2)} each</div>
                 </div>
                 <div className="quantity-controls">
@@ -300,25 +419,62 @@ const POSPage = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
-              <button 
-                className="btn btn-secondary"
-                onClick={() => cart.clearCart()}
-              >
-                Clear
-              </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--spacing-2)' }}>
+               {/* Hold / Clear Buttons */}
+               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => cart.clearCart()}
+                  >
+                    Clear
+                  </button>
+                  <button 
+                    className="btn btn-warning"
+                    onClick={handleHoldOrder}
+                    style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d' }}
+                  >
+                    <PauseCircle size={16} /> Hold
+                  </button>
+               </div>
+               
+               {/* Pay Button */}
               <button 
                 className="btn btn-success btn-lg"
-                style={{ flex: 1 }}
+                style={{ height: '100%', flexDirection: 'column', gap: '4px' }}
                 onClick={handleCheckout}
               >
-                <CreditCard size={18} />
-                Pay ₹{cart.getTotal().toFixed(2)}
+                <CreditCard size={24} />
+                <span style={{ fontSize: '1.2em', fontWeight: 700 }}>PAY ₹{cart.getTotal().toFixed(2)}</span>
               </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Add-on Selection Modal */}
+      {showAddonModal && selectedItemForAddon && (
+        <AddonSelectionModal
+          item={selectedItemForAddon}
+          onClose={() => {
+            setShowAddonModal(false);
+            setSelectedItemForAddon(null);
+          }}
+          onAddToCart={(item, quantity, notes, variant, addons) => {
+            cart.addItem(item, quantity, notes, variant, addons);
+            setShowAddonModal(false);
+            setSelectedItemForAddon(null);
+          }}
+        />
+      )}
+
+      {/* Held Orders Modal */}
+      {showHeldOrders && (
+        <HeldOrdersModal
+          orders={heldOrders}
+          onClose={() => setShowHeldOrders(false)}
+          onResume={handleResumeOrder}
+        />
+      )}
 
       {/* Payment Modal */}
       {showPayment && (
@@ -335,6 +491,204 @@ const POSPage = () => {
     </div>
   );
 };
+
+// Addon Selection Modal Component
+const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
+  const [quantity, setQuantity] = useState(1);
+  const [selectedVariant, setSelectedVariant] = useState(item.parsedVariants.length > 0 ? item.parsedVariants[0] : null);
+  const [selectedAddons, setSelectedAddons] = useState([]);
+  const [notes, setNotes] = useState('');
+
+  const calculateTotal = () => {
+    let total = selectedVariant ? parseFloat(selectedVariant.price) : item.price;
+    selectedAddons.forEach(addon => {
+      total += parseFloat(addon.price);
+    });
+    return total * quantity;
+  };
+
+  const toggleAddon = (addon) => {
+    if (selectedAddons.some(a => a.name === addon.name)) {
+      setSelectedAddons(selectedAddons.filter(a => a.name !== addon.name));
+    } else {
+      setSelectedAddons([...selectedAddons, addon]);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: '500px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h3 className="modal-title">{item.name}</h3>
+            <p className="text-muted text-sm">{item.description}</p>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
+          {/* Variants */}
+          {item.parsedVariants.length > 0 && (
+            <div className="mb-4">
+              <h4 className="font-medium mb-2">Size / Variant</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {item.parsedVariants.map((variant, idx) => (
+                  <label key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '8px', border: selectedVariant === variant ? '2px solid var(--primary-500)' : '1px solid var(--gray-200)', cursor: 'pointer', background: selectedVariant === variant ? 'var(--primary-50)' : 'white' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input 
+                        type="radio" 
+                        name="variant" 
+                        checked={selectedVariant === variant}
+                        onChange={() => setSelectedVariant(variant)}
+                      />
+                      <span className="font-medium">{variant.name}</span>
+                    </div>
+                    <span className="font-semibold">₹{parseFloat(variant.price).toFixed(2)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Add-ons */}
+          {item.parsedAddons.length > 0 && (
+            <div className="mb-4">
+              <h4 className="font-medium mb-2">Add-ons</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {item.parsedAddons.map((addon, idx) => {
+                  const isSelected = selectedAddons.some(a => a.name === addon.name);
+                  return (
+                    <label key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '8px', border: isSelected ? '2px solid var(--primary-500)' : '1px solid var(--gray-200)', cursor: 'pointer', background: isSelected ? 'var(--primary-50)' : 'white' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected}
+                          onChange={() => toggleAddon(addon)}
+                        />
+                         <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span className="font-medium">{addon.name}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                               {addon.type === 'veg' ? <div className="w-2 h-2 rounded-full bg-green-500"></div> : <div className="w-2 h-2 rounded-full bg-red-500"></div>}
+                               <span className="text-gray-500">{addon.type === 'veg' ? 'Veg' : 'Non-Veg'}</span>
+                            </div>
+                         </div>
+                      </div>
+                      <span className="font-semibold">+₹{parseFloat(addon.price).toFixed(2)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Special Instructions */}
+          <div className="mb-4">
+            <h4 className="font-medium mb-2">Special Notes</h4>
+            <textarea
+              className="input"
+              rows={3}
+              placeholder="e.g. Less spicy, Extra sauce..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
+          {/* Quantity */}
+           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', margin: '16px 0' }}>
+              <button 
+                className="btn btn-secondary btn-icon"
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              >
+                <Minus size={20} />
+              </button>
+              <span style={{ fontSize: '1.5em', fontWeight: 600, width: '40px', textAlign: 'center' }}>
+                {quantity}
+              </span>
+              <button 
+                className="btn btn-secondary btn-icon"
+                onClick={() => setQuantity(quantity + 1)}
+              >
+                <Plus size={20} />
+              </button>
+           </div>
+        </div>
+
+        <div className="modal-footer">
+           <button 
+            className="btn btn-primary btn-lg w-full" 
+            style={{ justifyContent: 'space-between' }}
+            onClick={() => onAddToCart(item, quantity, notes, selectedVariant, selectedAddons)}
+           >
+             <span>Add {quantity} to Order</span>
+             <span>₹{calculateTotal().toFixed(2)}</span>
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Held Orders Modal
+const HeldOrdersModal = ({ orders, onClose, onResume }) => {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+           <h3 className="modal-title">Held Orders</h3>
+           <button className="btn btn-ghost btn-icon" onClick={onClose}>
+             <X size={20} />
+           </button>
+        </div>
+        
+        <div className="modal-body" style={{ overflowY: 'auto' }}>
+           {orders.length === 0 ? (
+             <div className="empty-state">
+                <Clock size={48} className="text-gray-300" />
+                <p>No held orders found</p>
+             </div>
+           ) : (
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {orders.map(order => (
+                   <div key={order.id} style={{ border: '1px solid var(--gray-200)', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white' }}>
+                      <div>
+                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+                            <span className="badge badge-warning">#{order.order_number}</span>
+                            <span className="font-bold">{order.order_type.toUpperCase()}</span>
+                            {order.table_number && <span className="text-gray-600">Table: {order.table_number}</span>}
+                         </div>
+                         <div className="text-sm text-gray-500">
+                            {new Date(order.created_at).toLocaleString()}
+                         </div>
+                         {order.customer_name && (
+                            <div className="font-medium mt-1">Customer: {order.customer_name}</div>
+                         )}
+                         <div className="text-sm text-gray-400 mt-1">
+                            {order.items ? order.items.length : 0} items
+                         </div>
+                      </div>
+                      
+                      <div style={{ textAlign: 'right' }}>
+                         <div className="text-xl font-bold text-primary-600 mb-2">₹{order.total_amount.toFixed(2)}</div>
+                         <button 
+                           className="btn btn-primary"
+                           onClick={() => onResume(order)}
+                         >
+                            <PlayCircle size={16} /> Resume
+                         </button>
+                      </div>
+                   </div>
+                ))}
+             </div>
+           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 
 // Bill Preview Modal Component
 const BillPreviewModal = ({ order, onClose, onPrint }) => {
@@ -516,7 +870,7 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
 
 // Payment Modal Component with Customer Info Step
 const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
-  const [step, setStep] = useState('customer'); // 'customer' or 'payment'
+  const [step, setStep] = useState('customer'); // 'customer', 'payment', or 'cash'
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -527,14 +881,66 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
   const [orderId, setOrderId] = useState(null);
   const [showBillPreview, setShowBillPreview] = useState(false);
   const [viewingOrder, setViewingOrder] = useState(null);
+  
+  // Change calculator state
+  const [amountReceived, setAmountReceived] = useState('');
+  const [changeToReturn, setChangeToReturn] = useState(0);
+  
+  // Customer history state
+  const [customerHistory, setCustomerHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const cart = useCartStore();
+
+  // Lookup customer history when phone number changes
+  const lookupCustomerHistory = async (phone) => {
+    if (!phone || phone.length < 10) {
+      setCustomerHistory([]);
+      return;
+    }
+    
+    setLoadingHistory(true);
+    try {
+      const orders = await window.electronAPI.invoke('order:getByPhone', { phone });
+      setCustomerHistory(orders || []);
+    } catch (error) {
+      console.error('Failed to load customer history:', error);
+      setCustomerHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // Calculate change when amount received changes
+  const handleAmountChange = (value) => {
+    setAmountReceived(value);
+    const received = parseFloat(value) || 0;
+    const change = received - total;
+    setChangeToReturn(change >= 0 ? change : 0);
+  };
 
   const handleProceedToPayment = () => {
     // Update cart with customer info
     cart.setCustomerName(customerName);
     cart.setCustomerPhone(customerPhone);
     setStep('payment');
+  };
+  
+  const handleCashPayment = () => {
+    setPaymentMethod('cash');
+    setAmountReceived('');
+    setChangeToReturn(0);
+    setStep('cash');
+  };
+  
+  const handleConfirmCashPayment = () => {
+    const received = parseFloat(amountReceived) || 0;
+    if (received < total) {
+      alert('Insufficient amount received');
+      return;
+    }
+    handlePayment('cash');
   };
 
   const handlePayment = async (method) => {
@@ -717,6 +1123,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
                   placeholder="Enter phone number"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
+                  onBlur={(e) => lookupCustomerHistory(e.target.value)}
                 />
               </div>
               <div>
@@ -729,6 +1136,30 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
                   onChange={(e) => setCustomerEmail(e.target.value)}
                 />
               </div>
+
+              {/* Customer History */}
+              {customerHistory.length > 0 && (
+                <div style={{
+                  padding: 'var(--spacing-3)',
+                  background: 'var(--primary-50)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--primary-200)'
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    marginBottom: 'var(--spacing-2)'
+                  }}>
+                    <span style={{ fontWeight: 600, color: 'var(--primary-700)' }}>
+                      Returning Customer! ({customerHistory.length} orders)
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--gray-600)' }}>
+                    Last order: #{customerHistory[0].order_number} - ₹{customerHistory[0].total_amount.toFixed(2)} ({new Date(customerHistory[0].created_at).toLocaleDateString()})
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -751,6 +1182,112 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
   }
 
   // Payment Step
+  if (step === 'cash') {
+    return (
+      <div className="modal-overlay" onClick={() => setStep('payment')}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3 className="modal-title">Cash Payment</h3>
+            <button className="btn btn-ghost btn-icon" onClick={() => setStep('payment')}>
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="modal-body">
+            <div style={{
+              textAlign: 'center',
+              padding: 'var(--spacing-4)',
+              background: 'var(--gray-50)',
+              borderRadius: 'var(--radius-lg)',
+              marginBottom: 'var(--spacing-4)',
+            }}>
+              <div style={{ color: 'var(--gray-500)', fontSize: 'var(--font-size-sm)' }}>
+                Total Amount Due
+              </div>
+              <div style={{ 
+                fontSize: 'var(--font-size-4xl)', 
+                fontWeight: 700, 
+                color: 'var(--primary-600)' 
+              }}>
+                ₹{total.toFixed(2)}
+              </div>
+            </div>
+
+            {/* Amount Received Input */}
+            <div style={{ marginBottom: 'var(--spacing-4)' }}>
+              <label className="label">Amount Received</label>
+              <input
+                type="number"
+                className="input"
+                placeholder="Enter amount received"
+                value={amountReceived}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                style={{ fontSize: 'var(--font-size-xl)', textAlign: 'center', fontWeight: 600 }}
+                autoFocus
+              />
+            </div>
+
+            {/* Quick Amount Buttons */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(4, 1fr)', 
+              gap: 'var(--spacing-2)',
+              marginBottom: 'var(--spacing-4)'
+            }}>
+              {[Math.ceil(total / 10) * 10, Math.ceil(total / 50) * 50, Math.ceil(total / 100) * 100, Math.ceil(total / 500) * 500].map((amount) => (
+                <button
+                  key={amount}
+                  className="btn btn-secondary"
+                  onClick={() => handleAmountChange(amount.toString())}
+                  style={{ padding: 'var(--spacing-2)' }}
+                >
+                  ₹{amount}
+                </button>
+              ))}
+            </div>
+
+            {/* Change to Return */}
+            {parseFloat(amountReceived) >= total && (
+              <div style={{
+                textAlign: 'center',
+                padding: 'var(--spacing-4)',
+                background: 'var(--success-50)',
+                borderRadius: 'var(--radius-lg)',
+                border: '2px solid var(--success-200)',
+              }}>
+                <div style={{ color: 'var(--success-700)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--spacing-1)' }}>
+                  Change to Return
+                </div>
+                <div style={{ 
+                  fontSize: 'var(--font-size-3xl)', 
+                  fontWeight: 700, 
+                  color: 'var(--success-600)' 
+                }}>
+                  ₹{changeToReturn.toFixed(2)}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="modal-footer" style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
+            <button className="btn btn-secondary" onClick={() => setStep('payment')}>
+              Back
+            </button>
+            <button 
+              className="btn btn-success" 
+              style={{ flex: 1 }}
+              onClick={handleConfirmCashPayment}
+              disabled={isProcessing || !amountReceived || parseFloat(amountReceived) < total}
+            >
+              {isProcessing ? 'Processing...' : `Confirm Payment`}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Payment Method Selection Step
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -802,7 +1339,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
                 justifyContent: 'flex-start',
                 padding: 'var(--spacing-4)',
               }}
-              onClick={() => handlePayment('cash')}
+              onClick={handleCashPayment}
               disabled={isProcessing}
             >
               <Banknote size={24} />

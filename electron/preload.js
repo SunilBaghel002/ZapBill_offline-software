@@ -25,6 +25,9 @@ const validInvokeChannels = [
   'order:complete',
   'order:cancel',
   'order:delete',
+  'order:getHeld',
+  'order:resume',
+  'order:getByPhone',
   // KOT
   'kot:getPending',
   'kot:updateStatus',

@@ -284,8 +284,11 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
     is_vegetarian: item?.is_vegetarian || false,
     is_available: item?.is_available ?? true,
     preparation_time: item?.preparation_time || '',
+    variants: item?.variants ? (typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants) : [],
+    addons: item?.addons ? (typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons) : [],
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('basic'); // basic, variants, addons
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -316,9 +319,49 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
     }
   };
 
+  const addVariant = () => {
+    setFormData({
+      ...formData,
+      variants: [...formData.variants, { name: '', price: '' }]
+    });
+  };
+
+  const updateVariant = (index, field, value) => {
+    const newVariants = [...formData.variants];
+    newVariants[index][field] = value;
+    setFormData({ ...formData, variants: newVariants });
+  };
+
+  const removeVariant = (index) => {
+    setFormData({
+      ...formData,
+      variants: formData.variants.filter((_, i) => i !== index)
+    });
+  };
+
+  const addAddon = () => {
+    setFormData({
+      ...formData,
+      addons: [...formData.addons, { name: '', price: '', type: 'veg' }] // type: veg/non-veg
+    });
+  };
+
+  const updateAddon = (index, field, value) => {
+    const newAddons = [...formData.addons];
+    newAddons[index][field] = value;
+    setFormData({ ...formData, addons: newAddons });
+  };
+
+  const removeAddon = (index) => {
+    setFormData({
+      ...formData,
+      addons: formData.addons.filter((_, i) => i !== index)
+    });
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: '600px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">{item ? 'Edit Item' : 'Add New Item'}</h3>
           <button className="btn btn-ghost btn-icon" onClick={onClose}>
@@ -326,169 +369,285 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            <div className="input-group mb-4">
-              <label className="input-label">Name *</label>
-              <input
-                type="text"
-                className="input"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
-            </div>
+        <div style={{ padding: '0 var(--spacing-4)', borderBottom: '1px solid var(--gray-200)', display: 'flex', gap: 'var(--spacing-4)' }}>
+          <button 
+            className={`tab-btn ${activeTab === 'basic' ? 'active' : ''}`}
+            onClick={() => setActiveTab('basic')}
+            style={{ padding: '12px 0', borderBottom: activeTab === 'basic' ? '2px solid var(--primary-500)' : 'none', color: activeTab === 'basic' ? 'var(--primary-600)' : 'var(--gray-500)', fontWeight: 500 }}
+          >
+            Basic Info
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'variants' ? 'active' : ''}`}
+            onClick={() => setActiveTab('variants')}
+            style={{ padding: '12px 0', borderBottom: activeTab === 'variants' ? '2px solid var(--primary-500)' : 'none', color: activeTab === 'variants' ? 'var(--primary-600)' : 'var(--gray-500)', fontWeight: 500 }}
+          >
+            Variants ({formData.variants.length})
+          </button>
+          <button 
+            className={`tab-btn ${activeTab === 'addons' ? 'active' : ''}`}
+            onClick={() => setActiveTab('addons')}
+            style={{ padding: '12px 0', borderBottom: activeTab === 'addons' ? '2px solid var(--primary-500)' : 'none', color: activeTab === 'addons' ? 'var(--primary-600)' : 'var(--gray-500)', fontWeight: 500 }}
+          >
+            Add-ons ({formData.addons.length})
+          </button>
+        </div>
 
-            <div className="input-group mb-4">
-              <label className="input-label">Description</label>
-              <textarea
-                className="input"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-              />
-            </div>
+        <form onSubmit={handleSubmit} style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div className="modal-body" style={{ flex: 1, overflowY: 'auto' }}>
+            
+            {activeTab === 'basic' && (
+              <>
+                <div className="input-group mb-4">
+                  <label className="input-label">Name *</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
 
-            <div className="input-group mb-4">
-              <label className="input-label">Category *</label>
-              <select
-                className="input select"
-                value={formData.category_id}
-                onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
-                required
-              >
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-            </div>
+                <div className="input-group mb-4">
+                  <label className="input-label">Description</label>
+                  <textarea
+                    className="input"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={2}
+                  />
+                </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-              <div className="input-group mb-4">
-                <label className="input-label">Price *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  required
-                />
-              </div>
+                <div className="input-group mb-4">
+                  <label className="input-label">Category *</label>
+                  <select
+                    className="input select"
+                    value={formData.category_id}
+                    onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
+                    required
+                  >
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
 
-              <div className="input-group mb-4">
-                <label className="input-label">Cost Price</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input"
-                  value={formData.cost_price}
-                  onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-              <div className="input-group mb-4">
-                <label className="input-label">Tax Rate (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input"
-                  value={formData.tax_rate}
-                  onChange={(e) => setFormData({ ...formData, tax_rate: e.target.value })}
-                />
-              </div>
-
-              <div className="input-group mb-4">
-                <label className="input-label">Prep Time (min)</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={formData.preparation_time}
-                  onChange={(e) => setFormData({ ...formData, preparation_time: e.target.value })}
-                />
-              </div>
-            </div>
-
-            {/* Veg/Non-Veg Toggle */}
-            <div className="input-group mb-4">
-              <label className="input-label">Item Type</label>
-              <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, is_vegetarian: true })}
-                  style={{
-                    flex: 1,
-                    padding: 'var(--spacing-3)',
-                    border: `2px solid ${formData.is_vegetarian ? '#22c55e' : 'var(--gray-300)'}`,
-                    borderRadius: 'var(--radius-md)',
-                    background: formData.is_vegetarian ? '#dcfce7' : 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 'var(--spacing-2)'
-                  }}
-                >
-                  <div style={{
-                    width: '16px',
-                    height: '16px',
-                    border: '2px solid #22c55e',
-                    borderRadius: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
+                  <div className="input-group mb-4">
+                    <label className="input-label">Price *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input"
+                      value={formData.price}
+                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      required
+                    />
                   </div>
-                  <span style={{ fontWeight: formData.is_vegetarian ? 600 : 400, color: '#166534' }}>Veg</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, is_vegetarian: false })}
-                  style={{
-                    flex: 1,
-                    padding: 'var(--spacing-3)',
-                    border: `2px solid ${!formData.is_vegetarian ? '#ef4444' : 'var(--gray-300)'}`,
-                    borderRadius: 'var(--radius-md)',
-                    background: !formData.is_vegetarian ? '#fef2f2' : 'white',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 'var(--spacing-2)'
-                  }}
-                >
-                  <div style={{
-                    width: '16px',
-                    height: '16px',
-                    border: '2px solid #ef4444',
-                    borderRadius: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
-                  </div>
-                  <span style={{ fontWeight: !formData.is_vegetarian ? 600 : 400, color: '#991b1b' }}>Non-Veg</span>
-                </button>
-              </div>
-            </div>
 
-            <div style={{ marginTop: 'var(--spacing-2)' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={formData.is_available}
-                  onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
-                />
-                <span>Available for sale</span>
-              </label>
-            </div>
+                  <div className="input-group mb-4">
+                    <label className="input-label">Cost Price</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input"
+                      value={formData.cost_price}
+                      onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
+                  <div className="input-group mb-4">
+                    <label className="input-label">Tax Rate (%)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input"
+                      value={formData.tax_rate}
+                      onChange={(e) => setFormData({ ...formData, tax_rate: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="input-group mb-4">
+                    <label className="input-label">Prep Time (min)</label>
+                    <input
+                      type="number"
+                      className="input"
+                      value={formData.preparation_time}
+                      onChange={(e) => setFormData({ ...formData, preparation_time: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* Veg/Non-Veg Toggle */}
+                <div className="input-group mb-4">
+                  <label className="input-label">Item Type</label>
+                  <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, is_vegetarian: true })}
+                      style={{
+                        flex: 1,
+                        padding: 'var(--spacing-3)',
+                        border: `2px solid ${formData.is_vegetarian ? '#22c55e' : 'var(--gray-300)'}`,
+                        borderRadius: 'var(--radius-md)',
+                        background: formData.is_vegetarian ? '#dcfce7' : 'white',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 'var(--spacing-2)'
+                      }}
+                    >
+                      <Leaf size={16} fill="#22c55e" stroke="#166534" />
+                      <span style={{ fontWeight: formData.is_vegetarian ? 600 : 400, color: '#166534' }}>Veg</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, is_vegetarian: false })}
+                      style={{
+                        flex: 1,
+                        padding: 'var(--spacing-3)',
+                        border: `2px solid ${!formData.is_vegetarian ? '#ef4444' : 'var(--gray-300)'}`,
+                        borderRadius: 'var(--radius-md)',
+                        background: !formData.is_vegetarian ? '#fef2f2' : 'white',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 'var(--spacing-2)'
+                      }}
+                    >
+                      <div style={{ width: '16px', height: '16px', border: '2px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+                      </div>
+                      <span style={{ fontWeight: !formData.is_vegetarian ? 600 : 400, color: '#991b1b' }}>Non-Veg</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 'var(--spacing-2)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={formData.is_available}
+                      onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
+                    />
+                    <span>Available for sale</span>
+                  </label>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'variants' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <p className="text-muted text-sm">Add variations like sizes (Small, Medium, Large)</p>
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={addVariant}>
+                    <Plus size={14} /> Add Variant
+                  </button>
+                </div>
+                
+                {formData.variants.length === 0 ? (
+                  <div className="text-center p-4 bg-gray-50 rounded text-muted text-sm">
+                    No variants added yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {formData.variants.map((variant, index) => (
+                      <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="Variant Name"
+                          className="input btn-sm"
+                          style={{ flex: 1 }}
+                          value={variant.name}
+                          onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Price"
+                          className="input btn-sm"
+                          style={{ width: '80px' }}
+                          value={variant.price}
+                          onChange={(e) => updateVariant(index, 'price', e.target.value)}
+                        />
+                        <button 
+                          type="button" 
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => removeVariant(index)}
+                          style={{ color: 'var(--error-500)' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'addons' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <p className="text-muted text-sm">Add optional extra toppings or add-ons</p>
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={addAddon}>
+                    <Plus size={14} /> Add Add-on
+                  </button>
+                </div>
+
+                {formData.addons.length === 0 ? (
+                   <div className="text-center p-4 bg-gray-50 rounded text-muted text-sm">
+                    No add-ons added yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {formData.addons.map((addon, index) => (
+                      <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="Add-on Name"
+                          className="input btn-sm"
+                          style={{ flex: 2 }}
+                          value={addon.name}
+                          onChange={(e) => updateAddon(index, 'name', e.target.value)}
+                        />
+                        <input
+                          type="number"
+                          placeholder="Price"
+                          className="input btn-sm"
+                          style={{ width: '80px' }}
+                          value={addon.price}
+                          onChange={(e) => updateAddon(index, 'price', e.target.value)}
+                        />
+                        <select
+                          className="input select btn-sm"
+                          style={{ width: '100px' }}
+                          value={addon.type}
+                          onChange={(e) => updateAddon(index, 'type', e.target.value)}
+                        >
+                          <option value="veg">Veg</option>
+                          <option value="non-veg">Non-Veg</option>
+                        </select>
+                        <button 
+                          type="button" 
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => removeAddon(index)}
+                          style={{ color: 'var(--error-500)' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="modal-footer">
+          <div className="modal-footer" style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '16px' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>

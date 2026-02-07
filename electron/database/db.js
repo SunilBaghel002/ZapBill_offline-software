@@ -66,10 +66,173 @@ class Database {
       // Add is_deleted to order_items if missing
       this.db.run("ALTER TABLE order_items ADD COLUMN is_deleted INTEGER DEFAULT 0");
     } catch (error) {
-      // Column likely already exists, ignore error
-      if (!error.message.includes("duplicate column name")) {
-        console.log('Migration note:', error.message);
+      if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message);
+    }
+
+    try {
+      // Add variants/addons to menu_items
+      this.db.run("ALTER TABLE menu_items ADD COLUMN variants TEXT");
+    } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    try {
+      this.db.run("ALTER TABLE menu_items ADD COLUMN addons TEXT");
+    } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    try {
+      // Add is_hold to orders
+      this.db.run("ALTER TABLE orders ADD COLUMN is_hold INTEGER DEFAULT 0");
+    } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    try {
+      // Add variant/addons to order_items
+      this.db.run("ALTER TABLE order_items ADD COLUMN variant TEXT");
+    } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    try {
+      this.db.run("ALTER TABLE order_items ADD COLUMN addons TEXT");
+    } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    // Migrate orders table to support 'held' status in CHECK constraint
+    this.migrateOrdersTableForHeldStatus();
+
+    // Seed sample products with variants
+    this.seedSampleProducts();
+  }
+
+  migrateOrdersTableForHeldStatus() {
+    try {
+      // Check if migration is needed by trying to insert a held status
+      const testResult = this.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'");
+      if (testResult.length > 0 && testResult[0].sql && !testResult[0].sql.includes("'held'")) {
+        console.log('Migrating orders table to support held status...');
+        
+        // Backup existing orders
+        this.db.run(`CREATE TABLE IF NOT EXISTS orders_backup AS SELECT * FROM orders`);
+        
+        // Drop old table
+        this.db.run(`DROP TABLE orders`);
+        
+        // Create new orders table with updated CHECK constraint
+        this.db.run(`
+          CREATE TABLE orders (
+            id TEXT PRIMARY KEY,
+            order_number INTEGER NOT NULL,
+            order_type TEXT CHECK(order_type IN ('dine_in', 'takeaway', 'delivery')) DEFAULT 'dine_in',
+            table_number TEXT,
+            customer_name TEXT,
+            customer_phone TEXT,
+            subtotal REAL NOT NULL,
+            tax_amount REAL DEFAULT 0,
+            discount_amount REAL DEFAULT 0,
+            discount_reason TEXT,
+            total_amount REAL NOT NULL,
+            payment_method TEXT CHECK(payment_method IN ('cash', 'card', 'upi', 'mixed')),
+            payment_status TEXT CHECK(payment_status IN ('pending', 'partial', 'completed')) DEFAULT 'pending',
+            status TEXT CHECK(status IN ('active', 'completed', 'cancelled', 'held')) DEFAULT 'active',
+            is_hold INTEGER DEFAULT 0,
+            notes TEXT,
+            cashier_id TEXT REFERENCES users(id),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            synced_at TEXT,
+            is_deleted INTEGER DEFAULT 0
+          )
+        `);
+        
+        // Restore data
+        this.db.run(`INSERT INTO orders SELECT * FROM orders_backup`);
+        
+        // Drop backup
+        this.db.run(`DROP TABLE orders_backup`);
+        
+        console.log('Orders table migration completed.');
+        this.save();
       }
+    } catch (error) {
+      console.log('Orders table migration note:', error.message);
+    }
+  }
+
+  seedSampleProducts() {
+    try {
+      // Check if we already have products with variants
+      const existingWithVariants = this.execute("SELECT id FROM menu_items WHERE variants IS NOT NULL AND variants != '' LIMIT 1");
+      if (existingWithVariants.length > 0) return; // Already seeded
+
+      console.log('Seeding sample products with variants and add-ons...');
+
+      // Add Pizza category
+      const pizzaCatId = 'cat_pizza';
+      this.db.run(`INSERT OR IGNORE INTO categories (id, name, description, display_order, is_active) VALUES (?, ?, ?, ?, ?)`,
+        [pizzaCatId, 'Pizza', 'Delicious pizzas', 0, 1]);
+
+      // Pizza variants and add-ons
+      const pizzaVariants = JSON.stringify([
+        { name: 'Small (6")', price: 199 },
+        { name: 'Medium (9")', price: 299 },
+        { name: 'Large (12")', price: 449 },
+        { name: 'Extra Large (14")', price: 599 }
+      ]);
+
+      const pizzaAddons = JSON.stringify([
+        { name: 'Extra Cheese', price: 50, type: 'veg' },
+        { name: 'Jalapenos', price: 30, type: 'veg' },
+        { name: 'Olives', price: 40, type: 'veg' },
+        { name: 'Mushrooms', price: 35, type: 'veg' },
+        { name: 'Chicken Tikka', price: 80, type: 'non-veg' },
+        { name: 'Pepperoni', price: 70, type: 'non-veg' }
+      ]);
+
+      // Insert pizzas
+      const pizzas = [
+        { id: 'pizza_001', name: 'Margherita Pizza', desc: 'Classic tomato and mozzarella', price: 199, veg: 1 },
+        { id: 'pizza_002', name: 'Pepperoni Pizza', desc: 'Loaded with pepperoni slices', price: 249, veg: 0 },
+        { id: 'pizza_003', name: 'Veggie Supreme', desc: 'Loaded with fresh vegetables', price: 229, veg: 1 },
+        { id: 'pizza_004', name: 'Chicken BBQ', desc: 'BBQ chicken with onions', price: 279, veg: 0 }
+      ];
+
+      for (const pizza of pizzas) {
+        this.db.run(`
+          INSERT OR IGNORE INTO menu_items (id, category_id, name, description, price, tax_rate, is_vegetarian, is_available, variants, addons)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [pizza.id, pizzaCatId, pizza.name, pizza.desc, pizza.price, 5, pizza.veg, 1, pizzaVariants, pizzaAddons]);
+      }
+
+      // Add Burger category with variants
+      const burgerCatId = 'cat_burgers';
+      this.db.run(`INSERT OR IGNORE INTO categories (id, name, description, display_order, is_active) VALUES (?, ?, ?, ?, ?)`,
+        [burgerCatId, 'Burgers', 'Juicy burgers', 1, 1]);
+
+      const burgerVariants = JSON.stringify([
+        { name: 'Single Patty', price: 149 },
+        { name: 'Double Patty', price: 229 },
+        { name: 'Triple Patty', price: 299 }
+      ]);
+
+      const burgerAddons = JSON.stringify([
+        { name: 'Extra Cheese', price: 25, type: 'veg' },
+        { name: 'Bacon', price: 50, type: 'non-veg' },
+        { name: 'Fried Egg', price: 30, type: 'non-veg' },
+        { name: 'Extra Patty', price: 80, type: 'non-veg' }
+      ]);
+
+      const burgers = [
+        { id: 'burger_001', name: 'Classic Burger', desc: 'Beef patty with fresh veggies', price: 149, veg: 0 },
+        { id: 'burger_002', name: 'Veggie Burger', desc: 'Crispy veg patty', price: 129, veg: 1 },
+        { id: 'burger_003', name: 'Chicken Burger', desc: 'Grilled chicken patty', price: 169, veg: 0 }
+      ];
+
+      for (const burger of burgers) {
+        this.db.run(`
+          INSERT OR IGNORE INTO menu_items (id, category_id, name, description, price, tax_rate, is_vegetarian, is_available, variants, addons)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [burger.id, burgerCatId, burger.name, burger.desc, burger.price, 5, burger.veg, 1, burgerVariants, burgerAddons]);
+      }
+
+      this.save();
+      console.log('Sample products seeded successfully.');
+    } catch (error) {
+      console.log('Sample product seeding note:', error.message);
     }
   }
 
@@ -275,6 +438,17 @@ class Database {
   }
 
   saveMenuItem(item) {
+    // Helper to safely stringify JSON or return null
+    const safeStringify = (data) => {
+      try {
+        if (!data) return null;
+        if (typeof data === 'string') return data;
+        return JSON.stringify(data);
+      } catch (e) {
+        return null;
+      }
+    };
+
     if (item.id) {
       this.update('menu_items', {
         name: item.name,
@@ -286,6 +460,8 @@ class Database {
         is_vegetarian: item.is_vegetarian,
         is_available: item.is_available,
         preparation_time: item.preparation_time,
+        variants: safeStringify(item.variants),
+        addons: safeStringify(item.addons),
         updated_at: new Date().toISOString(),
       }, { id: item.id });
       
@@ -304,6 +480,8 @@ class Database {
         is_vegetarian: item.is_vegetarian,
         is_available: item.is_available,
         preparation_time: item.preparation_time,
+        variants: safeStringify(item.variants),
+        addons: safeStringify(item.addons),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_deleted: 0,
@@ -340,7 +518,8 @@ class Database {
       discount_amount: order.discount_amount || 0,
       total_amount: order.total_amount || 0,
       notes: order.notes || '',
-      status: 'active',
+      status: order.status || 'active',
+      is_hold: order.is_hold || 0,
       cashier_id: userId || null,
       created_at: now,
       updated_at: now,
@@ -360,6 +539,8 @@ class Database {
         unit_price: item.unit_price || 0,
         item_total: (item.quantity || 1) * (item.unit_price || 0),
         special_instructions: item.special_instructions || '',
+        variant: item.variant || null,
+        addons: item.addons || null,
         kot_status: 'pending',
         created_at: now,
       };
@@ -428,6 +609,20 @@ class Database {
 
     query += ` ORDER BY created_at DESC`;
     return this.execute(query, params);
+  }
+
+  getOrdersByPhone(phone) {
+    if (!phone) return [];
+    
+    return this.execute(`
+      SELECT o.id, o.order_number, o.total_amount, o.status, o.created_at, o.payment_method
+      FROM orders o
+      WHERE o.customer_phone LIKE ?
+        AND o.is_deleted = 0
+        AND o.status = 'completed'
+      ORDER BY o.created_at DESC
+      LIMIT 10
+    `, [`%${phone}%`]);
   }
 
   getOrderById(id) {
@@ -507,6 +702,38 @@ class Database {
       WHERE o.status = 'active' AND o.is_deleted = 0
       ORDER BY o.created_at DESC
     `);
+  }
+
+  getHeldOrders() {
+    const orders = this.execute(`
+      SELECT o.*, u.full_name as cashier_name
+      FROM orders o
+      LEFT JOIN users u ON o.cashier_id = u.id
+      WHERE o.status = 'held' AND o.is_deleted = 0
+      ORDER BY o.created_at DESC
+    `);
+
+    // Attach items to each order
+    return orders.map(order => {
+      order.items = this.execute(`
+        SELECT oi.*, mi.name as item_name
+        FROM order_items oi
+        LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+        WHERE oi.order_id = ?
+      `, [order.id]);
+      return order;
+    });
+  }
+
+  resumeHeldOrder(orderId) {
+    // Mark the held order as deleted so it doesn't show anymore
+    this.execute(`
+      UPDATE orders
+      SET is_deleted = 1
+      WHERE id = ?
+    `, [orderId]);
+    this.save();
+    return { success: true };
   }
 
   updateDailySales(order, paymentMethod) {
