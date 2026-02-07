@@ -644,7 +644,6 @@ class Database {
       status: 'completed',
       payment_method: paymentMethod,
       payment_status: 'completed',
-      completed_at: now,
       updated_at: now,
     }, { id });
 
@@ -655,6 +654,10 @@ class Database {
     }
 
     this.addToSyncQueue('order', id, 'update', { status: 'completed', paymentMethod });
+    
+    // Save to disk to persist changes
+    this.save();
+    
     return { success: true, order };
   }
 

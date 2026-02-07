@@ -174,11 +174,47 @@ const KOTPage = () => {
                 </div>
 
                 <div className="kot-items">
-                  {order.items.map(item => (
+                  {order.items.map(item => {
+                    // Parse variant and addons
+                    let variantInfo = null;
+                    let addonsInfo = [];
+                    
+                    if (item.variant) {
+                      try {
+                        const v = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
+                        if (v && v.name) variantInfo = v.name;
+                      } catch (e) {}
+                    }
+                    
+                    if (item.addons) {
+                      try {
+                        const a = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
+                        if (Array.isArray(a)) addonsInfo = a;
+                      } catch (e) {}
+                    }
+                    
+                    return (
                     <div key={item.id} className="kot-item">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
-                        <span className="kot-item-quantity">{item.quantity}x</span>
-                        <span>{item.item_name}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+                          <span className="kot-item-quantity">{item.quantity}x</span>
+                          <span style={{ fontWeight: 600 }}>{item.item_name}</span>
+                        </div>
+                        {variantInfo && (
+                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--primary-600)', marginLeft: '28px' }}>
+                            Size: {variantInfo}
+                          </div>
+                        )}
+                        {addonsInfo.length > 0 && (
+                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--gray-600)', marginLeft: '28px' }}>
+                            {addonsInfo.map((a, i) => <span key={i} style={{ marginRight: '8px' }}>+ {a.name}</span>)}
+                          </div>
+                        )}
+                        {item.special_instructions && (
+                          <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--warning-600)', marginLeft: '28px', fontStyle: 'italic' }}>
+                            Note: {item.special_instructions}
+                          </div>
+                        )}
                       </div>
                       <div>
                         {item.kot_status !== 'ready' && (
@@ -197,7 +233,7 @@ const KOTPage = () => {
                         )}
                       </div>
                     </div>
-                  ))}
+                  );})}
                   {order.items.some(i => i.special_instructions) && (
                     <div style={{ 
                       marginTop: 'var(--spacing-2)', 

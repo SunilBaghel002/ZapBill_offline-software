@@ -293,7 +293,10 @@ function setupIpcHandlers() {
 
   ipcMain.handle('order:complete', async (event, { id, paymentMethod }) => {
     try {
-      return db.completeOrder(id, paymentMethod);
+      log.info('Completing order:', id, 'with payment method:', paymentMethod);
+      const result = db.completeOrder(id, paymentMethod);
+      log.info('Order completion result:', result);
+      return result;
     } catch (error) {
       log.error('Complete order error:', error);
       return { success: false, error: error.message };

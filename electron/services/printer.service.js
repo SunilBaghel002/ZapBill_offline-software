@@ -219,9 +219,37 @@ class PrinterService {
     
     lines.push({ text: divider, style: 'normal' });
     
-    // Items
+    // Items with variants and add-ons
     items.forEach(item => {
       lines.push({ text: `${item.quantity}x ${item.item_name}`, style: 'bold' });
+      
+      // Show variant if present
+      if (item.variant) {
+        try {
+          const variant = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
+          if (variant && variant.name) {
+            lines.push({ text: `   Size: ${variant.name}`, style: 'normal' });
+          }
+        } catch (e) {
+          // Variant not parseable, skip
+        }
+      }
+      
+      // Show add-ons if present
+      if (item.addons) {
+        try {
+          const addons = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
+          if (Array.isArray(addons) && addons.length > 0) {
+            lines.push({ text: `   Add-ons:`, style: 'normal' });
+            addons.forEach(addon => {
+              lines.push({ text: `   + ${addon.name}`, style: 'normal' });
+            });
+          }
+        } catch (e) {
+          // Addons not parseable, skip
+        }
+      }
+      
       if (item.special_instructions) {
         lines.push({ text: `   >> ${item.special_instructions}`, style: 'normal' });
       }
