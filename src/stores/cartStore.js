@@ -10,8 +10,18 @@ export const useCartStore = create(
       customerName: '',
       customerPhone: '',
       notes: '',
-      discountAmount: 0,
+      // Enhanced billing fields
+      discountType: 'none', // 'none', 'percentage', 'flat', 'coupon'
+      discountValue: 0,
       discountReason: '',
+      couponCode: '',
+      serviceChargePercent: 0, // e.g., 5 for 5%
+      serviceChargeEnabled: false,
+      paymentMethod: 'cash', // 'cash', 'card', 'upi', 'split', 'due'
+      paymentDetails: {}, // For split payments or additional info
+      isPaid: false,
+      isComplimentary: false,
+      isSalesReturn: false,
 
       // Add item to cart
       addItem: (menuItem, quantity = 1, specialInstructions = '', variant = null, addons = []) => {
@@ -99,10 +109,36 @@ export const useCartStore = create(
       setCustomerName: (name) => set({ customerName: name }),
       setCustomerPhone: (phone) => set({ customerPhone: phone }),
       setNotes: (notes) => set({ notes }),
-      setDiscount: (amount, reason = '') => set({ 
-        discountAmount: amount, 
-        discountReason: reason 
+      
+      // Enhanced discount setters
+      setDiscountType: (type) => set({ discountType: type }),
+      setDiscountValue: (value) => set({ discountValue: value }),
+      setDiscountReason: (reason) => set({ discountReason: reason }),
+      setCouponCode: (code) => set({ couponCode: code }),
+      applyDiscount: (type, value, reason = '') => set({
+        discountType: type,
+        discountValue: value,
+        discountReason: reason
       }),
+      clearDiscount: () => set({
+        discountType: 'none',
+        discountValue: 0,
+        discountReason: '',
+        couponCode: ''
+      }),
+      
+      // Service charge
+      setServiceCharge: (percent, enabled = true) => set({
+        serviceChargePercent: percent,
+        serviceChargeEnabled: enabled
+      }),
+      
+      // Payment method
+      setPaymentMethod: (method) => set({ paymentMethod: method }),
+      setPaymentDetails: (details) => set({ paymentDetails: details }),
+      setIsPaid: (paid) => set({ isPaid: paid }),
+      setIsComplimentary: (comp) => set({ isComplimentary: comp }),
+      setIsSalesReturn: (ret) => set({ isSalesReturn: ret }),
 
       // Calculate subtotal
       getSubtotal: () => {
@@ -110,23 +146,85 @@ export const useCartStore = create(
         return items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
       },
 
-      // Calculate tax
-      getTax: () => {
+      // Calculate discount amount based on type
+      getDiscountAmount: () => {
+        const { discountType, discountValue, isComplimentary } = get();
+        const subtotal = get().getSubtotal();
+        
+        if (isComplimentary) return subtotal; // 100% discount
+        
+        switch (discountType) {
+          case 'percentage':
+            return (subtotal * discountValue) / 100;
+          case 'flat':
+            return Math.min(discountValue, subtotal); // Can't discount more than subtotal
+          case 'coupon':
+            return discountValue; // Coupon provides fixed discount
+          default:
+            return 0;
+        }
+      },
+
+      // Calculate taxable amount (after discount)
+      getTaxableAmount: () => {
+        const subtotal = get().getSubtotal();
+        const discount = get().getDiscountAmount();
+        return Math.max(0, subtotal - discount);
+      },
+
+      // Calculate tax with breakdown (CGST + SGST)
+      getTaxBreakdown: () => {
         const { items } = get();
-        return items.reduce((sum, item) => {
+        const taxableAmount = get().getTaxableAmount();
+        const subtotal = get().getSubtotal();
+        
+        if (subtotal === 0) return { cgst: 0, sgst: 0, total: 0 };
+        
+        // Calculate weighted average tax rate
+        const totalTax = items.reduce((sum, item) => {
           const itemTotal = item.unitPrice * item.quantity;
           const itemTax = itemTotal * (item.taxRate / 100);
           return sum + itemTax;
         }, 0);
+        
+        // Scale tax proportionally to taxable amount
+        const scaledTax = (totalTax / subtotal) * taxableAmount;
+        const cgst = scaledTax / 2;
+        const sgst = scaledTax / 2;
+        
+        return {
+          cgst: cgst,
+          sgst: sgst,
+          total: cgst + sgst
+        };
       },
 
-      // Calculate total
-      getTotal: () => {
-        const { discountAmount } = get();
-        const subtotal = get().getSubtotal();
-        const tax = get().getTax();
-        return subtotal + tax - discountAmount;
+      // Calculate total tax amount
+      getTaxAmount: () => {
+        return get().getTaxBreakdown().total;
       },
+
+      // Calculate service charge
+      getServiceCharge: () => {
+        const { serviceChargeEnabled, serviceChargePercent } = get();
+        if (!serviceChargeEnabled) return 0;
+        const taxableAmount = get().getTaxableAmount();
+        return (taxableAmount * serviceChargePercent) / 100;
+      },
+
+      // Calculate grand total
+      getGrandTotal: () => {
+        const { isSalesReturn } = get();
+        const taxableAmount = get().getTaxableAmount();
+        const tax = get().getTaxBreakdown().total;
+        const serviceCharge = get().getServiceCharge();
+        const total = taxableAmount + tax + serviceCharge;
+        return isSalesReturn ? -total : total;
+      },
+
+      // Legacy method for compatibility
+      getTax: () => get().getTaxBreakdown().total,
+      getTotal: () => get().getGrandTotal(),
 
       // Get item count
       getItemCount: () => {
@@ -142,8 +240,17 @@ export const useCartStore = create(
         customerName: '',
         customerPhone: '',
         notes: '',
-        discountAmount: 0,
+        discountType: 'none',
+        discountValue: 0,
         discountReason: '',
+        couponCode: '',
+        serviceChargePercent: 0,
+        serviceChargeEnabled: false,
+        paymentMethod: 'cash',
+        paymentDetails: {},
+        isPaid: false,
+        isComplimentary: false,
+        isSalesReturn: false,
       }),
 
       // Create order from cart
@@ -163,9 +270,14 @@ export const useCartStore = create(
           notes: state.notes || null,
           subtotal: state.getSubtotal(),
           tax_amount: state.getTax(),
-          discount_amount: state.discountAmount,
+          discount_amount: state.getDiscountAmount(),
+          discount_type: state.discountType,
           discount_reason: state.discountReason || null,
-          total_amount: state.getTotal(),
+          service_charge: state.getServiceCharge(),
+          total_amount: state.getGrandTotal(),
+          payment_method: state.paymentMethod,
+          is_complimentary: state.isComplimentary ? 1 : 0,
+          is_sales_return: state.isSalesReturn ? 1 : 0,
           status: status,
           is_hold: isHold
         };
@@ -226,8 +338,13 @@ export const useCartStore = create(
           customerName: order.customer_name || '',
           customerPhone: order.customer_phone || '',
           notes: order.notes || '',
-          discountAmount: order.discount_amount || 0,
-          discountReason: order.discount_reason || ''
+          discountType: order.discount_type || 'none',
+          discountValue: order.discount_amount || 0,
+          discountReason: order.discount_reason || '',
+          serviceChargeEnabled: order.service_charge > 0,
+          paymentMethod: order.payment_method || 'cash',
+          isComplimentary: order.is_complimentary === 1,
+          isSalesReturn: order.is_sales_return === 1,
         });
       },
     }),
@@ -240,8 +357,15 @@ export const useCartStore = create(
         customerName: state.customerName,
         customerPhone: state.customerPhone,
         notes: state.notes,
-        discountAmount: state.discountAmount,
+        discountType: state.discountType,
+        discountValue: state.discountValue,
         discountReason: state.discountReason,
+        couponCode: state.couponCode,
+        serviceChargePercent: state.serviceChargePercent,
+        serviceChargeEnabled: state.serviceChargeEnabled,
+        paymentMethod: state.paymentMethod,
+        isComplimentary: state.isComplimentary,
+        isSalesReturn: state.isSalesReturn,
       }),
     }
   )

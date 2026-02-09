@@ -4,6 +4,7 @@ import { useAuthStore } from './stores/authStore';
 
 // Pages
 import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/POSPage';
 import MenuPage from './pages/MenuPage';
 import OrdersPage from './pages/OrdersPage';
@@ -25,7 +26,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   }
   
   if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {
-    return <Navigate to="/pos" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
   
   return children;
@@ -44,7 +45,8 @@ function App() {
             <Layout />
           </ProtectedRoute>
         }>
-          <Route index element={<Navigate to="/pos" replace />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="pos" element={<POSPage />} />
           <Route path="menu" element={
             <ProtectedRoute allowedRoles={['admin']}>

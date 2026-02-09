@@ -17,7 +17,28 @@ import {
   FileText,
   PauseCircle,
   PlayCircle,
-  Clock
+  Clock,
+  User,
+  RefreshCw,
+  Keyboard,
+  Split,
+  ClipboardList,
+  Pizza,
+  Coffee,
+  IceCream,
+  Sandwich,
+  Soup,
+  Percent,
+  Save,
+  ChefHat,
+  Carrot,
+  Beef,
+  Cake,
+  Beer,
+  Wine,
+  Utensils,
+  Menu,
+  ChevronDown
 } from 'lucide-react';
 
 const POSPage = () => {
@@ -33,6 +54,12 @@ const POSPage = () => {
   const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
   const [showHeldOrders, setShowHeldOrders] = useState(false);
   const [heldOrders, setHeldOrders] = useState([]);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  
+  // Strict Design Match State
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
+  const [showBillSheet, setShowBillSheet] = useState(false);
 
   const { user } = useAuthStore();
   const cart = useCartStore();
@@ -97,6 +124,16 @@ const POSPage = () => {
     }
   };
 
+  const handleNewOrder = () => {
+    if (cart.items.length > 0) {
+      if (window.confirm('Clear current order?')) {
+        cart.clearCart();
+      }
+    } else {
+      cart.clearCart();
+    }
+  };
+
   const handleHoldOrder = async () => {
     if (cart.items.length === 0) return;
     
@@ -138,6 +175,102 @@ const POSPage = () => {
     }
   };
 
+  // KOT Only - Send to kitchen without completing order
+  const handleKOTOnly = async () => {
+    if (cart.items.length === 0) return;
+    
+    try {
+      // Create a temporary order object for KOT
+      const kotOrder = {
+        order_type: cart.orderType,
+        table_number: cart.tableNumber,
+        customer_name: cart.customerName,
+        notes: cart.notes,
+        items: cart.items.map(item => ({
+          item_name: item.name,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          special_instructions: item.specialInstructions,
+          variant: item.variant,
+          addons: item.addons
+        }))
+      };
+      
+      await window.electronAPI.invoke('print:kot', { 
+        order: kotOrder,
+        items: kotOrder.items 
+      });
+      
+      alert('KOT sent to kitchen!');
+    } catch (error) {
+      console.error('KOT print error:', error);
+      alert('Error sending KOT: ' + error.message);
+    }
+  };
+
+  // KOT & Print - Send to kitchen and print receipt preview
+  const handleKOTAndPrint = async () => {
+    if (cart.items.length === 0) return;
+    
+    try {
+      // Create order first
+      const result = await cart.createOrder(user?.id);
+      
+      if (result.success) {
+        const order = await window.electronAPI.invoke('order:getById', { id: result.id });
+        
+        // Print KOT
+        await window.electronAPI.invoke('print:kot', { 
+          order: order,
+          items: order.items 
+        });
+        
+        // Print Receipt
+        await window.electronAPI.invoke('print:receipt', { order: order });
+        
+        alert(`Order #${result.orderNumber} placed! KOT & Receipt printed.`);
+      } else {
+        throw new Error(result.error || 'Failed to create order');
+      }
+    } catch (error) {
+      console.error('KOT & Print error:', error);
+      alert('Error: ' + error.message);
+    }
+  };
+
+  // Save & Print - Complete order and print receipt
+  const handleSaveAndPrint = async () => {
+    if (cart.items.length === 0) return;
+    
+    try {
+      const result = await cart.createOrder(user?.id);
+      
+      if (result.success) {
+        const order = await window.electronAPI.invoke('order:getById', { id: result.id });
+        
+        // Complete order with selected payment method
+        await window.electronAPI.invoke('order:complete', {
+          id: result.id,
+          paymentMethod: cart.paymentMethod,
+        });
+        
+        // Print Receipt
+        await window.electronAPI.invoke('print:receipt', { order: order });
+        
+        alert(`Order #${result.orderNumber} completed! Receipt printed.`);
+      } else {
+        throw new Error(result.error || 'Failed to create order');
+      }
+    } catch (error) {
+      console.error('Save & Print error:', error);
+      alert('Error: ' + error.message);
+    }
+  };
+
+  const calculateTotal = () => {
+    return cart.getTotal();
+  };
+
   if (isLoading) {
     return (
       <div className="empty-state">
@@ -148,310 +281,390 @@ const POSPage = () => {
   }
 
   return (
-    <div className="pos-layout">
-      {/* Left Panel - Menu */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)', overflow: 'hidden' }}>
-        {/* Search Bar */}
-        <div style={{ position: 'relative' }}>
-          <Search 
-            size={18} 
-            style={{ 
-              position: 'absolute', 
-              left: '12px', 
-              top: '50%', 
-              transform: 'translateY(-50%)',
-              color: 'var(--gray-400)'
-            }} 
-          />
-          <input
-            type="text"
-            className="input"
-            placeholder="Search menu items..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '40px', background: 'white' }}
-          />
-        </div>
-
-        {/* Category Tabs */}
-        <div className="category-tabs">
-          <button
-            className={`category-tab ${!selectedCategory ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(null)}
-          >
-            All Items
+    <div className="pos-fullscreen">
+      {/* Header Bar */}
+      <div className="pos-header-bar">
+        <div className="pos-header-left">
+          <button className="pos-header-btn" style={{ border: 'none', padding: 0 }}>
+             <Menu size={24} color="#37474F" />
           </button>
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              className={`category-tab ${selectedCategory === cat.id ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(cat.id)}
-            >
-              {cat.name}
-            </button>
-          ))}
+          <div className="pos-logo-text">PetPooja</div>
+          <button className="pos-new-order-btn" onClick={handleNewOrder}>
+            New Order
+          </button>
+        </div>
+        
+        <div className="pos-search-wrapper">
+          <div className="pos-search-box">
+             <Search size={18} color="#90A4AE" />
+             <input 
+               type="text" 
+               placeholder="Search item" 
+               value={searchQuery}
+               onChange={(e) => setSearchQuery(e.target.value)}
+             />
+          </div>
+          <div className="pos-search-box" style={{ maxWidth: '150px' }}>
+             <input type="text" placeholder="Short Code" />
+          </div>
         </div>
 
-        {/* Menu Grid */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          {filteredItems.length > 0 ? (
-            <div className="menu-grid">
-              {filteredItems.map(item => (
-                <div
-                  key={item.id}
-                  className={`menu-item-card ${item.is_vegetarian ? 'vegetarian' : 'non-vegetarian'}`}
-                  onClick={() => handleAddToCart(item)}
-                >
-                  {/* Veg/Non-Veg Indicator Box */}
-                  <div style={{ 
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    width: '16px',
-                    height: '16px',
-                    border: `2px solid ${item.is_vegetarian ? '#22c55e' : '#ef4444'}`,
-                    borderRadius: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <div style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: item.is_vegetarian ? '#22c55e' : '#ef4444'
-                    }} />
-                  </div>
-                  <div className="menu-item-name">{item.name}</div>
-                  <div className="menu-item-price">₹{item.price.toFixed(2)}</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <ShoppingCart size={48} />
-              <p>No items found</p>
-            </div>
-          )}
+        <div className="pos-header-right">
+          <div style={{ border: '1px solid #ccc', borderRadius: '4px', padding: '4px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', marginRight: '10px' }}>
+             <span style={{ fontSize: '10px', color: '#666' }}>Call For Support</span>
+             <span style={{ fontWeight: 'bold', fontSize: '12px' }}>9099912483</span>
+          </div>
+          <button className="pos-header-btn" title="Sync"><RefreshCw size={20} /></button>
+          <button className="pos-header-btn"><Keyboard size={20} /></button>
+          <button className="pos-header-btn"><User size={20} /></button>
         </div>
       </div>
 
-      {/* Right Panel - Cart */}
-      <div className="cart-panel">
-        <div className="cart-header">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
-              <ShoppingCart size={20} />
-              <span style={{ fontWeight: 600 }}>Current Order</span>
+      {/* Main Body */}
+      <div className="pos-main-body">
+        
+        {/* Left Section: Categories & Menu */}
+        <div className="pos-left-panel">
+          {/* Category Sidebar */}
+          <div className="pos-category-sidebar">
+            <div 
+                className={`pos-category-item ${!selectedCategory ? 'active' : ''}`}
+                onClick={() => setSelectedCategory(null)}
+            >
+                <div className="pos-category-icon-wrapper" style={{ marginBottom: '4px' }}>
+                  <ClipboardList size={24} />
+                </div>
+                <span>All Items</span>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                className="btn btn-sm btn-ghost" 
-                onClick={() => setShowHeldOrders(true)} 
-                title="View Held Orders"
-                style={{ position: 'relative' }}
-              >
-                <Clock size={18} />
-                {heldOrders.length > 0 && (
-                  <span className="badge badge-error" style={{ position: 'absolute', top: -5, right: -5, padding: '2px 5px', fontSize: '10px' }}>
-                    {heldOrders.length}
-                  </span>
-                )}
-              </button>
-              <span className="badge" style={{ background: 'rgba(255,255,255,0.2)' }}>
-                {cart.getItemCount()} items
-              </span>
-            </div>
-          </div>
+            {categories.map((category, index) => {
+              // Helper to get icon based on category name
+              const getIcon = (name) => {
+                const n = name.toLowerCase();
+                if (n.includes('pizza')) return <Pizza size={24} />;
+                if (n.includes('coffee') || n.includes('tea') || n.includes('beverage')) return <Coffee size={24} />;
+                if (n.includes('ice') || n.includes('dessert')) return <IceCream size={24} />;
+                if (n.includes('sandwich') || n.includes('burger')) return <Sandwich size={24} />;
+                if (n.includes('soup')) return <Soup size={24} />;
+                if (n.includes('veg') || n.includes('salad')) return <Carrot size={24} />;
+                if (n.includes('chicken') || n.includes('beef') || n.includes('meat')) return <Beef size={24} />;
+                if (n.includes('cake') || n.includes('pastry')) return <Cake size={24} />;
+                if (n.includes('beer') || n.includes('alcohol')) return <Beer size={24} />;
+                return <Utensils size={24} />;
+              };
 
-          {/* Order Type Selection */}
-          <div style={{ 
-            display: 'flex', 
-            gap: 'var(--spacing-2)', 
-            marginTop: 'var(--spacing-3)' 
-          }}>
-            {['dine_in', 'takeaway', 'delivery'].map(type => (
-              <button
-                key={type}
-                onClick={() => cart.setOrderType(type)}
-                style={{
-                  flex: 1,
-                  padding: 'var(--spacing-2)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: 'var(--font-size-xs)',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  background: cart.orderType === type 
-                    ? 'white' 
-                    : 'rgba(255,255,255,0.2)',
-                  color: cart.orderType === type 
-                    ? 'var(--primary-700)' 
-                    : 'white',
-                }}
-              >
-                {type.replace('_', ' ').toUpperCase()}
-              </button>
-            ))}
-          </div>
-
-          {/* Table Number (for dine-in) */}
-          {cart.orderType === 'dine_in' && (
-            <input
-              type="text"
-              className="input"
-              placeholder="Table Number"
-              value={cart.tableNumber}
-              onChange={(e) => cart.setTableNumber(e.target.value)}
-              style={{ marginTop: 'var(--spacing-2)' }}
-            />
-          )}
-
-          {/* Customer Name input for Takeaway/Delivery for better Hold Order tracking */}
-          {(cart.orderType === 'takeaway' || cart.orderType === 'delivery') && (
-             <input
-              type="text"
-              className="input"
-              placeholder="Customer Name"
-              value={cart.customerName}
-              onChange={(e) => cart.setCustomerName(e.target.value)}
-              style={{ marginTop: 'var(--spacing-2)' }}
-            />
-          )}
-          
-          {/* Order Notes / Special Comments */}
-          <textarea
-            className="input"
-            placeholder="Order notes (e.g., Special delivery instructions, allergies...)"
-            value={cart.notes}
-            onChange={(e) => cart.setNotes(e.target.value)}
-            rows={2}
-            style={{ marginTop: 'var(--spacing-2)', resize: 'none' }}
-          />
-        </div>
-
-        {/* Cart Items */}
-        <div className="cart-items">
-          {cart.items.length > 0 ? (
-            cart.items.map(item => (
-              <div key={item.id} className="cart-item">
-                <div className="cart-item-info">
-                  <div className="cart-item-name">
-                    {item.name}
-                    {item.variant && <span className="text-xs text-muted"> ({item.variant.name})</span>}
-                  </div>
-                  {item.addons && item.addons.length > 0 && (
-                     <div className="text-xs text-muted" style={{ lineHeight: 1.2 }}>
-                       + {item.addons.map(a => a.name).join(', ')}
-                     </div>
-                  )}
-                  {item.specialInstructions && (
-                    <div className="text-xs text-muted" style={{ fontStyle: 'italic' }}>
-                      Note: {item.specialInstructions}
-                    </div>
-                  )}
-                  <div className="cart-item-price">₹{item.unitPrice.toFixed(2)} each</div>
-                </div>
-                <div className="quantity-controls">
-                  <button 
-                    className="quantity-btn"
-                    onClick={() => cart.updateQuantity(item.id, item.quantity - 1)}
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <span style={{ minWidth: '24px', textAlign: 'center', fontWeight: 600 }}>
-                    {item.quantity}
-                  </span>
-                  <button 
-                    className="quantity-btn"
-                    onClick={() => cart.updateQuantity(item.id, item.quantity + 1)}
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
-                <div style={{ 
-                  minWidth: '70px', 
-                  textAlign: 'right', 
-                  fontWeight: 600,
-                  color: 'var(--gray-900)'
-                }}>
-                  ₹{(item.unitPrice * item.quantity).toFixed(2)}
-                </div>
-                <button
-                  className="btn btn-ghost btn-icon btn-sm"
-                  onClick={() => cart.removeItem(item.id)}
-                  style={{ color: 'var(--error-500)' }}
+              return (
+                <div 
+                  key={category.id}
+                  className={`pos-category-item ${selectedCategory === category.id ? 'active' : ''}`}
+                  onClick={() => setSelectedCategory(category.id)}
                 >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))
-          ) : (
-            <div className="empty-state">
-              <ShoppingCart size={48} />
-              <p className="empty-state-title">Cart is empty</p>
-              <p className="text-sm text-muted">Add items from the menu</p>
+                  <div className="pos-category-icon-wrapper" style={{ marginBottom: '4px' }}>
+                    {getIcon(category.name)}
+                  </div>
+                  <span>{category.name}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Menu Grid Area */}
+          <div className="pos-menu-area">
+            <div className="pos-menu-grid">
+              {filteredItems.length > 0 ? (
+                  filteredItems.map(item => (
+                    <div key={item.id} className={`pos-menu-card ${item.is_vegetarian ? 'veg' : 'nonveg'}`} onClick={() => handleAddToCart(item)}>
+                      <div className="pos-menu-card-inner">
+                        <span className="pos-menu-card-name">{item.name}</span>
+                        <span className="pos-menu-card-price">₹{item.price.toFixed(0)}</span>
+                      </div>
+                    </div>
+                  ))
+              ) : (
+                    <div className="pos-empty-state" style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', color: 'var(--gray-400)' }}>
+                      <div style={{ background: 'var(--gray-100)', padding: '20px', borderRadius: '50%', marginBottom: '16px' }}>
+                        <UtensilsCrossed size={48} style={{ opacity: 0.5 }} />
+                      </div>
+                      <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--gray-600)', marginBottom: '4px' }}>No Items Found</h3>
+                      <p>Try selecting a different category or search term</p>
+                    </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Cart Footer */}
-        {cart.items.length > 0 && (
-          <div className="cart-footer">
-            <div className="cart-totals">
-              <div className="cart-total-row">
-                <span>Subtotal</span>
-                <span>₹{cart.getSubtotal().toFixed(2)}</span>
-              </div>
-              <div className="cart-total-row">
-                <span>Tax</span>
-                <span>₹{cart.getTax().toFixed(2)}</span>
-              </div>
-              {cart.discountAmount > 0 && (
-                <div className="cart-total-row" style={{ color: 'var(--success-600)' }}>
-                  <span>Discount</span>
-                  <span>-₹{cart.discountAmount.toFixed(2)}</span>
-                </div>
-              )}
-              <div className="cart-total-row grand-total">
-                <span>Total</span>
-                <span>₹{cart.getTotal().toFixed(2)}</span>
-              </div>
-            </div>
+        {/* Right Section: Cart Panel */}
+        <div className="pos-cart-panel">
+          {/* Order Type Tabs - Moved Inside Cart Panel */}
+          <div className="pos-cart-header-tabs">
+            <button 
+              className={`pos-order-type-tab ${cart.orderType === 'dine_in' ? 'active dine-in' : ''}`}
+              onClick={() => cart.setOrderType('dine_in')}
+            >
+              Dine In
+            </button>
+            <button 
+              className={`pos-order-type-tab ${cart.orderType === 'delivery' ? 'active delivery' : ''}`}
+              onClick={() => cart.setOrderType('delivery')}
+            >
+              Delivery
+            </button>
+            <button 
+              className={`pos-order-type-tab ${cart.orderType === 'takeaway' ? 'active pickup' : ''}`}
+              onClick={() => cart.setOrderType('takeaway')}
+            >
+              Pick Up
+            </button>
+          </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 'var(--spacing-2)' }}>
-               {/* Hold / Clear Buttons */}
-               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-2)' }}>
-                  <button 
-                    className="btn btn-secondary"
-                    onClick={() => cart.clearCart()}
-                  >
-                    Clear
-                  </button>
-                  <button 
-                    className="btn btn-warning"
-                    onClick={handleHoldOrder}
-                    style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fcd34d' }}
-                  >
-                    <PauseCircle size={16} /> Hold
-                  </button>
+          {/* Customer Info Section - Icon Bar */}
+          <div className="pos-customer-bar" style={{ display: 'flex', background: '#ECEFF1', borderBottom: '1px solid #CFD8DC' }}>
+             <div style={{ display: 'flex', gap: '1px', flex: 1 }}>
+                <button className="pos-header-btn" style={{ flex: 1, height: '40px', background: 'white', border: '1px solid #CFD8DC' }} title="Table"><Plus size={18} /> T1</button>
+                <button 
+                  className={`pos-header-btn ${showCustomerForm ? 'active' : ''}`}
+                  style={{ flex: 1, background: showCustomerForm ? '#E0F7FA' : 'white', border: '1px solid #CFD8DC' }} 
+                  title="Customer"
+                  onClick={() => setShowCustomerForm(!showCustomerForm)}
+                >
+                  <User size={18} />
+                </button>
+                <button className="pos-header-btn" style={{ flex: 1, background: 'white', border: '1px solid #CFD8DC' }} title="Waiter"><User size={18} /></button>
+                <button className="pos-header-btn" style={{ flex: 1, background: 'white', border: '1px solid #CFD8DC' }} title="Notes"><FileText size={18} /></button>
+             </div>
+             <div style={{ width: '80px', background: '#FFC107', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>
+                Outdoor
+             </div>
+          </div>
+
+          {/* User Info Form - Inline Slide Down */}
+          {showCustomerForm && (
+          <div className="pos-user-info-form" style={{ background: 'white', padding: '8px 12px', borderBottom: '1px solid #CFD8DC', fontSize: '13px', animation: 'slideDown 0.2s ease-out' }}>
+             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                <div>
+                    <label style={{ color: '#546E7A', fontWeight: 500, display: 'block', marginBottom: '2px' }}>Mobile:</label>
+                    <div style={{ display: 'flex' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Mobile No"
+                          value={cart.customerPhone || ''}
+                          onChange={(e) => cart.setCustomerPhone(e.target.value)}
+                          style={{ border: '1px solid #CFD8DC', borderRadius: '2px 0 0 2px', padding: '6px 8px', fontSize: '13px', outline: 'none', flex: 1, borderRight: 'none' }}
+                        />
+                        <button 
+                          onClick={() => setShowHistoryDrawer(true)}
+                          style={{ background: '#ECEFF1', border: '1px solid #CFD8DC', padding: '0 8px', cursor: 'pointer' }}
+                          title="Customer History"
+                        >
+                           <Clock size={14} color="#546E7A" />
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label style={{ color: '#546E7A', fontWeight: 500, display: 'block', marginBottom: '2px' }}>Name:</label>
+                    <input 
+                      type="text" 
+                      placeholder="Customer Name"
+                      value={cart.customerName || ''}
+                      onChange={(e) => cart.setCustomerName(e.target.value)}
+                      style={{ border: '1px solid #CFD8DC', borderRadius: '2px', padding: '6px 8px', fontSize: '13px', outline: 'none', width: '100%' }}
+                    />
+                </div>
+             </div>
+             
+             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div className="pos-input-group">
+                    <label style={{ color: '#546E7A', fontWeight: 500, display: 'block', marginBottom: '2px' }}>Address:</label>
+                    <input 
+                      type="text" 
+                      placeholder="Address"
+                      style={{ border: '1px solid #CFD8DC', borderRadius: '2px', padding: '6px 8px', fontSize: '13px', outline: 'none', width: '100%' }}
+                    />
+                </div>
+                <div className="pos-input-group">
+                    <label style={{ color: '#546E7A', fontWeight: 500, display: 'block', marginBottom: '2px' }}>Locality:</label>
+                    <input 
+                      type="text" 
+                      placeholder="Locality"
+                      style={{ border: '1px solid #CFD8DC', borderRadius: '2px', padding: '6px 8px', fontSize: '13px', outline: 'none', width: '100%' }}
+                    />
+                </div>
+             </div>
+          </div>
+          )}
+
+          <div className="pos-cart-table-header">
+             <span>ITEMS</span>
+             <span style={{ paddingLeft: '8px' }}>QTY.</span>
+             <span style={{ textAlign: 'right' }}>PRICE</span>
+          </div>
+
+          {/* Cart Items List */}
+          <div className="pos-cart-items">
+            {cart.items.length === 0 ? (
+              <div className="pos-cart-empty">
+                <ShoppingCart size={48} />
+                <p>Cart is Empty</p>
+              </div>
+            ) : (
+              cart.items.map(item => (
+                <div key={item.id} className="pos-cart-item">
+                  <div className="pos-cart-item-details">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                       <button className="pos-cart-item-remove" onClick={() => cart.removeItem(item.id)}>
+                         <X size={14} style={{ background: '#D32F2F', borderRadius: '50%', color: 'white', padding: '2px' }} />
+                       </button>
+                       <span className="pos-cart-item-name">{item.name}</span>
+                    </div>
+                    {item.addons && item.addons.length > 0 && (
+                      <div className="pos-cart-item-addons">
+                        {item.addons.map(a => a.name).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="pos-cart-qty-ctrl">
+                    <button className="pos-cart-qty-btn" onClick={() => cart.updateQuantity(item.id, item.quantity - 1)}>-</button>
+                    <div className="pos-cart-qty-val">{item.quantity}</div>
+                    <button className="pos-cart-qty-btn" onClick={() => cart.updateQuantity(item.id, item.quantity + 1)}>+</button>
+                  </div>
+
+                  <div className="pos-cart-item-price" style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 'bold' }}>{(item.unitPrice * item.quantity).toFixed(2)}</div>
+                    <div style={{ fontSize: '11px', color: '#888' }}>{item.unitPrice.toFixed(2)}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Cart Total & Actions */}
+          <div className="pos-cart-footer">
+             {/* Billing Breakdown */}
+             <div className="pos-billing-section">
+               <div className="pos-billing-ctrl-row">
+                 <button 
+                   className="pos-toggle-btn"
+                   onClick={() => setShowDiscountModal(true)}
+                   style={{ color: '#1565C0', borderColor: '#90CAF9', background: '#E3F2FD' }}
+                 >
+                   <Percent size={14} /> Discount
+                 </button>
+                 
+                 <label className={`pos-toggle-btn ${cart.isComplimentary ? 'active' : ''}`}>
+                   <input 
+                     type="checkbox" 
+                     checked={cart.isComplimentary}
+                     onChange={(e) => cart.setIsComplimentary(e.target.checked)}
+                   />
+                   <span>Complimentary</span>
+                 </label>
+
+                 <label className={`pos-toggle-btn ${cart.isSalesReturn ? 'active' : ''}`}>
+                   <input 
+                     type="checkbox" 
+                     checked={cart.isSalesReturn}
+                     onChange={(e) => cart.setIsSalesReturn(e.target.checked)}
+                   />
+                   <span>Return</span>
+                 </label>
+               </div>
+
+               {/* Breakdown */}
+               <div className="pos-billing-row">
+                  <span>Subtotal</span>
+                  <span>₹{cart.getSubtotal().toFixed(2)}</span>
                </div>
                
-               {/* Pay Button */}
-              <button 
-                className="btn btn-success btn-lg"
-                style={{ height: '100%', flexDirection: 'column', gap: '4px' }}
-                onClick={handleCheckout}
-              >
-                <CreditCard size={24} />
-                <span style={{ fontSize: '1.2em', fontWeight: 700 }}>PAY ₹{cart.getTotal().toFixed(2)}</span>
-              </button>
-            </div>
+               {/* Discount if applied */}
+               {cart.getDiscountAmount() > 0 && (
+                 <div className="pos-billing-row" style={{ color: '#43A047' }}>
+                    <span>Discount ({cart.discountType === 'percentage' ? `${cart.discountValue}%` : 'Flat'})</span>
+                    <span>-₹{cart.getDiscountAmount().toFixed(2)}</span>
+                 </div>
+               )}
+
+               {/* Metadata for Taxes */}
+               <div className="pos-billing-row">
+                  <span>CGST (2.5%)</span>
+                  <span>₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
+               </div>
+               <div className="pos-billing-row">
+                  <span>SGST (2.5%)</span>
+                  <span>₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
+               </div>
+
+               {/* Service Charge */}
+               {cart.getServiceCharge() > 0 && (
+                 <div className="pos-billing-row">
+                    <span>Service Charge ({cart.serviceChargePercent}%)</span>
+                    <span>₹{cart.getServiceCharge().toFixed(2)}</span>
+                 </div>
+               )}
+
+               {/* Total */}
+               <div className="pos-billing-row total-row">
+                  <span>Total Payable</span>
+                  <span style={{ fontSize: '20px', color: '#D32F2F' }}>₹{cart.getGrandTotal().toFixed(2)}</span>
+                  <button 
+                    onClick={() => setShowBillSheet(true)}
+                    style={{ background: '#ECEFF1', border: '1px solid #CFD8DC', borderRadius: '4px', cursor: 'pointer', color: '#546E7A', padding: '4px', display: 'flex', alignItems: 'center', marginLeft: '8px' }}
+                    title="View Breakdown"
+                  >
+                    <ChevronDown size={20} style={{ transform: 'rotate(180deg)' }} />
+                  </button>
+               </div>
+             </div>
+
+             {/* Footer Controls */}
+             {/* Payment Modes Grid */}
+             <div className="pos-payment-modes">
+               {[
+                 { id: 'cash', label: 'Cash', icon: Banknote },
+                 { id: 'card', label: 'Card', icon: CreditCard },
+                 { id: 'upi', label: 'UPI', icon: Smartphone },
+                 { id: 'due', label: 'Due', icon: Clock },
+                 { id: 'split', label: 'Split', icon: Split }
+               ].map(mode => (
+                 <button
+                   key={mode.id}
+                   className={`payment-mode-btn ${cart.paymentMethod === mode.id ? 'active' : ''}`}
+                   onClick={() => cart.setPaymentMethod(mode.id)}
+                 >
+                   <mode.icon className="payment-mode-icon" size={20} />
+                   <span className="payment-mode-label">{mode.label}</span>
+                 </button>
+               ))}
+             </div>
+
+             {/* Action Bar */}
+             <div className="pos-action-bar">
+               <button className="pos-action-btn btn-save" onClick={handleCheckout}>
+                  <Save size={18} style={{ marginBottom: '4px' }} />
+                  Save
+               </button>
+               <button className="pos-action-btn btn-print" onClick={handleSaveAndPrint}>
+                  <Printer size={18} style={{ marginBottom: '4px' }} />
+                  Print
+               </button>
+               <button className="pos-action-btn btn-kot" onClick={handleKOTOnly}>
+                  <ChefHat size={18} style={{ marginBottom: '4px' }} />
+                  KOT
+               </button>
+               <button className="pos-action-btn btn-kot-print" onClick={handleKOTAndPrint}>
+                  <Printer size={18} style={{ marginBottom: '4px' }} />
+                  KOT+Print
+               </button>
+               <button className="pos-action-btn btn-hold" onClick={handleHoldOrder}>
+                  <PauseCircle size={18} style={{ marginBottom: '4px' }} />
+                  Hold
+               </button>
+             </div>
           </div>
-        )}
+        </div>
+
       </div>
 
-      {/* Add-on Selection Modal */}
+      {/* Modals */}
       {showAddonModal && selectedItemForAddon && (
         <AddonSelectionModal
           item={selectedItemForAddon}
@@ -466,8 +679,7 @@ const POSPage = () => {
           }}
         />
       )}
-
-      {/* Held Orders Modal */}
+      
       {showHeldOrders && (
         <HeldOrdersModal
           orders={heldOrders}
@@ -476,28 +688,105 @@ const POSPage = () => {
         />
       )}
 
-      {/* Payment Modal */}
       {showPayment && (
         <PaymentModal
-          total={cart.getTotal()}
+          total={cart.getGrandTotal()}
           onClose={() => setShowPayment(false)}
           onSuccess={() => {
             setShowPayment(false);
-            loadData(); // Refresh menu
+            cart.clearCart();
+            loadData(); 
           }}
-          userId={user.id}
+          userId={user?.id}
         />
       )}
+
+      {/* Discount Modal */}
+      {showDiscountModal && (
+        <DiscountModal
+          onClose={() => setShowDiscountModal(false)}
+          onApply={(type, value, reason) => {
+            cart.applyDiscount(type, value, reason);
+            setShowDiscountModal(false);
+          }}
+          onClear={() => {
+            cart.clearDiscount();
+            setShowDiscountModal(false);
+          }}
+          currentType={cart.discountType}
+          currentValue={cart.discountValue}
+          subtotal={cart.getSubtotal()}
+        />
+      )}
+
+      {/* Strict Design: Customer History Drawer */}
+      <div className={`pos-drawer-overlay ${showHistoryDrawer ? 'active' : ''}`} onClick={() => setShowHistoryDrawer(false)}></div>
+      <div className={`pos-right-drawer ${showHistoryDrawer ? 'active' : ''}`}>
+          <div className="drawer-header" style={{ padding: '16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#37474F', color: 'white' }}>
+              <h3 style={{ margin: 0, fontSize: '16px' }}>Customer History</h3>
+              <button onClick={() => setShowHistoryDrawer(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20} /></button>
+          </div>
+          <div className="drawer-body" style={{ padding: '16px' }}>
+              <div className="history-search">
+                  <input type="text" placeholder="Search orders..." style={{ width: '100%', padding: '8px', marginBottom: '16px', border: '1px solid #ddd', borderRadius: '4px' }} />
+              </div>
+              <div className="history-list">
+                  <p style={{ textAlign: 'center', color: '#999', marginTop: '20px' }}>
+                      <Clock size={32} style={{ marginBottom: '8px', opacity: 0.5 }} /><br/>
+                      No history found for {cart.customerPhone || 'this customer'}
+                  </p>
+              </div>
+          </div>
+      </div>
+
+      {/* Strict Design: Bill Breakdown Sheet */}
+      <div className={`pos-sheet-overlay ${showBillSheet ? 'active' : ''}`} onClick={() => setShowBillSheet(false)}></div>
+      <div className={`pos-bottom-sheet ${showBillSheet ? 'active' : ''}`}>
+          <div className="sheet-header" style={{ padding: '12px 16px', background: '#37474F', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0' }}>
+              <h3 style={{ margin: 0, fontSize: '16px' }}>Bill Details</h3>
+              <button onClick={() => setShowBillSheet(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><ChevronDown size={24} /></button>
+          </div>
+          <div className="sheet-body" style={{ padding: '20px', background: 'white' }}>
+             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px' }}>
+                <span>Subtotal</span>
+                <span>₹{cart.getSubtotal().toFixed(2)}</span>
+             </div>
+             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#666', fontSize: '14px' }}>
+                <span>Discount</span>
+                <span>-₹{cart.discountValue || 0}</span>
+             </div>
+             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#666', fontSize: '14px' }}>
+                <span>Taxes</span>
+                <span>₹{cart.getTaxAmount().toFixed(2)}</span>
+             </div>
+             
+             {/* Extra Fields as per design description */}
+             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#666', fontSize: '14px' }}>
+                <span>Container Charge</span>
+                <span>₹0.00</span>
+             </div>
+             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#666', fontSize: '14px' }}>
+                <span>Delivery Charge</span>
+                <span>₹0.00</span>
+             </div>
+
+             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #ddd', fontWeight: 'bold', fontSize: '20px', color: '#D32F2F' }}>
+                <span>Grand Total</span>
+                <span>₹{cart.getGrandTotal().toFixed(2)}</span>
+             </div>
+          </div>
+      </div>
+
     </div>
   );
 };
 
-// Addon Selection Modal Component
+// Addon Selection Modal Component - Redesigned to match reference
 const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState(item.parsedVariants.length > 0 ? item.parsedVariants[0] : null);
   const [selectedAddons, setSelectedAddons] = useState([]);
-  const [notes, setNotes] = useState('');
+  const [addonSearch, setAddonSearch] = useState('');
 
   const calculateTotal = () => {
     let total = selectedVariant ? parseFloat(selectedVariant.price) : item.price;
@@ -515,115 +804,105 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
     }
   };
 
+  // Filter addons by search
+  const filteredAddons = item.parsedAddons.filter(addon =>
+    addon.name.toLowerCase().includes(addonSearch.toLowerCase())
+  );
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: '500px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+      <div className="modal addon-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Modal Header */}
+        <div className="addon-modal-header">
           <div>
-            <h3 className="modal-title">{item.name}</h3>
-            <p className="text-muted text-sm">{item.description}</p>
+            <span className="addon-modal-title">{item.name}</span>
+            <span className="addon-modal-price"> | ₹{(selectedVariant ? parseFloat(selectedVariant.price) : item.price).toFixed(2)}</span>
           </div>
           <button className="btn btn-ghost btn-icon" onClick={onClose}>
             <X size={20} />
           </button>
         </div>
 
-        <div className="modal-body" style={{ overflowY: 'auto', flex: 1 }}>
-          {/* Variants */}
-          {item.parsedVariants.length > 0 && (
-            <div className="mb-4">
-              <h4 className="font-medium mb-2">Size / Variant</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {item.parsedVariants.map((variant, idx) => (
-                  <label key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '8px', border: selectedVariant === variant ? '2px solid var(--primary-500)' : '1px solid var(--gray-200)', cursor: 'pointer', background: selectedVariant === variant ? 'var(--primary-50)' : 'white' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input 
-                        type="radio" 
-                        name="variant" 
-                        checked={selectedVariant === variant}
-                        onChange={() => setSelectedVariant(variant)}
-                      />
-                      <span className="font-medium">{variant.name}</span>
-                    </div>
-                    <span className="font-semibold">₹{parseFloat(variant.price).toFixed(2)}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
+        {/* Variant Tabs at Top */}
+        {item.parsedVariants.length > 0 && (
+          <div className="addon-variant-tabs">
+            {item.parsedVariants.map((variant, idx) => (
+              <button
+                key={idx}
+                className={`addon-variant-tab ${selectedVariant === variant ? 'active' : ''}`}
+                onClick={() => setSelectedVariant(variant)}
+              >
+                <span className="addon-variant-tab-name">{variant.name}</span>
+                <span className="addon-variant-tab-price">₹{parseFloat(variant.price).toFixed(0)}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
-          {/* Add-ons */}
+        {/* Addon Search */}
+        {item.parsedAddons.length > 0 && (
+          <div className="addon-search-box">
+            <div style={{ position: 'relative' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#90A4AE' }} />
+              <input
+                type="text"
+                className="addon-search-input"
+                placeholder="Search addon item..."
+                value={addonSearch}
+                onChange={(e) => setAddonSearch(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Addon Groups */}
+        <div className="addon-groups">
           {item.parsedAddons.length > 0 && (
-            <div className="mb-4">
-              <h4 className="font-medium mb-2">Add-ons</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {item.parsedAddons.map((addon, idx) => {
+            <div className="addon-group">
+              <div className="addon-group-header">
+                <span className="addon-group-name">
+                  <span style={{ width: '4px', height: '16px', background: '#FF9800', borderRadius: '4px', display: 'inline-block' }}></span>
+                  {selectedVariant?.name || 'Default'}
+                </span>
+                <span className="addon-group-info" style={{ fontSize: '12px', color: '#78909C' }}>Multiple Add-ons (Min: 0, Max: 7)</span>
+              </div>
+              <div className="addon-grid">
+                {filteredAddons.map((addon, idx) => {
                   const isSelected = selectedAddons.some(a => a.name === addon.name);
                   return (
-                    <label key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '8px', border: isSelected ? '2px solid var(--primary-500)' : '1px solid var(--gray-200)', cursor: 'pointer', background: isSelected ? 'var(--primary-50)' : 'white' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected}
-                          onChange={() => toggleAddon(addon)}
-                        />
-                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span className="font-medium">{addon.name}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-                               {addon.type === 'veg' ? <div className="w-2 h-2 rounded-full bg-green-500"></div> : <div className="w-2 h-2 rounded-full bg-red-500"></div>}
-                               <span className="text-gray-500">{addon.type === 'veg' ? 'Veg' : 'Non-Veg'}</span>
-                            </div>
-                         </div>
-                      </div>
-                      <span className="font-semibold">+₹{parseFloat(addon.price).toFixed(2)}</span>
-                    </label>
+                    <div
+                      key={idx}
+                      className={`addon-item ${addon.type !== 'veg' ? 'nonveg' : ''} ${isSelected ? 'selected' : ''}`}
+                      onClick={() => toggleAddon(addon)}
+                    >
+                      <span className="addon-item-name">{addon.name}</span>
+                      <span className="addon-item-price">₹{parseFloat(addon.price).toFixed(0)}</span>
+                    </div>
                   );
                 })}
               </div>
             </div>
           )}
 
-          {/* Special Instructions */}
-          <div className="mb-4">
-            <h4 className="font-medium mb-2">Special Notes</h4>
-            <textarea
-              className="input"
-              rows={3}
-              placeholder="e.g. Less spicy, Extra sauce..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
-
-          {/* Quantity */}
-           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', margin: '16px 0' }}>
-              <button 
-                className="btn btn-secondary btn-icon"
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              >
-                <Minus size={20} />
-              </button>
-              <span style={{ fontSize: '1.5em', fontWeight: 600, width: '40px', textAlign: 'center' }}>
-                {quantity}
-              </span>
-              <button 
-                className="btn btn-secondary btn-icon"
-                onClick={() => setQuantity(quantity + 1)}
-              >
-                <Plus size={20} />
-              </button>
-           </div>
+          {/* Empty state if no addons */}
+          {item.parsedAddons.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-500)' }}>
+              <p>No add-ons available for this item</p>
+            </div>
+          )}
         </div>
 
-        <div className="modal-footer">
-           <button 
-            className="btn btn-primary btn-lg w-full" 
-            style={{ justifyContent: 'space-between' }}
-            onClick={() => onAddToCart(item, quantity, notes, selectedVariant, selectedAddons)}
-           >
-             <span>Add {quantity} to Order</span>
-             <span>₹{calculateTotal().toFixed(2)}</span>
-           </button>
+        {/* Modal Footer */}
+        <div className="addon-modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-save"
+            onClick={() => onAddToCart(item, quantity, '', selectedVariant, selectedAddons)}
+          >
+            Save
+          </button>
         </div>
       </div>
     </div>
@@ -634,7 +913,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
 const HeldOrdersModal = ({ orders, onClose, onResume }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
            <h3 className="modal-title">Held Orders</h3>
            <button className="btn btn-ghost btn-icon" onClick={onClose}>
@@ -706,11 +985,7 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1001 }}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ 
-        maxWidth: '400px', 
-        background: '#fff',
-        fontFamily: 'monospace'
-      }}>
+      <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">Bill Preview</h3>
           <button className="btn btn-ghost btn-icon" onClick={onClose}>
@@ -725,7 +1000,8 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
             padding: 'var(--spacing-4)', 
             border: '1px dashed var(--gray-300)',
             margin: 'var(--spacing-3)',
-            borderRadius: 'var(--radius-md)'
+            borderRadius: 'var(--radius-md)',
+            fontFamily: 'monospace' // Restore monospace for receipt look
           }}>
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: 'var(--spacing-3)' }}>
@@ -1014,7 +1290,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
   if (orderComplete) {
     return (
       <div className="modal-overlay">
-        <div className="modal" style={{ textAlign: 'center', padding: 'var(--spacing-8)', maxWidth: '400px' }}>
+        <div className="modal modal-sm" style={{ textAlign: 'center', padding: 'var(--spacing-8)' }}>
           <div style={{
             width: '80px',
             height: '80px',
@@ -1383,6 +1659,25 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
                 UPI
               </span>
             </button>
+
+            <button
+              className="btn btn-lg"
+              style={{
+                background: '#FFF3E0',
+                color: '#E65100',
+                border: '2px solid #FFCC80',
+                justifyContent: 'flex-start',
+                padding: 'var(--spacing-4)',
+              }}
+              onClick={() => handlePayment('due')}
+              disabled={isProcessing}
+            >
+              <Clock size={24} />
+              <span style={{ flex: 1, textAlign: 'left', marginLeft: 'var(--spacing-3)' }}>
+                Due / Credit
+              </span>
+              <span style={{ fontSize: '12px', color: '#F57C00' }}>Pay Later</span>
+            </button>
           </div>
 
           {isProcessing && (
@@ -1397,6 +1692,155 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
               <span>Processing payment...</span>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Discount Modal Component
+const DiscountModal = ({ onClose, onApply, onClear, currentType, currentValue, subtotal }) => {
+  const [discountType, setDiscountType] = React.useState(currentType !== 'none' ? currentType : 'percentage');
+  const [discountValue, setDiscountValue] = React.useState(currentValue || 0);
+  const [reason, setReason] = React.useState('');
+
+  const calculatePreview = () => {
+    if (discountType === 'percentage') {
+      return (subtotal * discountValue) / 100;
+    }
+    return Math.min(discountValue, subtotal);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: '450px', height: 'auto', maxHeight: '90vh' }}>
+        {/* Header */}
+        <div className="modal-header" style={{ background: '#D32F2F', color: 'white' }}>
+          <h3 className="modal-title" style={{ color: 'white', fontSize: '18px' }}>Apply Discount</h3>
+          <button 
+            className="modal-close-btn" 
+            onClick={onClose}
+            style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none' }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="modal-body">
+          {/* Discount Type Selection */}
+          <div style={{ marginBottom: '20px' }}>
+            <label className="label">Discount Type</label>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setDiscountType('percentage')}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: discountType === 'percentage' ? '2px solid #D32F2F' : '1px solid #CFD8DC',
+                  borderRadius: '8px',
+                  background: discountType === 'percentage' ? '#FFEBEE' : 'white',
+                  color: discountType === 'percentage' ? '#D32F2F' : '#546E7A',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Percentage (%)
+              </button>
+              <button
+                onClick={() => setDiscountType('flat')}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: discountType === 'flat' ? '2px solid #D32F2F' : '1px solid #CFD8DC',
+                  borderRadius: '8px',
+                  background: discountType === 'flat' ? '#FFEBEE' : 'white',
+                  color: discountType === 'flat' ? '#D32F2F' : '#546E7A',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Flat Amount (₹)
+              </button>
+            </div>
+          </div>
+
+          {/* Discount Value */}
+          <div style={{ marginBottom: '20px' }}>
+            <label className="label">
+              {discountType === 'percentage' ? 'Discount Percentage' : 'Discount Amount'}
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="number"
+                value={discountValue}
+                onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
+                placeholder={discountType === 'percentage' ? 'Enter percentage (e.g., 10)' : 'Enter amount (e.g., 50)'}
+                className="input"
+                style={{ fontSize: '18px', fontWeight: 'bold' }}
+                min="0"
+                max={discountType === 'percentage' ? 100 : subtotal}
+                autoFocus
+              />
+              <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#90A4AE', fontWeight: 'bold' }}>
+                {discountType === 'percentage' ? '%' : '₹'}
+              </span>
+            </div>
+          </div>
+
+          {/* Reason */}
+          <div style={{ marginBottom: '20px' }}>
+            <label className="label">Reason (Optional)</label>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="E.g., Birthday discount, Loyalty reward"
+              className="input"
+            />
+          </div>
+
+          {/* Preview */}
+          <div style={{ background: '#E8F5E9', padding: '16px', borderRadius: '12px', border: '1px solid #C8E6C9' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2E7D32', fontWeight: '700', marginBottom: '8px' }}>
+              <span>Discount Amount:</span>
+              <span>-₹{calculatePreview().toFixed(2)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#546E7A', fontSize: '14px', borderTop: '1px dashed #A5D6A7', paddingTop: '8px' }}>
+              <span>New Total:</span>
+              <span style={{ fontWeight: '600', color: '#37474F' }}>₹{(subtotal - calculatePreview()).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="modal-footer">
+          {currentType !== 'none' && (
+            <button
+              onClick={onClear}
+              className="btn"
+              style={{ border: '1px solid #FFCDD2', color: '#D32F2F', background: '#FFEBEE' }}
+            >
+              Clear
+            </button>
+          )}
+          <div style={{ flex: 1 }}></div>
+          <button
+            onClick={onClose}
+            className="btn btn-secondary"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onApply(discountType, discountValue, reason)}
+            disabled={discountValue <= 0}
+            className="btn btn-primary"
+            style={{ background: '#D32F2F', borderColor: '#D32F2F' }}
+          >
+            Apply Discount
+          </button>
         </div>
       </div>
     </div>
