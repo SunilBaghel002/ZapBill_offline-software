@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useCartStore } from '../stores/cartStore';
-import { 
-  ShoppingCart, 
-  Trash2, 
-  Plus, 
-  Minus, 
-  CreditCard, 
-  Banknote, 
+import {
+  ShoppingCart,
+  Trash2,
+  Plus,
+  Minus,
+  CreditCard,
+  Banknote,
   Smartphone,
   X,
   Printer,
@@ -43,6 +43,7 @@ import {
   Edit2
 } from 'lucide-react';
 import MainSidebar from '../components/layout/MainSidebar';
+import '../styles/pos-sheet.css';
 
 const CustomerHistoryModal = ({ isOpen, onClose, history, customerName, customerPhone }) => {
   if (!isOpen) return null;
@@ -56,85 +57,85 @@ const CustomerHistoryModal = ({ isOpen, onClose, history, customerName, customer
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'flex-end'
     }} onClick={onClose}>
-      <div 
+      <div
         style={{
-          background: 'white', width: '600px', height: '100%', 
+          background: 'white', width: '600px', height: '100%',
           display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 15px rgba(0,0,0,0.1)',
           animation: 'slideInRight 0.3s ease-out'
-        }} 
+        }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ padding: '20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa' }}>
           <div>
-             <h3 style={{ margin: 0, fontSize: '18px', color: '#2c3e50' }}>Customer History</h3>
-             <div style={{ fontSize: '13px', color: '#7f8c8d', marginTop: '4px' }}>{customerName || 'Unknown'} - {customerPhone}</div>
+            <h3 style={{ margin: 0, fontSize: '18px', color: '#2c3e50' }}>Customer History</h3>
+            <div style={{ fontSize: '13px', color: '#7f8c8d', marginTop: '4px' }}>{customerName || 'Unknown'} - {customerPhone}</div>
           </div>
           <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px' }}><X size={24} color="#546E7A" /></button>
         </div>
 
         <div style={{ padding: '16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', borderBottom: '1px solid #eee', background: '#fff' }}>
-            <div style={{ background: '#e3f2fd', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
-               <div style={{ fontSize: '11px', color: '#546e7a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Orders</div>
-               <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#0288d1' }}>{history.length}</div>
-            </div>
-            <div style={{ background: '#e8f5e9', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
-               <div style={{ fontSize: '11px', color: '#546e7a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Max Order</div>
-               <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#388e3c' }}>₹{maxOrderValue.toFixed(0)}</div>
-            </div>
-            <div style={{ background: '#fff3e0', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
-               <div style={{ fontSize: '11px', color: '#546e7a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Avg Order</div>
-               <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#f57c00' }}>₹{avgBill.toFixed(0)}</div>
-            </div>
+          <div style={{ background: '#e3f2fd', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: '#546e7a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Orders</div>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#0288d1' }}>{history.length}</div>
+          </div>
+          <div style={{ background: '#e8f5e9', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: '#546e7a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Max Order</div>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#388e3c' }}>₹{maxOrderValue.toFixed(0)}</div>
+          </div>
+          <div style={{ background: '#fff3e0', padding: '12px', borderRadius: '8px', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: '#546e7a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Avg Order</div>
+            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#f57c00' }}>₹{avgBill.toFixed(0)}</div>
+          </div>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '0', background: '#fff' }}>
-           {history.length === 0 ? (
-             <div style={{ textAlign: 'center', padding: '40px 20px', color: '#90a4ae' }}>
-                <Clock size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-                <p>No order history found for this customer.</p>
-             </div>
-           ) : (
-             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
-               <thead style={{ position: 'sticky', top: 0, background: '#f8f9fa', color: '#546E7A', fontWeight: '600', zIndex: 1, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-                 <tr>
-                   <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Order No</th>
-                   <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Date</th>
-                   <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Type</th>
-                   <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Items</th>
-                   <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Payment Type</th>
-                   <th style={{ padding: '12px', borderBottom: '1px solid #eee', textAlign: 'right' }}>Amount</th>
-                 </tr>
-               </thead>
-               <tbody>
-                 {history.map((order, idx) => (
-                   <tr key={order.id} style={{ borderBottom: '1px solid #f5f5f5', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                      <td style={{ padding: '12px', fontWeight: '500', color: '#37474F' }}>#{order.order_number}</td>
-                      <td style={{ padding: '12px', color: '#78909C' }}>{new Date(order.created_at).toLocaleDateString()}</td>
-                      <td style={{ padding: '12px' }}>
-                        <span style={{ 
-                          background: order.order_type === 'dine_in' ? '#E3F2FD' : order.order_type === 'delivery' ? '#FFF3E0' : '#E8F5E9', 
-                          color: order.order_type === 'dine_in' ? '#1565C0' : order.order_type === 'delivery' ? '#EF6C00' : '#2E7D32',
-                          padding: '2px 8px', borderRadius: '4px', fontSize: '11px', textTransform: 'capitalize' 
-                        }}>
-                          {order.order_type?.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#546E7A' }} title={order.items?.map(i => `${i.quantity} x ${i.item_name}`).join(', ')}>
-                         {order.items?.map(i => `${i.quantity} x ${i.item_name}`).join(', ')}
-                      </td>
-                      <td style={{ padding: '12px', color: '#546E7A', textTransform: 'capitalize' }}>
-                         {order.payment_method === 'upi' ? 'UPI' : 
-                          order.payment_method === 'card' ? 'Card' : 
-                          order.payment_method === 'due' ? 'Pay Later' : 
-                          order.payment_method === 'split' ? 'Split' : 
-                          order.payment_method === 'cash' ? 'Cash' : '-'}
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: '#263238' }}>₹{order.total_amount}</td>
-                   </tr>
-                 ))}
-               </tbody>
-             </table>
-           )}
+          {history.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#90a4ae' }}>
+              <Clock size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+              <p>No order history found for this customer.</p>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#f8f9fa', color: '#546E7A', fontWeight: '600', zIndex: 1, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                <tr>
+                  <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Order No</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Date</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Type</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Items</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid #eee' }}>Payment Type</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid #eee', textAlign: 'right' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((order, idx) => (
+                  <tr key={order.id} style={{ borderBottom: '1px solid #f5f5f5', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                    <td style={{ padding: '12px', fontWeight: '500', color: '#37474F' }}>#{order.order_number}</td>
+                    <td style={{ padding: '12px', color: '#78909C' }}>{new Date(order.created_at).toLocaleDateString()}</td>
+                    <td style={{ padding: '12px' }}>
+                      <span style={{
+                        background: order.order_type === 'dine_in' ? '#E3F2FD' : order.order_type === 'delivery' ? '#FFF3E0' : '#E8F5E9',
+                        color: order.order_type === 'dine_in' ? '#1565C0' : order.order_type === 'delivery' ? '#EF6C00' : '#2E7D32',
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', textTransform: 'capitalize'
+                      }}>
+                        {order.order_type?.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: '#546E7A' }} title={order.items?.map(i => `${i.quantity} x ${i.item_name}`).join(', ')}>
+                      {order.items?.map(i => `${i.quantity} x ${i.item_name}`).join(', ')}
+                    </td>
+                    <td style={{ padding: '12px', color: '#546E7A', textTransform: 'capitalize' }}>
+                      {order.payment_method === 'upi' ? 'UPI' :
+                        order.payment_method === 'card' ? 'Card' :
+                          order.payment_method === 'due' ? 'Pay Later' :
+                            order.payment_method === 'split' ? 'Split' :
+                              order.payment_method === 'cash' ? 'Cash' : '-'}
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: '#263238' }}>₹{order.total_amount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
       <style>{`
@@ -154,14 +155,14 @@ const POSPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPayment, setShowPayment] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // New States for Add-ons and Hold Order
   const [showAddonModal, setShowAddonModal] = useState(false);
   const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
   const [showHeldOrders, setShowHeldOrders] = useState(false);
   // heldOrders are now in cart store
   const [showDiscountModal, setShowDiscountModal] = useState(false);
-  
+
   // Strict Design Match State
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
@@ -177,39 +178,39 @@ const POSPage = () => {
   const [customerLocality, setCustomerLocality] = useState('');
 
   const handlePhoneInput = async (e) => {
-      const val = e.target.value;
-      cart.setCustomerPhone(val);
-      
-      if (val.length > 2) {
-          try {
-              const suggestions = await window.electronAPI.invoke('customer:search', { query: val });
-              setCustomerSuggestions(suggestions);
-              setShowSuggestions(true);
-          } catch (err) {
-              console.error(err);
-          }
-      } else {
-          setCustomerSuggestions([]);
-          setShowSuggestions(false);
+    const val = e.target.value;
+    cart.setCustomerPhone(val);
+
+    if (val.length > 2) {
+      try {
+        const suggestions = await window.electronAPI.invoke('customer:search', { query: val });
+        setCustomerSuggestions(suggestions);
+        setShowSuggestions(true);
+      } catch (err) {
+        console.error(err);
       }
+    } else {
+      setCustomerSuggestions([]);
+      setShowSuggestions(false);
+    }
   };
 
   const selectCustomer = (cust) => {
-      cart.setCustomerName(cust.customer_name);
-      cart.setCustomerPhone(cust.customer_phone);
-      // If we had address/locality in DB, we'd set them here
-      setShowSuggestions(false);
+    cart.setCustomerName(cust.customer_name);
+    cart.setCustomerPhone(cust.customer_phone);
+    // If we had address/locality in DB, we'd set them here
+    setShowSuggestions(false);
   };
 
   const fetchHistory = async () => {
-      if (!cart.customerPhone) return alert("Please enter mobile number first");
-      try {
-          const history = await window.electronAPI.invoke('customer:getHistory', { phone: cart.customerPhone });
-          setHistoryData(history);
-          setShowHistoryModal(true);
-      } catch (err) {
-          alert("Failed to fetch history");
-      }
+    if (!cart.customerPhone) return alert("Please enter mobile number first");
+    try {
+      const history = await window.electronAPI.invoke('customer:getHistory', { phone: cart.customerPhone });
+      setHistoryData(history);
+      setShowHistoryModal(true);
+    } catch (err) {
+      alert("Failed to fetch history");
+    }
   };
 
   const { user } = useAuthStore();
@@ -224,7 +225,7 @@ const POSPage = () => {
     try {
       const categoriesResult = await window.electronAPI.invoke('menu:getCategories');
       setCategories(categoriesResult);
-      
+
       if (categoriesResult.length > 0) {
         setSelectedCategory(categoriesResult[0].id);
       }
@@ -240,7 +241,7 @@ const POSPage = () => {
 
   const filteredItems = menuItems.filter(item => {
     const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
-    const matchesSearch = !searchQuery || 
+    const matchesSearch = !searchQuery ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch && item.is_available;
   });
@@ -260,7 +261,7 @@ const POSPage = () => {
 
   const handleCheckout = async () => {
     if (cart.items.length === 0) return;
-    
+
     // Direct Checkout: Create Order -> KOT -> Print -> Clear
     // Validate Customer Details
     if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
@@ -270,24 +271,24 @@ const POSPage = () => {
     }
 
     if (window.confirm('Confirm Order & Send to Kitchen?')) {
-        try {
-            const result = await cart.createOrder(user?.id);
-            if (result.success) {
-                // 1. KOT
-                // 2. Print Receipt
-                // 3. Clear Cart (done in createOrder)
-                // 4. Alert/Notify
-                 const order = await window.electronAPI.invoke('order:getById', { id: result.id });
-                 await window.electronAPI.invoke('print:kot', { order: order, items: order.items });
-                 alert(`Order #${result.orderNumber} Placed Successfully!`);
-                 loadData(); 
-            } else {
-                 alert('Order Failed: ' + result.error);
-            }
-        } catch (error) {
-            console.error(error);
-            alert('Error processing order');
+      try {
+        const result = await cart.createOrder(user?.id);
+        if (result.success) {
+          // 1. KOT
+          // 2. Print Receipt
+          // 3. Clear Cart (done in createOrder)
+          // 4. Alert/Notify
+          const order = await window.electronAPI.invoke('order:getById', { id: result.id });
+          await window.electronAPI.invoke('print:kot', { order: order, items: order.items });
+          alert(`Order #${result.orderNumber} Placed Successfully!`);
+          loadData();
+        } else {
+          alert('Order Failed: ' + result.error);
         }
+      } catch (error) {
+        console.error(error);
+        alert('Error processing order');
+      }
     }
   };
 
@@ -310,7 +311,7 @@ const POSPage = () => {
         // Auto-resume if only 1
         const order = cart.heldOrders[0];
         if (window.confirm(`Resume held order #${order.orderNumber}?`)) {
-           cart.resumeOrder(order);
+          cart.resumeOrder(order);
         }
       } else {
         // Show modal if > 1
@@ -318,7 +319,7 @@ const POSPage = () => {
       }
       return;
     }
-    
+
     // Logic for non-empty cart: Hold it
     if (window.confirm('Hold this order and clear cart?')) {
       const result = cart.holdOrder();
@@ -336,24 +337,24 @@ const POSPage = () => {
         return;
       }
     }
-    
+
     cart.resumeOrder(order);
     setShowHeldOrders(false);
   };
 
   const handleDeleteHeldOrder = (orderId) => {
-      if(window.confirm('Are you sure you want to delete this held order?')) {
-          cart.removeHeldOrder(orderId);
-          if (cart.heldOrders.length === 0) {
-              setShowHeldOrders(false);
-          }
+    if (window.confirm('Are you sure you want to delete this held order?')) {
+      cart.removeHeldOrder(orderId);
+      if (cart.heldOrders.length === 0) {
+        setShowHeldOrders(false);
       }
+    }
   };
 
   // KOT Only - Send to kitchen without completing order
   const handleKOTOnly = async () => {
     if (cart.items.length === 0) return;
-    
+
     try {
       // Validate Customer Details
       if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
@@ -377,12 +378,12 @@ const POSPage = () => {
           addons: item.addons
         }))
       };
-      
-      await window.electronAPI.invoke('print:kot', { 
+
+      await window.electronAPI.invoke('print:kot', {
         order: kotOrder,
-        items: kotOrder.items 
+        items: kotOrder.items
       });
-      
+
       alert('KOT sent to kitchen!');
     } catch (error) {
       console.error('KOT print error:', error);
@@ -393,7 +394,7 @@ const POSPage = () => {
   // KOT & Print - Send to kitchen and print receipt preview
   const handleKOTAndPrint = async () => {
     if (cart.items.length === 0) return;
-    
+
     try {
       // Validate Customer Details
       if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
@@ -404,19 +405,19 @@ const POSPage = () => {
 
       // Create order first
       const result = await cart.createOrder(user?.id);
-      
+
       if (result.success) {
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
-        
+
         // Print KOT
-        await window.electronAPI.invoke('print:kot', { 
+        await window.electronAPI.invoke('print:kot', {
           order: order,
-          items: order.items 
+          items: order.items
         });
-        
+
         // Print Receipt
         await window.electronAPI.invoke('print:receipt', { order: order });
-        
+
         alert(`Order #${result.orderNumber} placed! KOT & Receipt printed.`);
       } else {
         throw new Error(result.error || 'Failed to create order');
@@ -430,7 +431,7 @@ const POSPage = () => {
   // Save & Print - Complete order and print receipt
   const handleSaveAndPrint = async () => {
     if (cart.items.length === 0) return;
-    
+
     try {
       // Validate Customer Details
       if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
@@ -440,19 +441,19 @@ const POSPage = () => {
       }
 
       const result = await cart.createOrder(user?.id);
-      
+
       if (result.success) {
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
-        
+
         // Complete order with selected payment method
         await window.electronAPI.invoke('order:complete', {
           id: result.id,
           paymentMethod: cart.paymentMethod,
         });
-        
+
         // Print Receipt
         await window.electronAPI.invoke('print:receipt', { order: order });
-        
+
         alert(`Order #${result.orderNumber} completed! Receipt printed.`);
       } else {
         throw new Error(result.error || 'Failed to create order');
@@ -469,12 +470,12 @@ const POSPage = () => {
 
   if (isLoading) {
     return (
-      <div style={{ 
-        display: 'flex', 
+      <div style={{
+        display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        height: '100vh', 
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
         background: '#f5f5f5',
         color: '#546E7A'
       }}>
@@ -488,33 +489,33 @@ const POSPage = () => {
   return (
     <div className="pos-fullscreen">
       {/* Header Bar - Strict PetPooja Design */}
-      <CustomerHistoryModal 
-        isOpen={showHistoryModal} 
-        onClose={() => setShowHistoryModal(false)} 
+      <CustomerHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
         history={historyData}
         customerName={cart.customerName}
         customerPhone={cart.customerPhone}
       />
       <div className="pos-header-bar">
         <div className="pos-header-left">
-          <button 
-            className="pos-header-menu-btn" 
+          <button
+            className="pos-header-menu-btn"
             onClick={() => setShowMainSidebar(true)}
           >
-             <Menu size={24} color="#546E7A" />
+            <Menu size={24} color="#546E7A" />
           </button>
           <div className="pos-logo-text">PetPooja</div>
         </div>
-        
+
         <div className="pos-search-wrapper">
           <div className="pos-search-box">
-             <Search size={18} color="#90A4AE" />
-             <input 
-               type="text" 
-               placeholder="Search by Item Name / Short Code" 
-               value={searchQuery}
-               onChange={(e) => setSearchQuery(e.target.value)}
-             />
+            <Search size={18} color="#90A4AE" />
+            <input
+              type="text"
+              placeholder="Search by Item Name / Short Code"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
 
@@ -522,12 +523,12 @@ const POSPage = () => {
           <button className="pos-new-order-btn" onClick={handleNewOrder}>
             New Order
           </button>
-          
+
           <div className="pos-support-box">
-             <span>Support</span>
-             <strong>9099912483</strong>
+            <span>Support</span>
+            <strong>9099912483</strong>
           </div>
-          
+
           <div className="pos-header-actions">
             <button className="pos-header-icon-btn" title="Sync"><RefreshCw size={20} /></button>
             <button className="pos-header-icon-btn" title="Keyboard Shortcuts"><Keyboard size={20} /></button>
@@ -538,19 +539,19 @@ const POSPage = () => {
 
       {/* Main Body */}
       <div className="pos-main-body">
-        
+
         {/* Left Section: Categories & Menu */}
         <div className="pos-left-panel">
           {/* Category Sidebar */}
           <div className="pos-category-sidebar">
-            <div 
-                className={`pos-category-item ${!selectedCategory ? 'active' : ''}`}
-                onClick={() => setSelectedCategory(null)}
+            <div
+              className={`pos-category-item ${!selectedCategory ? 'active' : ''}`}
+              onClick={() => setSelectedCategory(null)}
             >
-                <div className="pos-category-icon-wrapper" style={{ marginBottom: '4px' }}>
-                  <ClipboardList size={32} />
-                </div>
-                <span>All Items</span>
+              <div className="pos-category-icon-wrapper" style={{ marginBottom: '4px' }}>
+                <ClipboardList size={32} />
+              </div>
+              <span>All Items</span>
             </div>
             {categories.map((category, index) => {
               // Helper to get icon based on category name
@@ -569,7 +570,7 @@ const POSPage = () => {
               };
 
               return (
-                <div 
+                <div
                   key={category.id}
                   className={`pos-category-item ${selectedCategory === category.id ? 'active' : ''}`}
                   onClick={() => setSelectedCategory(category.id)}
@@ -587,23 +588,23 @@ const POSPage = () => {
           <div className="pos-menu-area">
             <div className="pos-menu-grid">
               {filteredItems.length > 0 ? (
-                  filteredItems.map(item => (
-                    <div key={item.id} className={`pos-menu-card ${item.is_vegetarian ? 'veg' : 'nonveg'}`} onClick={() => handleAddToCart(item)}>
-                      <div className="pos-menu-card-inner">
-                        <span className="pos-menu-card-name">{item.name}</span>
-                        <span className="pos-menu-card-price">₹{item.price.toFixed(0)}</span>
-                      </div>
+                filteredItems.map(item => (
+                  <div key={item.id} className={`pos-menu-card ${item.is_vegetarian ? 'veg' : 'nonveg'}`} onClick={() => handleAddToCart(item)}>
+                    <div className="pos-menu-card-inner">
+                      <span className="pos-menu-card-name">{item.name}</span>
+                      <span className="pos-menu-card-price">₹{item.price.toFixed(0)}</span>
                     </div>
-                  ))
+                  </div>
+                ))
 
               ) : (
-                    <div className="pos-empty-state">
-                      <div className="pos-empty-state-icon">
-                        <UtensilsCrossed size={48} />
-                      </div>
-                      <h3>No Items Found</h3>
-                      <p>Try selecting a different category or search term</p>
-                    </div>
+                <div className="pos-empty-state">
+                  <div className="pos-empty-state-icon">
+                    <UtensilsCrossed size={48} />
+                  </div>
+                  <h3>No Items Found</h3>
+                  <p>Try selecting a different category or search term</p>
+                </div>
               )}
             </div>
           </div>
@@ -613,19 +614,19 @@ const POSPage = () => {
         <div className="pos-cart-panel">
           {/* Order Type Tabs - Moved Inside Cart Panel */}
           <div className="pos-cart-header-tabs">
-            <button 
+            <button
               className={`pos-order-type-tab ${cart.orderType === 'dine_in' ? 'active dine-in' : ''}`}
               onClick={() => cart.setOrderType('dine_in')}
             >
               Dine In
             </button>
-            <button 
+            <button
               className={`pos-order-type-tab ${cart.orderType === 'delivery' ? 'active delivery' : ''}`}
               onClick={() => cart.setOrderType('delivery')}
             >
               Delivery
             </button>
-            <button 
+            <button
               className={`pos-order-type-tab ${cart.orderType === 'takeaway' ? 'active pickup' : ''}`}
               onClick={() => cart.setOrderType('takeaway')}
             >
@@ -635,111 +636,111 @@ const POSPage = () => {
 
           {/* Customer Info Section - Icon Bar */}
           <div className="pos-customer-bar">
-             <div className="pos-customer-bar-actions">
-                <button className="pos-header-btn" title="Table"><Plus size={18} /> T1</button>
-                <button 
-                  className={`pos-header-btn ${showCustomerForm ? 'active' : ''}`}
-                  title="Customer"
-                  onClick={() => setShowCustomerForm(!showCustomerForm)}
-                >
-                  <User size={18} />
-                </button>
-                <button className="pos-header-btn" title="Waiter"><User size={18} /></button>
-                <button className="pos-header-btn" title="Notes"><FileText size={18} /></button>
-             </div>
-             <div className="pos-order-mode-badge">
-                Outdoor
-             </div>
+            <div className="pos-customer-bar-actions">
+              <button className="pos-header-btn" title="Table"><Plus size={18} /> T1</button>
+              <button
+                className={`pos-header-btn ${showCustomerForm ? 'active' : ''}`}
+                title="Customer"
+                onClick={() => setShowCustomerForm(!showCustomerForm)}
+              >
+                <User size={18} />
+              </button>
+              <button className="pos-header-btn" title="Waiter"><User size={18} /></button>
+              <button className="pos-header-btn" title="Notes"><FileText size={18} /></button>
+            </div>
+            <div className="pos-order-mode-badge">
+              Outdoor
+            </div>
           </div>
 
           {/* User Info Form - Inline Slide Down */}
           {showCustomerForm && (
-          <div className="pos-user-info-form" style={{ background: 'white', padding: '12px', borderBottom: '1px solid #CFD8DC', fontSize: '13px', animation: 'slideDown 0.2s ease-out', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-             
-             {/* Mobile Number with Autocomplete */}
-             <div style={{ position: 'relative' }}>
+            <div className="pos-user-info-form" style={{ background: 'white', padding: '12px', borderBottom: '1px solid #CFD8DC', fontSize: '13px', animation: 'slideDown 0.2s ease-out', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+              {/* Mobile Number with Autocomplete */}
+              <div style={{ position: 'relative' }}>
                 <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Mobile Number:</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                    <input 
-                      type="text" 
-                      placeholder="Enter Mobile No"
-                      value={cart.customerPhone || ''}
-                      onChange={handlePhoneInput}
-                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                      autoComplete="off"
-                      style={{ border: '1px solid #CFD8DC', borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', flex: 1 }}
-                    />
-                    <button 
-                       onClick={fetchHistory}
-                       style={{ background: '#ECEFF1', border: '1px solid #CFD8DC', borderRadius: '4px', padding: '0 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                       title="View History"
-                    >
-                       <Clock size={16} color="#546E7A" />
-                       <span style={{ color: '#546E7A', fontWeight: 500 }}>History</span>
-                    </button>
+                  <input
+                    type="text"
+                    placeholder="Enter Mobile No"
+                    value={cart.customerPhone || ''}
+                    onChange={handlePhoneInput}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    autoComplete="off"
+                    style={{ border: '1px solid #CFD8DC', borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', flex: 1 }}
+                  />
+                  <button
+                    onClick={fetchHistory}
+                    style={{ background: '#ECEFF1', border: '1px solid #CFD8DC', borderRadius: '4px', padding: '0 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    title="View History"
+                  >
+                    <Clock size={16} color="#546E7A" />
+                    <span style={{ color: '#546E7A', fontWeight: 500 }}>History</span>
+                  </button>
                 </div>
                 {/* Suggestions Dropdown */}
                 {showSuggestions && customerSuggestions.length > 0 && (
-                    <div style={{ 
-                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, 
-                        background: 'white', border: '1px solid #eee', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                        maxHeight: '200px', overflowY: 'auto'
-                    }}>
-                        {customerSuggestions.map((cust, i) => (
-                            <div 
-                                key={i} 
-                                onMouseDown={() => selectCustomer(cust)}
-                                style={{ padding: '8px 12px', borderBottom: '1px solid #f5f5f5', cursor: 'pointer' }}
-                            >
-                                <div style={{ fontWeight: '500', color: '#2c3e50' }}>{cust.customer_phone}</div>
-                                <div style={{ fontSize: '12px', color: '#7f8c8d' }}>{cust.customer_name}</div>
-                            </div>
-                        ))}
-                    </div>
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                    background: 'white', border: '1px solid #eee', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    maxHeight: '200px', overflowY: 'auto'
+                  }}>
+                    {customerSuggestions.map((cust, i) => (
+                      <div
+                        key={i}
+                        onMouseDown={() => selectCustomer(cust)}
+                        style={{ padding: '8px 12px', borderBottom: '1px solid #f5f5f5', cursor: 'pointer' }}
+                      >
+                        <div style={{ fontWeight: '500', color: '#2c3e50' }}>{cust.customer_phone}</div>
+                        <div style={{ fontSize: '12px', color: '#7f8c8d' }}>{cust.customer_name}</div>
+                      </div>
+                    ))}
+                  </div>
                 )}
-             </div>
+              </div>
 
-             {/* Name */}
-             <div>
+              {/* Name */}
+              <div>
                 <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Customer Name:</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Enter Name"
                   value={cart.customerName || ''}
                   onChange={(e) => cart.setCustomerName(e.target.value)}
                   style={{ border: '1px solid #CFD8DC', borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', width: '100%' }}
                 />
-             </div>
+              </div>
 
-             {/* Column Layout for Address & Locality */}
-             <div>
+              {/* Column Layout for Address & Locality */}
+              <div>
                 <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Address:</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Enter Address"
                   value={customerAddress}
                   onChange={(e) => setCustomerAddress(e.target.value)}
                   style={{ border: '1px solid #CFD8DC', borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', width: '100%' }}
                 />
-             </div>
+              </div>
 
-             <div>
+              <div>
                 <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Locality:</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="Enter Locality"
                   value={customerLocality}
                   onChange={(e) => setCustomerLocality(e.target.value)}
                   style={{ border: '1px solid #CFD8DC', borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', width: '100%' }}
                 />
-             </div>
-          </div>
+              </div>
+            </div>
           )}
 
           <div className="pos-cart-table-header">
-             <span>ITEMS</span>
-             <span style={{ paddingLeft: '8px' }}>QTY.</span>
-             <span style={{ textAlign: 'right' }}>PRICE</span>
+            <span>ITEMS</span>
+            <span style={{ paddingLeft: '8px' }}>QTY.</span>
+            <span style={{ textAlign: 'right' }}>PRICE</span>
           </div>
 
           {/* Cart Items List */}
@@ -754,10 +755,10 @@ const POSPage = () => {
                 <div key={item.id} className="pos-cart-item">
                   <div className="pos-cart-item-details">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                       <button className="pos-cart-item-remove" onClick={() => cart.removeItem(item.id)}>
-                         <X size={14} style={{ background: '#D32F2F', borderRadius: '50%', color: 'white', padding: '2px' }} />
-                       </button>
-                       <span className="pos-cart-item-name">{item.name}</span>
+                      <button className="pos-cart-item-remove" onClick={() => cart.removeItem(item.id)}>
+                        <X size={14} style={{ background: '#D32F2F', borderRadius: '50%', color: 'white', padding: '2px' }} />
+                      </button>
+                      <span className="pos-cart-item-name">{item.name}</span>
                     </div>
                     {item.addons && item.addons.length > 0 && (
                       <div className="pos-cart-item-addons">
@@ -765,7 +766,7 @@ const POSPage = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="pos-cart-qty-ctrl">
                     <button className="pos-cart-qty-btn" onClick={() => cart.updateQuantity(item.id, item.quantity - 1)}>-</button>
                     <div className="pos-cart-qty-val">{item.quantity}</div>
@@ -783,237 +784,154 @@ const POSPage = () => {
 
           {/* Cart Total & Actions */}
           <div className="pos-cart-footer">
-             {/* Billing Breakdown */}
-             {/* Strict Design Bill Breakdown - Matches pos2.jpeg */ }
-             <div className="pos-bill-breakdown">
-               <div className="pos-bill-row">
-                  <span className="pos-bill-label">Sub Total</span>
-                  <span className="pos-bill-value">₹{cart.getSubtotal().toFixed(2)}</span>
-               </div>
-               
-               {cart.getDiscountAmount() > 0 && (
-                 <div className="pos-bill-row discount">
-                    <span className="pos-bill-label">Discount ({cart.discountType === 'percentage' ? `${cart.discountValue}%` : 'Flat'})</span>
-                    <span className="pos-bill-value">- ₹{cart.getDiscountAmount().toFixed(2)}</span>
-                 </div>
-               )}
+            {/* Billing Breakdown */}
+            {/* Strict Design Bill Breakdown - Matches pos2.jpeg */}
+            <div className="pos-bill-breakdown">
+              <div className="pos-bill-row">
+                <span className="pos-bill-label">Sub Total</span>
+                <span className="pos-bill-value">₹{cart.getSubtotal().toFixed(2)}</span>
+              </div>
 
-               <div className="pos-bill-row">
-                  <span className="pos-bill-label">SGST 2.5%</span>
-                  <span className="pos-bill-value">₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
-               </div>
+              {cart.getDiscountAmount() > 0 && (
+                <div className="pos-bill-row discount">
+                  <span className="pos-bill-label">Discount ({cart.discountType === 'percentage' ? `${cart.discountValue}%` : 'Flat'})</span>
+                  <span className="pos-bill-value">- ₹{cart.getDiscountAmount().toFixed(2)}</span>
+                </div>
+              )}
 
-               <div className="pos-bill-row">
-                  <span className="pos-bill-label">CGST 2.5%</span>
-                  <span className="pos-bill-value">₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
-               </div>
+              <div className="pos-bill-row">
+                <span className="pos-bill-label">SGST 2.5%</span>
+                <span className="pos-bill-value">₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
+              </div>
 
-               {cart.getServiceCharge() > 0 && (
-                 <div className="pos-bill-row">
-                    <span className="pos-bill-label">Service Charge ({cart.serviceChargePercent}%)</span>
-                    <span className="pos-bill-value">₹{cart.getServiceCharge().toFixed(2)}</span>
-                 </div>
-               )}
+              <div className="pos-bill-row">
+                <span className="pos-bill-label">CGST 2.5%</span>
+                <span className="pos-bill-value">₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
+              </div>
 
-               <div className="pos-bill-divider"></div>
+              {cart.getServiceCharge() > 0 && (
+                <div className="pos-bill-row">
+                  <span className="pos-bill-label">Service Charge ({cart.serviceChargePercent}%)</span>
+                  <span className="pos-bill-value">₹{cart.getServiceCharge().toFixed(2)}</span>
+                </div>
+              )}
 
-               <div className="pos-bill-total-row">
-                  <span className="pos-bill-total-label">Grand Total</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span className="pos-bill-total-value">₹{cart.getGrandTotal().toFixed(2)}</span>
-                    <button 
-                      onClick={() => setShowBillSheet(true)}
-                      style={{ background: '#ECEFF1', border: '1px solid #CFD8DC', borderRadius: '4px', cursor: 'pointer', color: '#546E7A', padding: '4px', display: 'flex', alignItems: 'center' }}
-                      title="View Detailed Bill"
-                    >
-                      <ChevronDown size={20} />
-                    </button>
-                  </div>
-               </div>
-               
-               <div className="pos-bill-controls">
-                 <button 
-                   className="pos-bill-toggle-btn"
-                   onClick={() => setShowDiscountModal(true)}
-                 >
-                   <Percent size={14} /> Add Discount
-                 </button>
-                 <div className="pos-bill-toggles">
-                    <label className={`pos-bill-checkbox ${cart.isComplimentary ? 'checked' : ''}`}>
-                      <input 
-                        type="checkbox" 
-                        checked={cart.isComplimentary}
-                        onChange={(e) => cart.setIsComplimentary(e.target.checked)}
-                      />
-                      <span>Complimentary</span>
-                    </label>
-                    <label className={`pos-bill-checkbox ${cart.isSalesReturn ? 'checked' : ''}`}>
-                      <input 
-                        type="checkbox" 
-                        checked={cart.isSalesReturn}
-                        onChange={(e) => cart.setIsSalesReturn(e.target.checked)}
-                      />
-                      <span>Return</span>
-                    </label>
-                 </div>
-               </div>
-             </div>
+              <div className="pos-bill-divider"></div>
 
-             {/* Footer Controls */}
-             {/* Payment Modes Grid */}
-             <div className="pos-payment-modes">
-               {[
-                 { id: 'cash', label: 'Cash', icon: Banknote },
-                 { id: 'card', label: 'Card', icon: CreditCard },
-                 { id: 'upi', label: 'UPI', icon: Smartphone },
-                 { id: 'due', label: 'Due', icon: Clock },
-                 { id: 'split', label: 'Split', icon: Split }
-               ].map(mode => (
-                 <button
-                   key={mode.id}
-                   className={`payment-mode-btn ${cart.paymentMethod === mode.id ? 'active' : ''}`}
-                   onClick={() => cart.setPaymentMethod(mode.id)}
-                 >
-                   <mode.icon className="payment-mode-icon" size={20} />
-                   <span className="payment-mode-label">{mode.label}</span>
-                 </button>
-               ))}
-             </div>
+              <div className="pos-bill-total-row">
+                <span className="pos-bill-total-label">Grand Total</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="pos-bill-total-value">₹{cart.getGrandTotal().toFixed(2)}</span>
+                  <button
+                    onClick={() => setShowBillSheet(true)}
+                    style={{ background: '#ECEFF1', border: '1px solid #CFD8DC', borderRadius: '4px', cursor: 'pointer', color: '#546E7A', padding: '4px', display: 'flex', alignItems: 'center' }}
+                    title="View Detailed Bill"
+                  >
+                    <ChevronDown size={20} />
+                  </button>
+                </div>
+              </div>
 
-             {/* Action Bar */}
-             <div className="pos-action-bar">
-               <button className="pos-action-btn btn-save" onClick={handleCheckout}>
-                  <Save size={18} style={{ marginBottom: '4px' }} />
-                  Save
-               </button>
-               <button className="pos-action-btn btn-print" onClick={handleSaveAndPrint}>
-                  <Printer size={18} style={{ marginBottom: '4px' }} />
-                  Print
-               </button>
-               <button className="pos-action-btn btn-kot" onClick={handleKOTOnly}>
-                  <ChefHat size={18} style={{ marginBottom: '4px' }} />
-                  KOT
-               </button>
-               <button className="pos-action-btn btn-kot-print" onClick={handleKOTAndPrint}>
-                  <Printer size={18} style={{ marginBottom: '4px' }} />
-                  KOT+Print
-               </button>
-               <button className="pos-action-btn btn-hold" onClick={handleHoldOrder} style={{ position: 'relative' }}>
-                  <PauseCircle size={18} style={{ marginBottom: '4px' }} />
-                  Hold
-                  {cart.heldOrders.length > 0 && (
-                    <span style={{ 
-                      position: 'absolute', 
-                      top: '-5px', 
-                      right: '-5px', 
-                      background: '#D32F2F', 
-                      color: 'white', 
-                      borderRadius: '50%', 
-                      width: '20px', 
-                      height: '20px', 
-                      fontSize: '12px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      border: '2px solid white'
-                    }}>
-                      {cart.heldOrders.length}
-                    </span>
-                  )}
-               </button>
-               <button className="pos-action-btn btn-secondary" onClick={() => setShowHeldOrders(true)} title="View Held Orders">
-                  <ClipboardList size={18} style={{ marginBottom: '4px' }} />
-                  Recall
-               </button>
-             </div>
-           </div>
+              <div className="pos-bill-controls">
+                <button
+                  className="pos-bill-toggle-btn"
+                  onClick={() => setShowDiscountModal(true)}
+                >
+                  <Percent size={14} /> Add Discount
+                </button>
+                <div className="pos-bill-toggles">
+                  <label className={`pos-bill-checkbox ${cart.isComplimentary ? 'checked' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={cart.isComplimentary}
+                      onChange={(e) => cart.setIsComplimentary(e.target.checked)}
+                    />
+                    <span>Complimentary</span>
+                  </label>
+                  <label className={`pos-bill-checkbox ${cart.isSalesReturn ? 'checked' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={cart.isSalesReturn}
+                      onChange={(e) => cart.setIsSalesReturn(e.target.checked)}
+                    />
+                    <span>Return</span>
+                  </label>
+                </div>
+              </div>
+            </div>
 
-           {/* Detailed Bill Sheet Overlay */}
-           {showBillSheet && (
-             <div className="pos-bottom-sheet" style={{ 
-                 position: 'absolute', 
-                 bottom: '130px', /* Sit above payment/action buttons (approx 120-130px height) */
-                 right: '12px', 
-                 left: '12px', /* Match cart panel width minus padding */
-                 background: 'white',
-                 zIndex: 30,
-                 borderRadius: '16px',
-                 boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
-                 animation: 'slideUp 0.3s ease-out',
-                 border: '1px solid #e0e0e0'
-             }}>
-                 <div className="sheet-header" style={{ padding: '12px 16px', background: '#37474F', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0' }}>
-                     <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Bill Details</h3>
-                     <button onClick={() => setShowBillSheet(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0 }}><ChevronDown size={24} /></button>
-                 </div>
-                 <div className="sheet-body" style={{ padding: '20px' }}>
-                    
-                    {/* Subtotal */}
-                    <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
-                       <span>Subtotal</span>
-                       <span style={{ fontWeight: 600 }}>₹{cart.getSubtotal().toFixed(2)}</span>
-                    </div>
-                    
-                    {/* Editable Discount */}
-                    <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px' }}>
-                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#37474F' }}>
-                           Discount 
-                           <button onClick={() => setShowDiscountModal(true)} style={{ background: '#E3F2FD', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#1565C0', padding: '2px 6px', display: 'flex', alignItems: 'center' }}>
-                               <Edit2 size={10} style={{ marginRight: '2px' }} /> Edit
-                           </button>
-                       </span>
-                       <span style={{ color: cart.discountValue > 0 ? '#388e3c' : '#78909c', fontWeight: cart.discountValue > 0 ? 600 : 400 }}>
-                           {cart.discountValue > 0 ? `-₹${cart.getDiscountAmount().toFixed(2)}` : '₹0.00'}
-                       </span>
-                    </div>
-       
-                    {/* Taxes breakdown */}
-                    <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: '#78909C' }}>
-                       <span>SGST 2.5%</span>
-                       <span>₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
-                    </div>
-                    <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#78909C' }}>
-                       <span>CGST 2.5%</span>
-                       <span>₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
-                    </div>
-                    
-                    {/* Editable Container Charge */}
-                    <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
-                       <span>Container Charge</span>
-                       <input 
-                           type="number" 
-                           value={cart.packagingCharge || ''}
-                           onChange={(e) => cart.setPackagingCharge(parseFloat(e.target.value) || 0)}
-                           placeholder="0"
-                           style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
-                       />
-                    </div>
+            {/* Footer Controls */}
+            {/* Payment Modes Grid */}
+            <div className="pos-payment-modes">
+              {[
+                { id: 'cash', label: 'Cash', icon: Banknote },
+                { id: 'card', label: 'Card', icon: CreditCard },
+                { id: 'upi', label: 'UPI', icon: Smartphone },
+                { id: 'due', label: 'Due', icon: Clock },
+                { id: 'split', label: 'Split', icon: Split }
+              ].map(mode => (
+                <button
+                  key={mode.id}
+                  className={`payment-mode-btn ${cart.paymentMethod === mode.id ? 'active' : ''}`}
+                  onClick={() => cart.setPaymentMethod(mode.id)}
+                >
+                  <mode.icon className="payment-mode-icon" size={20} />
+                  <span className="payment-mode-label">{mode.label}</span>
+                </button>
+              ))}
+            </div>
 
-                    {/* Editable Delivery Charge */}
-                    <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', fontSize: '14px', color: '#37474F' }}>
-                       <span>Delivery Charge</span>
-                        <input 
-                           type="number" 
-                           value={cart.deliveryCharge || ''}
-                           onChange={(e) => cart.setDeliveryCharge(parseFloat(e.target.value) || 0)}
-                           placeholder="0"
-                           style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
-                       />
-                    </div>
-
-                    {/* Divider */}
-                    <div style={{ height: '1px', background: '#eee', marginBottom: '16px' }}></div>
-
-                    {/* Grand Total */}
-                    <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', color: '#D32F2F' }}>
-                       <span>Grand Total</span>
-                       <span>₹{cart.getGrandTotal().toFixed(2)}</span>
-                    </div>
-                 </div>
-           </div>
-           )}
+            {/* Action Bar */}
+            <div className="pos-action-bar">
+              <button className="pos-action-btn btn-save" onClick={handleCheckout}>
+                <Save size={18} style={{ marginBottom: '4px' }} />
+                Save
+              </button>
+              <button className="pos-action-btn btn-print" onClick={handleSaveAndPrint}>
+                <Printer size={18} style={{ marginBottom: '4px' }} />
+                Print
+              </button>
+              <button className="pos-action-btn btn-kot" onClick={handleKOTOnly}>
+                <ChefHat size={18} style={{ marginBottom: '4px' }} />
+                KOT
+              </button>
+              <button className="pos-action-btn btn-kot-print" onClick={handleKOTAndPrint}>
+                <Printer size={18} style={{ marginBottom: '4px' }} />
+                KOT+Print
+              </button>
+              <button className="pos-action-btn btn-hold" onClick={handleHoldOrder} style={{ position: 'relative' }}>
+                <PauseCircle size={18} style={{ marginBottom: '4px' }} />
+                Hold
+                {cart.heldOrders.length > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-5px',
+                    right: '-5px',
+                    background: '#D32F2F',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '20px',
+                    height: '20px',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '2px solid white'
+                  }}>
+                    {cart.heldOrders.length}
+                  </span>
+                )}
+              </button>
+              <button className="pos-action-btn btn-secondary" onClick={() => setShowHeldOrders(true)} title="View Held Orders">
+                <ClipboardList size={18} style={{ marginBottom: '4px' }} />
+                Recall
+              </button>
+            </div>
           </div>
+
+
         </div>
+      </div>
 
 
 
@@ -1032,7 +950,7 @@ const POSPage = () => {
           }}
         />
       )}
-      
+
       {showHeldOrders && (
         <HeldOrdersModal
           orders={cart.heldOrders}
@@ -1049,7 +967,7 @@ const POSPage = () => {
           onSuccess={() => {
             setShowPayment(false);
             cart.clearCart();
-            loadData(); 
+            loadData();
           }}
           userId={user?.id}
         />
@@ -1076,91 +994,114 @@ const POSPage = () => {
       {/* Strict Design: Customer History Drawer */}
       <div className={`pos-drawer-overlay ${showHistoryDrawer ? 'active' : ''}`} onClick={() => setShowHistoryDrawer(false)}></div>
       <div className={`pos-right-drawer ${showHistoryDrawer ? 'active' : ''}`}>
-          <div className="drawer-header" style={{ padding: '16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#37474F', color: 'white' }}>
-              <h3 style={{ margin: 0, fontSize: '16px' }}>Customer History</h3>
-              <button onClick={() => setShowHistoryDrawer(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20} /></button>
+        <div className="drawer-header" style={{ padding: '16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#37474F', color: 'white' }}>
+          <h3 style={{ margin: 0, fontSize: '16px' }}>Customer History</h3>
+          <button onClick={() => setShowHistoryDrawer(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20} /></button>
+        </div>
+        <div className="drawer-body" style={{ padding: '16px' }}>
+          <div className="history-search">
+            <input type="text" placeholder="Search orders..." style={{ width: '100%', padding: '8px', marginBottom: '16px', border: '1px solid #ddd', borderRadius: '4px' }} />
           </div>
-          <div className="drawer-body" style={{ padding: '16px' }}>
-              <div className="history-search">
-                  <input type="text" placeholder="Search orders..." style={{ width: '100%', padding: '8px', marginBottom: '16px', border: '1px solid #ddd', borderRadius: '4px' }} />
-              </div>
-              <div className="history-list">
-                  <p style={{ textAlign: 'center', color: '#999', marginTop: '20px' }}>
-                      <Clock size={32} style={{ marginBottom: '8px', opacity: 0.5 }} /><br/>
-                      No history found for {cart.customerPhone || 'this customer'}
-                  </p>
-              </div>
+          <div className="history-list">
+            <p style={{ textAlign: 'center', color: '#999', marginTop: '20px' }}>
+              <Clock size={32} style={{ marginBottom: '8px', opacity: 0.5 }} /><br />
+              No history found for {cart.customerPhone || 'this customer'}
+            </p>
           </div>
+        </div>
       </div>
 
       {/* Strict Design: Bill Breakdown Sheet */}
       <div className={`pos-sheet-overlay ${showBillSheet ? 'active' : ''}`} onClick={() => setShowBillSheet(false)}></div>
       <div className={`pos-bottom-sheet ${showBillSheet ? 'active' : ''}`}>
-          <div className="sheet-header" style={{ padding: '12px 16px', background: '#37474F', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0' }}>
-              <h3 style={{ margin: 0, fontSize: '16px' }}>Bill Details</h3>
-              <button onClick={() => setShowBillSheet(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><ChevronDown size={24} /></button>
+        <div className="sheet-header" style={{ padding: '12px 16px', background: '#37474F', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0' }}>
+          <h3 style={{ margin: 0, fontSize: '16px' }}>Bill Details</h3>
+          <button onClick={() => setShowBillSheet(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><ChevronDown size={24} /></button>
+        </div>
+        <div className="sheet-body" style={{ padding: '20px', background: 'white' }}>
+          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
+            <span>Subtotal</span>
+            <span style={{ fontWeight: 600 }}>₹{cart.getSubtotal().toFixed(2)}</span>
           </div>
-          <div className="sheet-body" style={{ padding: '20px', background: 'white' }}>
-             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px' }}>
-                <span>Subtotal</span>
-                <span>₹{cart.getSubtotal().toFixed(2)}</span>
-             </div>
-             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#666', fontSize: '14px' }}>
-                <span>Discount</span>
-                <span>-₹{cart.discountValue || 0}</span>
-             </div>
-             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#666', fontSize: '14px' }}>
-                <span>Taxes</span>
-                <span>₹{cart.getTaxAmount().toFixed(2)}</span>
-             </div>
-             
-             {/* Editable Fields */}
-             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', color: '#666', fontSize: '14px' }}>
-                <span>Container Charge</span>
-                <input 
-                    type="number" 
-                    placeholder="0"
-                    style={{ width: '80px', textAlign: 'right', border: '1px solid #ddd', padding: '4px', borderRadius: '4px' }}
-                />
-             </div>
-             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', color: '#666', fontSize: '14px' }}>
-                <span>Delivery Charge</span>
-                 <input 
-                    type="number" 
-                    value={cart.deliveryCharge || ''}
-                    onChange={(e) => cart.setDeliveryCharge(parseFloat(e.target.value) || 0)}
-                    placeholder="0"
-                    style={{ width: '80px', textAlign: 'right', border: '1px solid #ddd', padding: '4px', borderRadius: '4px' }}
-                />
-             </div>
 
-             <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #ddd', fontWeight: 'bold', fontSize: '20px', color: '#D32F2F' }}>
-                <span>Grand Total</span>
-                <span>₹{cart.getGrandTotal().toFixed(2)}</span>
-             </div>
-
-             {/* Return Calculation */}
-             <div style={{ marginTop: '20px', padding: '16px', background: '#E0F2F1', borderRadius: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontWeight: '600', color: '#00695C' }}>Customer Paid</span>
-                    <input 
-                        type="number" 
-                        value={cart.customerPaid || ''}
-                        onChange={(e) => cart.setCustomerPaid(parseFloat(e.target.value) || 0)}
-                        placeholder="Amount"
-                        style={{ width: '100px', textAlign: 'right', border: '1px solid #80CBC4', padding: '6px', borderRadius: '4px', fontWeight: 'bold' }}
-                    />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#004D40', fontWeight: 'bold' }}>
-                    <span>Return to Customer</span>
-                    <span style={{ fontSize: '18px' }}>
-                        ₹{Math.max(0, (cart.customerPaid || 0) - cart.getGrandTotal()).toFixed(2)}
-                    </span>
-                </div>
-             </div>
+          {/* Editable Discount */}
+          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#37474F' }}>
+              Discount
+              <button onClick={() => setShowDiscountModal(true)} style={{ background: '#E3F2FD', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#1565C0', padding: '2px 6px', display: 'flex', alignItems: 'center' }}>
+                <Edit2 size={10} style={{ marginRight: '2px' }} /> Edit
+              </button>
+            </span>
+            <span style={{ color: cart.discountValue > 0 ? '#388e3c' : '#78909c', fontWeight: cart.discountValue > 0 ? 600 : 400 }}>
+              {cart.discountValue > 0 ? `-₹${cart.getDiscountAmount().toFixed(2)}` : '₹0.00'}
+            </span>
           </div>
+
+          {/* Taxes breakdown */}
+          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: '#78909C' }}>
+            <span>SGST 2.5%</span>
+            <span>₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
+          </div>
+          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#78909C' }}>
+            <span>CGST 2.5%</span>
+            <span>₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
+          </div>
+
+          {/* Editable Container Charge */}
+          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
+            <span>Container Charge</span>
+            <input
+              type="number"
+              value={cart.packagingCharge || ''}
+              onChange={(e) => cart.setPackagingCharge(parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
+            />
+          </div>
+
+          {/* Editable Delivery Charge */}
+          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', fontSize: '14px', color: '#37474F' }}>
+            <span>Delivery Charge</span>
+            <input
+              type="number"
+              value={cart.deliveryCharge || ''}
+              onChange={(e) => cart.setDeliveryCharge(parseFloat(e.target.value) || 0)}
+              placeholder="0"
+              style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
+            />
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: '1px', background: '#eee', marginBottom: '16px' }}></div>
+
+          {/* Grand Total */}
+          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', color: '#D32F2F' }}>
+            <span>Grand Total</span>
+            <span>₹{cart.getGrandTotal().toFixed(2)}</span>
+          </div>
+
+          {/* Return Calculation */}
+          <div style={{ marginTop: '20px', padding: '16px', background: '#E0F2F1', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontWeight: '600', color: '#00695C' }}>Customer Paid</span>
+              <input
+                type="number"
+                value={cart.customerPaid || ''}
+                onChange={(e) => cart.setCustomerPaid(parseFloat(e.target.value) || 0)}
+                placeholder="Amount"
+                style={{ width: '100px', textAlign: 'right', border: '1px solid #80CBC4', padding: '6px', borderRadius: '4px', fontWeight: 'bold' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#004D40', fontWeight: 'bold' }}>
+              <span>Return to Customer</span>
+              <span style={{ fontSize: '18px' }}>
+                ₹{Math.max(0, (cart.customerPaid || 0) - cart.getGrandTotal()).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
-      
+
       {/* Main Sidebar Overlay */}
       <MainSidebar isOpen={showMainSidebar} onClose={() => setShowMainSidebar(false)} />
 
@@ -1326,9 +1267,9 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
 
         <div className="modal-body" style={{ padding: 0 }}>
           {/* Bill Content */}
-          <div style={{ 
-            background: '#fafafa', 
-            padding: 'var(--spacing-4)', 
+          <div style={{
+            background: '#fafafa',
+            padding: 'var(--spacing-4)',
             border: '1px dashed var(--gray-300)',
             margin: 'var(--spacing-3)',
             borderRadius: 'var(--radius-md)',
@@ -1344,8 +1285,8 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
               </div>
             </div>
 
-            <div style={{ 
-              borderTop: '1px dashed var(--gray-400)', 
+            <div style={{
+              borderTop: '1px dashed var(--gray-400)',
               borderBottom: '1px dashed var(--gray-400)',
               padding: 'var(--spacing-2) 0',
               marginBottom: 'var(--spacing-2)'
@@ -1374,9 +1315,9 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
 
             {/* Items */}
             <div style={{ marginBottom: 'var(--spacing-2)' }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
                 fontWeight: 600,
                 fontSize: 'var(--font-size-xs)',
                 borderBottom: '1px solid var(--gray-300)',
@@ -1388,8 +1329,8 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
                 <span>Amount</span>
               </div>
               {order.items?.map((item, idx) => (
-                <div key={idx} style={{ 
-                  display: 'flex', 
+                <div key={idx} style={{
+                  display: 'flex',
                   justifyContent: 'space-between',
                   fontSize: 'var(--font-size-sm)',
                   padding: '2px 0'
@@ -1402,7 +1343,7 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
             </div>
 
             {/* Totals */}
-            <div style={{ 
+            <div style={{
               borderTop: '1px dashed var(--gray-400)',
               paddingTop: 'var(--spacing-2)',
               fontSize: 'var(--font-size-sm)'
@@ -1423,8 +1364,8 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
                   <span>-₹{(order.discount_amount || 0).toFixed(2)}</span>
                 </div>
               )}
-              <div style={{ 
-                display: 'flex', 
+              <div style={{
+                display: 'flex',
                 justifyContent: 'space-between',
                 fontWeight: 700,
                 fontSize: 'var(--font-size-lg)',
@@ -1439,8 +1380,8 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
 
             {/* Payment Info */}
             {order.payment_method && (
-              <div style={{ 
-                textAlign: 'center', 
+              <div style={{
+                textAlign: 'center',
                 marginTop: 'var(--spacing-3)',
                 fontSize: 'var(--font-size-sm)',
                 color: 'var(--gray-600)'
@@ -1450,8 +1391,8 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
             )}
 
             {/* Footer */}
-            <div style={{ 
-              textAlign: 'center', 
+            <div style={{
+              textAlign: 'center',
               marginTop: 'var(--spacing-3)',
               fontSize: 'var(--font-size-xs)',
               color: 'var(--gray-500)'
@@ -1488,11 +1429,11 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
   const [orderId, setOrderId] = useState(null);
   const [showBillPreview, setShowBillPreview] = useState(false);
   const [viewingOrder, setViewingOrder] = useState(null);
-  
+
   // Change calculator state
   const [amountReceived, setAmountReceived] = useState('');
   const [changeToReturn, setChangeToReturn] = useState(0);
-  
+
   // Customer history state
   const [customerHistory, setCustomerHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -1506,7 +1447,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
       setCustomerHistory([]);
       return;
     }
-    
+
     setLoadingHistory(true);
     try {
       const orders = await window.electronAPI.invoke('order:getByPhone', { phone });
@@ -1533,14 +1474,14 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
     cart.setCustomerPhone(customerPhone);
     setStep('payment');
   };
-  
+
   const handleCashPayment = () => {
     setPaymentMethod('cash');
     setAmountReceived('');
     setChangeToReturn(0);
     setStep('cash');
   };
-  
+
   const handleConfirmCashPayment = () => {
     const received = parseFloat(amountReceived) || 0;
     if (received < total) {
@@ -1564,9 +1505,9 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
 
         // 1. Print KOT to Kitchen immediately when order is placed
         console.log('Printing KOT to kitchen...');
-        await window.electronAPI.invoke('print:kot', { 
+        await window.electronAPI.invoke('print:kot', {
           order: order,
-          items: order.items 
+          items: order.items
         });
 
         // 2. Complete the order with payment method
@@ -1641,18 +1582,18 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
           <p style={{ color: 'var(--gray-500)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--spacing-4)' }}>
             KOT sent to kitchen • Receipt printed
           </p>
-          
+
           <div style={{ display: 'flex', gap: 'var(--spacing-2)', marginBottom: 'var(--spacing-3)' }}>
-            <button 
-              className="btn btn-secondary" 
+            <button
+              className="btn btn-secondary"
               style={{ flex: 1 }}
               onClick={handleViewBill}
             >
               <FileText size={18} />
               View Bill
             </button>
-            <button 
-              className="btn btn-secondary" 
+            <button
+              className="btn btn-secondary"
               style={{ flex: 1 }}
               onClick={handleReprintBill}
             >
@@ -1660,7 +1601,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
               Reprint
             </button>
           </div>
-          
+
           <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={onSuccess}>
             New Order
           </button>
@@ -1668,8 +1609,8 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
 
         {/* Bill Preview Modal */}
         {showBillPreview && viewingOrder && (
-          <BillPreviewModal 
-            order={viewingOrder} 
+          <BillPreviewModal
+            order={viewingOrder}
             onClose={() => setShowBillPreview(false)}
             onPrint={handleReprintBill}
           />
@@ -1701,10 +1642,10 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
               <div style={{ color: 'var(--gray-500)', fontSize: 'var(--font-size-sm)' }}>
                 Total Amount
               </div>
-              <div style={{ 
-                fontSize: 'var(--font-size-2xl)', 
-                fontWeight: 700, 
-                color: 'var(--primary-600)' 
+              <div style={{
+                fontSize: 'var(--font-size-2xl)',
+                fontWeight: 700,
+                color: 'var(--primary-600)'
               }}>
                 ₹{total.toFixed(2)}
               </div>
@@ -1752,9 +1693,9 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
                   borderRadius: 'var(--radius-md)',
                   border: '1px solid var(--primary-200)'
                 }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
                     justifyContent: 'space-between',
                     marginBottom: 'var(--spacing-2)'
                   }}>
@@ -1774,8 +1715,8 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
             <button className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>
-            <button 
-              className="btn btn-primary" 
+            <button
+              className="btn btn-primary"
               style={{ flex: 1 }}
               onClick={handleProceedToPayment}
               disabled={!customerName.trim() || !customerPhone.trim()}
@@ -1811,10 +1752,10 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
               <div style={{ color: 'var(--gray-500)', fontSize: 'var(--font-size-sm)' }}>
                 Total Amount Due
               </div>
-              <div style={{ 
-                fontSize: 'var(--font-size-4xl)', 
-                fontWeight: 700, 
-                color: 'var(--primary-600)' 
+              <div style={{
+                fontSize: 'var(--font-size-4xl)',
+                fontWeight: 700,
+                color: 'var(--primary-600)'
               }}>
                 ₹{total.toFixed(2)}
               </div>
@@ -1835,9 +1776,9 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
             </div>
 
             {/* Quick Amount Buttons */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(4, 1fr)', 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
               gap: 'var(--spacing-2)',
               marginBottom: 'var(--spacing-4)'
             }}>
@@ -1865,10 +1806,10 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
                 <div style={{ color: 'var(--success-700)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--spacing-1)' }}>
                   Change to Return
                 </div>
-                <div style={{ 
-                  fontSize: 'var(--font-size-3xl)', 
-                  fontWeight: 700, 
-                  color: 'var(--success-600)' 
+                <div style={{
+                  fontSize: 'var(--font-size-3xl)',
+                  fontWeight: 700,
+                  color: 'var(--success-600)'
                 }}>
                   ₹{changeToReturn.toFixed(2)}
                 </div>
@@ -1880,8 +1821,8 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
             <button className="btn btn-secondary" onClick={() => setStep('payment')}>
               Back
             </button>
-            <button 
-              className="btn btn-success" 
+            <button
+              className="btn btn-success"
               style={{ flex: 1 }}
               onClick={handleConfirmCashPayment}
               disabled={isProcessing || !amountReceived || parseFloat(amountReceived) < total}
@@ -1919,17 +1860,17 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
             <div style={{ color: 'var(--gray-500)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-1)' }}>
               Total Amount
             </div>
-            <div style={{ 
-              fontSize: 'var(--font-size-4xl)', 
-              fontWeight: 700, 
-              color: 'var(--primary-600)' 
+            <div style={{
+              fontSize: 'var(--font-size-4xl)',
+              fontWeight: 700,
+              color: 'var(--primary-600)'
             }}>
               ₹{total.toFixed(2)}
             </div>
           </div>
 
-          <p style={{ 
-            textAlign: 'center', 
+          <p style={{
+            textAlign: 'center',
             marginBottom: 'var(--spacing-4)',
             color: 'var(--gray-600)'
           }}>
@@ -2012,9 +1953,9 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
           </div>
 
           {isProcessing && (
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               justifyContent: 'center',
               marginTop: 'var(--spacing-4)',
               gap: 'var(--spacing-2)'
@@ -2026,23 +1967,23 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
         </div>
       </div>
       {/* Modals & Overlays */}
-      <MainSidebar 
-        isOpen={showMainSidebar} 
-        onClose={() => setShowMainSidebar(false)} 
+      <MainSidebar
+        isOpen={showMainSidebar}
+        onClose={() => setShowMainSidebar(false)}
       />
 
       {showDiscountModal && (
-        <DiscountModal 
-          currentType={cart.discountType || 'percentage'} 
+        <DiscountModal
+          currentType={cart.discountType || 'percentage'}
           currentValue={cart.discountValue || 0}
           subtotal={cart.getSubtotal()}
           onApply={(type, val, reason) => {
-             cart.applyDiscount(type, val, reason);
-             setShowDiscountModal(false);
+            cart.applyDiscount(type, val, reason);
+            setShowDiscountModal(false);
           }}
           onClear={() => {
-             cart.clearDiscount();
-             setShowDiscountModal(false);
+            cart.clearDiscount();
+            setShowDiscountModal(false);
           }}
           onClose={() => setShowDiscountModal(false)}
         />
@@ -2070,8 +2011,8 @@ const DiscountModal = ({ onClose, onApply, onClear, currentType, currentValue, s
         {/* Header */}
         <div className="modal-header" style={{ background: '#D32F2F', color: 'white' }}>
           <h3 className="modal-title" style={{ color: 'white', fontSize: '18px' }}>Apply Discount</h3>
-          <button 
-            className="modal-close-btn" 
+          <button
+            className="modal-close-btn"
             onClick={onClose}
             style={{ background: 'rgba(255,255,255,0.2)', color: 'white', border: 'none' }}
           >
@@ -2223,49 +2164,49 @@ const HeldOrdersModal = ({ orders, onClose, onResume, onDelete }) => {
                 <div key={order.id} style={{ padding: '16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Order #{order.orderNumber}</div>
-                        <span style={{ fontSize: '11px', background: '#ECEFF1', padding: '2px 6px', borderRadius: '4px', color: '#546E7A' }}>
-                            {new Date(order.timestamp).toLocaleTimeString()}
-                        </span>
+                      <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Order #{order.orderNumber}</div>
+                      <span style={{ fontSize: '11px', background: '#ECEFF1', padding: '2px 6px', borderRadius: '4px', color: '#546E7A' }}>
+                        {new Date(order.timestamp).toLocaleTimeString()}
+                      </span>
                     </div>
                     <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
                       {order.items.length} Items • {order.orderType?.toUpperCase()}
                     </div>
                     {(order.customerName || order.customerPhone) && (
-                        <div style={{ fontSize: '12px', color: '#1976D2', marginTop: '2px' }}>
-                            <User size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }}/>
-                            {order.customerName} {order.customerPhone ? `(${order.customerPhone})` : ''}
-                        </div>
+                      <div style={{ fontSize: '12px', color: '#1976D2', marginTop: '2px' }}>
+                        <User size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                        {order.customerName} {order.customerPhone ? `(${order.customerPhone})` : ''}
+                      </div>
                     )}
                     {order.items.slice(0, 3).map((item, idx) => (
-                        <div key={idx} style={{ fontSize: '11px', color: '#90A4AE' }}>
-                            - {item.quantity} x {item.name}
-                        </div>
+                      <div key={idx} style={{ fontSize: '11px', color: '#90A4AE' }}>
+                        - {item.quantity} x {item.name}
+                      </div>
                     ))}
                     {order.items.length > 3 && <div style={{ fontSize: '11px', color: '#90A4AE' }}>... +{order.items.length - 3} more</div>}
                   </div>
-                  
+
                   <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                     <div style={{ fontWeight: 'bold', fontSize: '18px', color: '#D32F2F' }}>
-                        ₹{order.totalAmount.toFixed(2)}
+                      ₹{order.totalAmount.toFixed(2)}
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <button 
-                          onClick={() => onDelete(order.id)}
-                          className="btn"
-                          style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid #FFCDD2', background: '#FFEBEE', color: '#D32F2F' }}
-                        >
-                          <Trash2 size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                          Delete
-                        </button>
-                        <button 
-                          onClick={() => onResume(order)}
-                          className="btn btn-primary"
-                          style={{ padding: '6px 12px', fontSize: '12px' }}
-                        >
-                          <PlayCircle size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
-                          Resume
-                        </button>
+                      <button
+                        onClick={() => onDelete(order.id)}
+                        className="btn"
+                        style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid #FFCDD2', background: '#FFEBEE', color: '#D32F2F' }}
+                      >
+                        <Trash2 size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => onResume(order)}
+                        className="btn btn-primary"
+                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                      >
+                        <PlayCircle size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                        Resume
+                      </button>
                     </div>
                   </div>
                 </div>

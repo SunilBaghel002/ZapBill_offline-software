@@ -1,4 +1,3 @@
-
 /* POS Bottom Sheet Overlay */
 .pos-sheet-overlay {
   position: fixed;
@@ -18,29 +17,34 @@
   pointer-events: auto;
 }
 
-/* POS Bottom Sheet - Bottom Right Position */
+/* POS Bottom Sheet - Center Screen Modal */
 .pos-bottom-sheet {
-  position: absolute; /* Relative to pos-layout or body if fixed */
-  bottom: 90px; /* Above the payment buttons */
-  right: 24px; /* Align with right edge of cart */
-  width: 380px; /* Match cart width roughly */
+  /* Center Screen Layout - FORCE OVERRIDE */
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  bottom: auto !important;
+  right: auto !important;
+  transform: translate(-50%, -50%) scale(0.95) !important;
+  width: 400px;
+  margin: 0 !important;
+
+  /* Standard Styles */
   background: white;
   border-radius: 16px;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 100;
-  transform: translateY(20px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
   opacity: 0;
   pointer-events: none;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
-  max-height: 60vh;
+  max-height: 80vh;
   display: flex;
   flex-direction: column;
 }
 
 .pos-bottom-sheet.active {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
-  position: fixed; /* Fix to viewport */
+  transform: translate(-50%, -50%) scale(1) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
