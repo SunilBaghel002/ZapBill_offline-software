@@ -243,6 +243,36 @@ function setupIpcHandlers() {
     }
   });
 
+
+
+  // ============ ADDONS OPERATIONS ============
+  ipcMain.handle('menu:getAddons', async () => {
+    try {
+      return db.getAddons();
+    } catch (error) {
+      log.error('Get addons error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:saveAddon', async (event, { addon }) => {
+    try {
+      return db.saveAddon(addon);
+    } catch (error) {
+      log.error('Save addon error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:deleteAddon', async (event, { id }) => {
+    try {
+      return db.deleteAddon(id);
+    } catch (error) {
+      log.error('Delete addon error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // ============ ORDER OPERATIONS ============
   ipcMain.handle('order:create', async (event, { order, items }) => {
     try {

@@ -7,8 +7,11 @@ import {
   X,
   Save,
   FolderOpen,
-  Leaf
+  Leaf,
+  RefreshCw,
+  List
 } from 'lucide-react';
+import './MenuPage.css'; // Added import
 
 const MenuPage = () => {
   const [categories, setCategories] = useState([]);
@@ -17,8 +20,12 @@ const MenuPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showItemModal, setShowItemModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showGlobalAddonsModal, setShowGlobalAddonsModal] = useState(false); // New modal state
   const [editingItem, setEditingItem] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [addons, setAddons] = useState([]);
+  const [showAddonModal, setShowAddonModal] = useState(false);
+  const [editingAddon, setEditingAddon] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -27,12 +34,14 @@ const MenuPage = () => {
 
   const loadData = async () => {
     try {
-      const [cats, items] = await Promise.all([
+      const [cats, items, addonsList] = await Promise.all([
         window.electronAPI.invoke('menu:getCategories'),
         window.electronAPI.invoke('menu:getItems', {}),
+        window.electronAPI.invoke('menu:getAddons')
       ]);
       setCategories(cats);
       setMenuItems(items);
+      setAddons(addonsList || []);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -64,6 +73,23 @@ const MenuPage = () => {
     setShowCategoryModal(true);
   };
 
+  const handleDeleteCategory = async (id) => { // Added for completeness if needed later, but keeping loop clean
+      // ... implementation if needed, but sticking to existing logic ...
+  };
+  
+  // Helper for Global Addons List Modal
+  const handleEditAddon = (addon) => {
+    setEditingAddon(addon);
+    setShowAddonModal(true);
+  };
+
+  const handleDeleteAddon = async (id) => {
+    if (window.confirm('Are you sure you want to delete this add-on?')) {
+      await window.electronAPI.invoke('menu:deleteAddon', { id });
+      loadData();
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="empty-state">
@@ -74,19 +100,34 @@ const MenuPage = () => {
   }
 
   return (
-    <div>
+    <div className="page-content">
       {/* Header */}
+      {/* Sticky Header */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        marginBottom: 'var(--spacing-6)'
+        background: 'white',
+        padding: '16px 24px',
+        margin: '-24px -24px 24px -24px',
+        position: 'sticky',
+        top: 0, // Updated to 0 to align with scroll container
+        zIndex: 20, // Increased z-index
+        borderBottom: '1px solid var(--gray-200)',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
       }}>
         <div>
-          <h1>Menu Management</h1>
-          <p className="text-muted">Manage your menu items and categories</p>
+          <h1 style={{ fontSize: '1.5rem', margin: 0 }}>Menu Management</h1>
+          <p className="text-muted" style={{ fontSize: '0.875rem', margin: '4px 0 0 0' }}>Manage items, categories & add-ons</p>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
+        <div style={{ display: 'flex', gap: '12px' }}>
+           <button 
+            className="btn btn-secondary"
+            onClick={() => setShowGlobalAddonsModal(true)}
+          >
+            <List size={18} />
+            Global Add-ons
+          </button>
           <button 
             className="btn btn-secondary"
             onClick={() => {
@@ -94,7 +135,7 @@ const MenuPage = () => {
               setShowCategoryModal(true);
             }}
           >
-            <FolderOpen size={18} />
+            <Plus size={18} />
             Add Category
           </button>
           <button 
@@ -103,6 +144,7 @@ const MenuPage = () => {
               setEditingItem(null);
               setShowItemModal(true);
             }}
+            style={{ background: '#D32F2F', border: 'none' }}
           >
             <Plus size={18} />
             Add Item
@@ -236,23 +278,6 @@ const MenuPage = () => {
         )}
       </div>
 
-      {/* Item Modal */}
-      {showItemModal && (
-        <MenuItemModal
-          item={editingItem}
-          categories={categories}
-          onClose={() => {
-            setShowItemModal(false);
-            setEditingItem(null);
-          }}
-          onSave={() => {
-            setShowItemModal(false);
-            setEditingItem(null);
-            loadData();
-          }}
-        />
-      )}
-
       {/* Category Modal */}
       {showCategoryModal && (
         <CategoryModal
@@ -268,12 +293,222 @@ const MenuPage = () => {
           }}
         />
       )}
+
+      {/* Item Modal */}
+      {showItemModal && (
+        <MenuItemModal
+          item={editingItem}
+          categories={categories}
+          onClose={() => {
+            setShowItemModal(false);
+            setEditingItem(null);
+          }}
+          onSave={() => {
+            setShowItemModal(false);
+            setEditingItem(null);
+            loadData();
+          }}
+
+          globalAddons={addons}
+          onRefreshAddons={loadData}
+        />
+      )}
+
+      {/* Addon Modal */}
+      {showAddonModal && (
+        <AddonModal
+          addon={editingAddon}
+          onClose={() => {
+            setShowAddonModal(false);
+            setEditingAddon(null);
+          }}
+          onSave={() => {
+            setShowAddonModal(false);
+            setEditingAddon(null);
+            loadData();
+          }}
+        />
+      )}
+
+      {/* Global Add-ons List Modal */}
+      {showGlobalAddonsModal && (
+        <GlobalAddonsListModal
+          addons={addons}
+          onClose={() => setShowGlobalAddonsModal(false)}
+          onAdd={() => {
+            setEditingAddon(null);
+            setShowAddonModal(true);
+            // We keep GlobalAddonsListModal open, AddonModal opens on top
+          }}
+          onEdit={(addon) => {
+            setEditingAddon(addon);
+            setShowAddonModal(true);
+          }}
+          onDelete={handleDeleteAddon}
+        />
+      )}
+    </div>
+  );
+};
+
+// Global Add-ons List Modal
+const GlobalAddonsListModal = ({ addons, onClose, onAdd, onEdit, onDelete }) => {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: '600px', height: '70vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header" style={{ borderBottom: '1px solid var(--gray-200)' }}>
+          <div>
+            <h3 className="modal-title">Global Add-ons</h3>
+            <p className="text-muted text-sm">Manage add-ons available for all items</p>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+        
+        <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                <button className="btn btn-secondary" onClick={onAdd}>
+                    <Plus size={16} /> New Add-on
+                </button>
+             </div>
+
+             {addons.length === 0 ? (
+                 <div className="empty-state" style={{ padding: '40px 0' }}>
+                     <p className="text-muted">No global add-ons found.</p>
+                 </div>
+             ) : (
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {addons.map(addon => (
+                        <div key={addon.id} style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            padding: '12px 16px', 
+                            background: 'white', 
+                            border: '1px solid var(--gray-200)', 
+                            borderRadius: '8px' 
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ 
+                                    width: '32px', 
+                                    height: '32px', 
+                                    borderRadius: '50%', 
+                                    background: addon.type === 'veg' ? '#dcfce7' : '#fef2f2',
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center'
+                                }}>
+                                    <div style={{ 
+                                        width: '12px', 
+                                        height: '12px', 
+                                        borderRadius: '50%', 
+                                        background: addon.type === 'veg' ? '#16a34a' : '#dc2626' 
+                                    }} />
+                                </div>
+                                <div>
+                                    <div style={{ fontWeight: 500 }}>{addon.name}</div>
+                                    <div className="text-sm text-muted">₹{addon.price}</div>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                className="btn btn-ghost btn-icon btn-sm"
+                                onClick={() => onEdit(addon)}
+                                >
+                                <Edit2 size={16} />
+                                </button>
+                                <button
+                                className="btn btn-ghost btn-icon btn-sm"
+                                onClick={() => onDelete(addon.id)}
+                                style={{ color: 'var(--error-500)' }}
+                                >
+                                <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                 </div>
+             )}
+        </div>
+        
+        <div className="modal-footer" style={{ borderTop: '1px solid var(--gray-200)' }}>
+          <button className="btn btn-primary" onClick={onClose} style={{ width: '100%' }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Category Modal - Redesigned
+const CategoryModal = ({ category, onClose, onSave }) => {
+  const [name, setName] = useState(category?.name || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      if (category?.id) {
+        await window.electronAPI.invoke('menu:updateCategory', { id: category.id, name });
+      } else {
+        await window.electronAPI.invoke('menu:createCategory', { name });
+      }
+      onSave();
+    } catch (error) {
+      console.error(error);
+      alert('Failed to save category');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: '400px', borderRadius: '16px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+          <div>
+            <h3 className="modal-title" style={{ fontSize: '1.25rem', color: '#111827' }}>{category ? 'Edit Category' : 'New Category'}</h3>
+            <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '4px' }}>Organize your menu items</p>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ borderRadius: '50%' }}>
+            <X size={20} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body" style={{ paddingTop: '24px' }}>
+            <div className="input-group">
+              <label className="input-label" style={{ marginBottom: '8px' }}>Category Name</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g. Pizzas"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                autoFocus
+                style={{ padding: '12px', fontSize: '1rem' }}
+              />
+            </div>
+          </div>
+          <div className="modal-footer" style={{ borderTop: 'none', background: 'transparent', paddingBottom: '24px', paddingRight: '24px' }}>
+            <button type="button" className="btn btn-ghost" onClick={onClose} style={{ fontWeight: 600 }}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ 
+              padding: '10px 24px', 
+              background: '#D32F2F',
+              boxShadow: '0 4px 6px -1px rgba(211, 47, 47, 0.4)' 
+            }}>
+              {isSaving ? 'Saving...' : 'Save Category'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
 
 // Menu Item Modal
-const MenuItemModal = ({ item, categories, onClose, onSave }) => {
+const MenuItemModal = ({ item, categories, onClose, onSave, globalAddons = [], onRefreshAddons }) => {
   const [formData, setFormData] = useState({
     name: item?.name || '',
     description: item?.description || '',
@@ -284,11 +519,39 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
     is_vegetarian: item?.is_vegetarian || false,
     is_available: item?.is_available ?? true,
     preparation_time: item?.preparation_time || '',
-    variants: item?.variants ? (typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants) : [],
-    addons: item?.addons ? (typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons) : [],
+    variants: [],
+    addons: [],
   });
+  
+  // Safe init
+  useEffect(() => {
+    let initialVariants = [];
+    let initialAddons = [];
+    try {
+        if (item?.variants) {
+            initialVariants = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants;
+        }
+    } catch (e) { console.error('Error parsing variants', e) }
+
+    try {
+        if (item?.addons) {
+            initialAddons = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
+        }
+    } catch (e) { console.error('Error parsing addons', e) }
+
+    setFormData(prev => ({
+        ...prev,
+        variants: initialVariants || [],
+        addons: initialAddons || []
+    }));
+  }, [item]);
+
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('basic'); // basic, variants, addons
+  
+  // Variant Selection State
+  const [variantType, setVariantType] = useState('Small'); // Small, Medium, Large, Custom
+  const [customVariantName, setCustomVariantName] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -319,11 +582,33 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
     }
   };
 
-  const addVariant = () => {
-    setFormData({
-      ...formData,
-      variants: [...formData.variants, { name: '', price: '' }]
-    });
+  const addVariant = (name) => {
+    // Check dupes
+    if (formData.variants.some(v => v.name === name)) {
+      alert('Variant already exists');
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      variants: [...prev.variants, { name: name, price: '' }]
+    }));
+  };
+
+  const handleAddVariant = () => {
+    let nameToAdd = variantType;
+    if (variantType === 'Custom') {
+      if (!customVariantName.trim()) {
+        alert('Please enter a variant name');
+        return;
+      }
+      nameToAdd = customVariantName;
+    }
+    
+    addVariant(nameToAdd);
+
+    // Reset
+    if (variantType === 'Custom') setCustomVariantName('');
   };
 
   const updateVariant = (index, field, value) => {
@@ -339,10 +624,25 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
     });
   };
 
+  const addGlobalAddon = (globalAddon) => {
+    if (formData.addons.some(a => a.name === globalAddon.name)) {
+      alert('This add-on is already added');
+      return;
+    }
+    setFormData({
+      ...formData,
+      addons: [...formData.addons, { 
+        name: globalAddon.name, 
+        price: globalAddon.price, 
+        type: globalAddon.type 
+      }]
+    });
+  };
+
   const addAddon = () => {
     setFormData({
       ...formData,
-      addons: [...formData.addons, { name: '', price: '', type: 'veg' }] // type: veg/non-veg
+      addons: [...formData.addons, { name: '', price: '', type: 'veg' }]
     });
   };
 
@@ -361,71 +661,79 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: '600px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">{item ? 'Edit Item' : 'Add New Item'}</h3>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: '700px', height: '80vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header" style={{ borderBottom: '1px solid #f3f4f6', padding: '20px 24px' }}>
+          <div>
+            <h3 className="modal-title" style={{ fontSize: '1.25rem', color: '#111827' }}>{item ? 'Edit Item' : 'New Menu Item'}</h3>
+            <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '4px' }}>Fill in the details for your menu item.</p>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ borderRadius: '50%' }}>
             <X size={20} />
           </button>
         </div>
 
-        <div style={{ padding: '0 var(--spacing-4)', borderBottom: '1px solid var(--gray-200)', display: 'flex', gap: 'var(--spacing-4)' }}>
-          <button 
-            className={`tab-btn ${activeTab === 'basic' ? 'active' : ''}`}
-            onClick={() => setActiveTab('basic')}
-            style={{ padding: '12px 0', borderBottom: activeTab === 'basic' ? '2px solid var(--primary-500)' : 'none', color: activeTab === 'basic' ? 'var(--primary-600)' : 'var(--gray-500)', fontWeight: 500 }}
-          >
-            Basic Info
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'variants' ? 'active' : ''}`}
-            onClick={() => setActiveTab('variants')}
-            style={{ padding: '12px 0', borderBottom: activeTab === 'variants' ? '2px solid var(--primary-500)' : 'none', color: activeTab === 'variants' ? 'var(--primary-600)' : 'var(--gray-500)', fontWeight: 500 }}
-          >
-            Variants ({formData.variants.length})
-          </button>
-          <button 
-            className={`tab-btn ${activeTab === 'addons' ? 'active' : ''}`}
-            onClick={() => setActiveTab('addons')}
-            style={{ padding: '12px 0', borderBottom: activeTab === 'addons' ? '2px solid var(--primary-500)' : 'none', color: activeTab === 'addons' ? 'var(--primary-600)' : 'var(--gray-500)', fontWeight: 500 }}
-          >
-            Add-ons ({formData.addons.length})
-          </button>
+        {/* Improved Tabs */}
+        <div style={{ padding: '0 24px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}>
+          <div style={{ display: 'flex', gap: '24px' }}>
+            {['basic', 'variants', 'addons'].map(tab => (
+              <button 
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: '16px 0',
+                  border: 'none',
+                  background: 'none',
+                  borderBottom: activeTab === tab ? '2px solid #D32F2F' : '2px solid transparent',
+                  color: activeTab === tab ? '#D32F2F' : '#6b7280',
+                  fontWeight: activeTab === tab ? 600 : 500,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  textTransform: 'capitalize',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {tab === 'basic' ? 'Basic Info' : tab === 'variants' ? `Variants (${formData.variants.length})` : `Add-ons (${formData.addons.length})`}
+              </button>
+            ))}
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div className="modal-body" style={{ flex: 1, overflowY: 'auto' }}>
+          <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
             
             {activeTab === 'basic' && (
-              <>
-                <div className="input-group mb-4">
-                  <label className="input-label">Name *</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="input-group">
+                  <label className="input-label">Item Name *</label>
                   <input
                     type="text"
                     className="input"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
+                    style={{ padding: '12px', fontSize: '1rem' }}
                   />
                 </div>
 
-                <div className="input-group mb-4">
+                <div className="input-group">
                   <label className="input-label">Description</label>
                   <textarea
                     className="input"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows={2}
+                    style={{ padding: '12px' }}
                   />
                 </div>
 
-                <div className="input-group mb-4">
+                <div className="input-group">
                   <label className="input-label">Category *</label>
                   <select
                     className="input select"
                     value={formData.category_id}
                     onChange={(e) => setFormData({ ...formData, category_id: e.target.value })}
                     required
+                    style={{ padding: '12px' }}
                   >
                     {categories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -433,9 +741,9 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
                   </select>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-                  <div className="input-group mb-4">
-                    <label className="input-label">Price *</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div className="input-group">
+                    <label className="input-label">Price (₹) *</label>
                     <input
                       type="number"
                       step="0.01"
@@ -443,23 +751,10 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                       required
+                      style={{ padding: '12px', fontWeight: 600 }}
                     />
                   </div>
-
-                  <div className="input-group mb-4">
-                    <label className="input-label">Cost Price</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="input"
-                      value={formData.cost_price}
-                      onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-4)' }}>
-                  <div className="input-group mb-4">
+                  <div className="input-group">
                     <label className="input-label">Tax Rate (%)</label>
                     <input
                       type="number"
@@ -467,182 +762,240 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
                       className="input"
                       value={formData.tax_rate}
                       onChange={(e) => setFormData({ ...formData, tax_rate: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="input-group mb-4">
-                    <label className="input-label">Prep Time (min)</label>
-                    <input
-                      type="number"
-                      className="input"
-                      value={formData.preparation_time}
-                      onChange={(e) => setFormData({ ...formData, preparation_time: e.target.value })}
+                      style={{ padding: '12px' }}
                     />
                   </div>
                 </div>
 
-                {/* Veg/Non-Veg Toggle */}
-                <div className="input-group mb-4">
-                  <label className="input-label">Item Type</label>
-                  <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, is_vegetarian: true })}
-                      style={{
-                        flex: 1,
-                        padding: 'var(--spacing-3)',
-                        border: `2px solid ${formData.is_vegetarian ? '#22c55e' : 'var(--gray-300)'}`,
-                        borderRadius: 'var(--radius-md)',
-                        background: formData.is_vegetarian ? '#dcfce7' : 'white',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 'var(--spacing-2)'
-                      }}
-                    >
-                      <Leaf size={16} fill="#22c55e" stroke="#166534" />
-                      <span style={{ fontWeight: formData.is_vegetarian ? 600 : 400, color: '#166534' }}>Veg</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, is_vegetarian: false })}
-                      style={{
-                        flex: 1,
-                        padding: 'var(--spacing-3)',
-                        border: `2px solid ${!formData.is_vegetarian ? '#ef4444' : 'var(--gray-300)'}`,
-                        borderRadius: 'var(--radius-md)',
-                        background: !formData.is_vegetarian ? '#fef2f2' : 'white',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 'var(--spacing-2)'
-                      }}
-                    >
-                      <div style={{ width: '16px', height: '16px', border: '2px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginTop: '10px' }}>
+                   {/* Veg/Non-Veg Toggle - Styled */}
+                   <div style={{ display: 'flex', background: '#f3f4f6', padding: '4px', borderRadius: '8px', gap: '4px' }}>
+                      <div 
+                        onClick={() => setFormData({ ...formData, is_vegetarian: true })}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          background: formData.is_vegetarian ? 'white' : 'transparent',
+                          color: formData.is_vegetarian ? '#15803d' : '#6b7280',
+                          fontWeight: 500,
+                          boxShadow: formData.is_vegetarian ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                          cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: '6px'
+                        }}
+                      >
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#15803d' }}></div> Veg
                       </div>
-                      <span style={{ fontWeight: !formData.is_vegetarian ? 600 : 400, color: '#991b1b' }}>Non-Veg</span>
-                    </button>
-                  </div>
-                </div>
+                      <div 
+                        onClick={() => setFormData({ ...formData, is_vegetarian: false })}
+                        style={{
+                          padding: '8px 16px',
+                          borderRadius: '6px',
+                          background: !formData.is_vegetarian ? 'white' : 'transparent',
+                          color: !formData.is_vegetarian ? '#b91c1c' : '#6b7280',
+                          fontWeight: 500,
+                          boxShadow: !formData.is_vegetarian ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                          cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: '6px'
+                        }}
+                      >
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#b91c1c' }}></div> Non-Veg
+                      </div>
+                   </div>
 
-                <div style={{ marginTop: 'var(--spacing-2)' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={formData.is_available}
-                      onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
-                    />
-                    <span>Available for sale</span>
-                  </label>
+                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginLeft: 'auto' }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.is_available}
+                        onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+                      <span style={{ fontWeight: 500 }}>Available for Sale</span>
+                   </label>
                 </div>
-              </>
+              </div>
             )}
 
             {activeTab === 'variants' && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <p className="text-muted text-sm">Add variations like sizes (Small, Medium, Large)</p>
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={addVariant}>
-                    <Plus size={14} /> Add Variant
-                  </button>
-                </div>
-                
-                {formData.variants.length === 0 ? (
-                  <div className="text-center p-4 bg-gray-50 rounded text-muted text-sm">
-                    No variants added yet.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {formData.variants.map((variant, index) => (
-                      <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input
-                          type="text"
-                          placeholder="Variant Name"
-                          className="input btn-sm"
-                          style={{ flex: 1 }}
-                          value={variant.name}
-                          onChange={(e) => updateVariant(index, 'name', e.target.value)}
-                        />
-                        <input
-                          type="number"
-                          placeholder="Price"
-                          className="input btn-sm"
-                          style={{ width: '80px' }}
-                          value={variant.price}
-                          onChange={(e) => updateVariant(index, 'price', e.target.value)}
-                        />
+                <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '12px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 1 }}>
+                     <label className="input-label" style={{ marginBottom: '8px', display: 'block' }}>Add Variant</label>
+                     <div style={{ display: 'flex', gap: '12px' }}>
+                        <select 
+                          className="input select" 
+                          value={variantType} 
+                          onChange={(e) => setVariantType(e.target.value)}
+                          style={{ padding: '10px' }}
+                        >
+                          <option value="Small">Small</option>
+                          <option value="Medium">Medium</option>
+                          <option value="Large">Large</option>
+                          <option value="Half">Half</option>
+                          <option value="Full">Full</option>
+                          <option value="Custom">Custom...</option>
+                        </select>
+                        {variantType === 'Custom' && (
+                          <input 
+                            type="text" 
+                            className="input" 
+                            placeholder="Variant Name"
+                            value={customVariantName}
+                            onChange={(e) => setCustomVariantName(e.target.value)}
+                            style={{ padding: '10px' }}
+                          />
+                        )}
                         <button 
                           type="button" 
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => removeVariant(index)}
-                          style={{ color: 'var(--error-500)' }}
+                          className="btn btn-secondary"
+                          onClick={handleAddVariant}
+                          style={{ whiteSpace: 'nowrap' }}
                         >
-                          <Trash2 size={16} />
+                          <Plus size={16} /> Add
                         </button>
-                      </div>
-                    ))}
+                     </div>
+                     <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {['Small', 'Medium', 'Large', 'Half', 'Full'].map(size => (
+                            <button
+                                key={size}
+                                type="button"
+                                className="btn btn-xs btn-outline"
+                                onClick={() => addVariant(size)}
+                                style={{ 
+                                  fontSize: '0.75rem', 
+                                  padding: '4px 8px', 
+                                  borderRadius: '4px',
+                                  background: 'white',
+                                  border: '1px solid #e5e7eb',
+                                  cursor: 'pointer'
+                                }}
+                            >
+                                + {size}
+                            </button>
+                        ))}
+                     </div>
                   </div>
-                )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {formData.variants.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', background: '#f9fafb', borderRadius: '12px', border: '1px dashed #e5e7eb' }}>
+                      <p>No variants added yet.</p>
+                      <p style={{ fontSize: '0.875rem' }}>Add variants like Small, Medium, Large to offer options.</p>
+                    </div>
+                  )}
+                  {formData.variants.map((variant, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'white', padding: '12px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Variant Name</label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={variant.name}
+                          onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                          placeholder="Name"
+                          style={{ padding: '8px', fontSize: '0.9rem' }}
+                        />
+                      </div>
+                      <div style={{ width: '150px' }}>
+                        <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Price (₹)</label>
+                        <input
+                          type="number"
+                          className="input"
+                          value={variant.price}
+                          onChange={(e) => updateVariant(index, 'price', e.target.value)}
+                          placeholder="0.00"
+                          style={{ padding: '8px', fontWeight: 600, fontSize: '0.9rem' }}
+                        />
+                      </div>
+                      <button 
+                        type="button" 
+                        className="btn btn-ghost btn-icon" 
+                        onClick={() => removeVariant(index)}
+                        title="Remove Variant"
+                        style={{ marginTop: '16px', color: '#ef4444' }}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
             {activeTab === 'addons' && (
               <div>
+                {/* Global Add-ons Selector */}
+                <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid #dcfce7' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                     <h4 style={{ fontSize: '0.9rem', color: '#166534', margin: 0 }}>Import from Global Add-ons</h4>
+                     <button type="button" className="btn btn-sm btn-ghost" onClick={onRefreshAddons} style={{ color: '#166534' }}>
+                        <RefreshCw size={14} /> Refresh
+                     </button>
+                   </div>
+                   <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+                      {globalAddons.length === 0 && <p style={{ fontSize: '0.875rem', color: '#166534' }}>No global add-ons found.</p>}
+                      {globalAddons.map(ga => (
+                        <button
+                          key={ga.id}
+                          type="button"
+                          onClick={() => addGlobalAddon(ga)}
+                          style={{
+                            padding: '6px 12px',
+                            background: 'white',
+                            border: '1px solid #bbf7d0',
+                            borderRadius: '20px',
+                            fontSize: '0.875rem',
+                            color: '#166534',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                          }}
+                        >
+                          <Plus size={12} /> {ga.name} (₹{ga.price})
+                        </button>
+                      ))}
+                   </div>
+                </div>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <p className="text-muted text-sm">Add optional extra toppings or add-ons</p>
+                  <p className="text-muted text-sm">Add-ons for this item</p>
                   <button type="button" className="btn btn-sm btn-secondary" onClick={addAddon}>
-                    <Plus size={14} /> Add Add-on
+                    <Plus size={14} /> Custom Add-on
                   </button>
                 </div>
 
-                {formData.addons.length === 0 ? (
-                   <div className="text-center p-4 bg-gray-50 rounded text-muted text-sm">
-                    No add-ons added yet.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {formData.addons.map((addon, index) => (
-                      <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input
-                          type="text"
-                          placeholder="Add-on Name"
-                          className="input btn-sm"
-                          style={{ flex: 2 }}
-                          value={addon.name}
-                          onChange={(e) => updateAddon(index, 'name', e.target.value)}
-                        />
-                        <input
-                          type="number"
-                          placeholder="Price"
-                          className="input btn-sm"
-                          style={{ width: '80px' }}
-                          value={addon.price}
-                          onChange={(e) => updateAddon(index, 'price', e.target.value)}
-                        />
-                        <select
-                          className="input select btn-sm"
-                          style={{ width: '100px' }}
-                          value={addon.type}
-                          onChange={(e) => updateAddon(index, 'type', e.target.value)}
-                        >
-                          <option value="veg">Veg</option>
-                          <option value="non-veg">Non-Veg</option>
-                        </select>
-                        <button 
-                          type="button" 
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => removeAddon(index)}
-                          style={{ color: 'var(--error-500)' }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {formData.addons.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', background: '#f9fafb', borderRadius: '12px', border: '1px dashed #e5e7eb' }}>
+                      <p>No add-ons added yet.</p>
+                    </div>
+                  )}
+                  {formData.addons.map((addon, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: 'white', padding: '12px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Add-on Name</label>
+                        <input type="text" className="input" value={addon.name} onChange={(e) => updateAddon(index, 'name', e.target.value)} placeholder="Name" style={{ padding: '8px', fontSize: '0.9rem' }} />
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div style={{ width: '100px' }}>
+                        <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Price (₹)</label>
+                        <input type="number" className="input" value={addon.price} onChange={(e) => updateAddon(index, 'price', e.target.value)} placeholder="0.00" style={{ padding: '8px', fontWeight: 600, fontSize: '0.9rem' }} />
+                      </div>
+                      <div style={{ width: '110px' }}>
+                         <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Type</label>
+                         <select className="input select" value={addon.type} onChange={(e) => updateAddon(index, 'type', e.target.value)} style={{ padding: '8px', fontSize: '0.9rem' }}>
+                            <option value="veg">Veg</option>
+                            <option value="non-veg">Non-Veg</option>
+                         </select>
+                      </div>
+                      <button type="button" className="btn btn-ghost btn-icon" onClick={() => removeAddon(index)} title="Remove Add-on" style={{ marginTop: '16px', color: '#ef4444' }}>
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -662,12 +1015,15 @@ const MenuItemModal = ({ item, categories, onClose, onSave }) => {
   );
 };
 
-// Category Modal
-const CategoryModal = ({ category, onClose, onSave }) => {
+export default MenuPage;
+
+// Addon Modal
+const AddonModal = ({ addon, onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    name: category?.name || '',
-    description: category?.description || '',
-    display_order: category?.display_order || 0,
+    name: addon?.name || '',
+    price: addon?.price || '',
+    type: addon?.type || 'veg',
+    is_available: addon?.is_available ?? true,
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -678,18 +1034,19 @@ const CategoryModal = ({ category, onClose, onSave }) => {
     try {
       const saveData = {
         ...formData,
-        display_order: parseInt(formData.display_order),
+        price: parseFloat(formData.price),
+        is_available: formData.is_available ? 1 : 0,
       };
 
-      if (category?.id) {
-        saveData.id = category.id;
+      if (addon?.id) {
+        saveData.id = addon.id;
       }
 
-      await window.electronAPI.invoke('menu:saveCategory', { category: saveData });
+      await window.electronAPI.invoke('menu:saveAddon', { addon: saveData });
       onSave();
     } catch (error) {
       console.error('Save failed:', error);
-      alert('Failed to save category');
+      alert('Failed to save add-on');
     } finally {
       setIsSaving(false);
     }
@@ -697,55 +1054,137 @@ const CategoryModal = ({ category, onClose, onSave }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">{category ? 'Edit Category' : 'Add Category'}</h3>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: '450px', borderRadius: '16px', border: 'none', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+          <div>
+            <h3 className="modal-title" style={{ fontSize: '1.25rem', color: '#111827' }}>{addon ? 'Edit Add-on' : 'New Add-on'}</h3>
+            <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '4px' }}>Create a global add-on for your menu items.</p>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ borderRadius: '50%' }}>
             <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="modal-body">
+          <div className="modal-body" style={{ paddingTop: '24px' }}>
+            
+            {/* Type Selection Pills */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+              <div 
+                onClick={() => setFormData({ ...formData, type: 'veg' })}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: `2px solid ${formData.type === 'veg' ? '#22c55e' : '#e5e7eb'}`,
+                  background: formData.type === 'veg' ? '#f0fdf4' : 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ width: '16px', height: '16px', border: '2px solid #22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }} />
+                </div>
+                <span style={{ fontWeight: 600, color: formData.type === 'veg' ? '#15803d' : '#6b7280' }}>Veg</span>
+              </div>
+              
+              <div 
+                onClick={() => setFormData({ ...formData, type: 'non-veg' })}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '12px',
+                  border: `2px solid ${formData.type === 'non-veg' ? '#ef4444' : '#e5e7eb'}`,
+                  background: formData.type === 'non-veg' ? '#fef2f2' : 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ width: '16px', height: '16px', border: '2px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
+                </div>
+                <span style={{ fontWeight: 600, color: formData.type === 'non-veg' ? '#b91c1c' : '#6b7280' }}>Non-Veg</span>
+              </div>
+            </div>
+
             <div className="input-group mb-4">
-              <label className="input-label">Name *</label>
+              <label className="input-label" style={{ marginBottom: '8px' }}>Add-on Name</label>
               <input
                 type="text"
                 className="input"
+                placeholder="e.g. Extra Cheese"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
+                style={{ padding: '12px', fontSize: '1rem' }}
               />
             </div>
 
             <div className="input-group mb-4">
-              <label className="input-label">Description</label>
+              <label className="input-label" style={{ marginBottom: '8px' }}>Price (₹)</label>
               <input
-                type="text"
+                type="number"
+                step="0.01"
                 className="input"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="0.00"
+                value={formData.price}
+                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                required
+                style={{ padding: '12px', fontSize: '1rem', fontWeight: 600 }}
               />
             </div>
 
-            <div className="input-group">
-              <label className="input-label">Display Order</label>
-              <input
-                type="number"
-                className="input"
-                value={formData.display_order}
-                onChange={(e) => setFormData({ ...formData, display_order: e.target.value })}
-              />
+            <div style={{ marginTop: '24px', padding: '16px', background: '#f9fafb', borderRadius: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <div style={{ 
+                    width: '40px', 
+                    height: '24px', 
+                    background: formData.is_available ? '#22c55e' : '#e5e7eb', 
+                    borderRadius: '20px', 
+                    position: 'relative',
+                    transition: 'background 0.2s'
+                  }}>
+                    <div style={{ 
+                      width: '20px', 
+                      height: '20px', 
+                      background: 'white', 
+                      borderRadius: '50%', 
+                      position: 'absolute', 
+                      top: '2px', 
+                      left: formData.is_available ? '18px' : '2px', 
+                      transition: 'left 0.2s',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.2)' 
+                    }} />
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={formData.is_available}
+                    onChange={(e) => setFormData({ ...formData, is_available: e.target.checked })}
+                    style={{ display: 'none' }}
+                  />
+                  <span style={{ fontWeight: 500, color: '#374151' }}>Available for sale</span>
+                </label>
             </div>
           </div>
 
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
+          <div className="modal-footer" style={{ borderTop: 'none', background: 'transparent', paddingBottom: '24px', paddingRight: '24px' }}>
+            <button type="button" className="btn btn-ghost" onClick={onClose} style={{ fontWeight: 600 }}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={isSaving}>
-              <Save size={18} />
-              {isSaving ? 'Saving...' : 'Save'}
+            <button type="submit" className="btn btn-primary" disabled={isSaving} style={{ 
+              padding: '10px 24px', 
+              background: '#D32F2F',
+              boxShadow: '0 4px 6px -1px rgba(211, 47, 47, 0.4)' 
+            }}>
+              {isSaving ? 'Saving...' : 'Save Add-on'}
             </button>
           </div>
         </form>
@@ -753,5 +1192,3 @@ const CategoryModal = ({ category, onClose, onSave }) => {
     </div>
   );
 };
-
-export default MenuPage;

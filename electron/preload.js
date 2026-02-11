@@ -15,6 +15,9 @@ const validInvokeChannels = [
   'menu:saveCategory',
   'menu:saveItem',
   'menu:deleteItem',
+  'menu:getAddons',
+  'menu:saveAddon',
+  'menu:deleteAddon',
   // Orders
   'order:create',
   'order:update',

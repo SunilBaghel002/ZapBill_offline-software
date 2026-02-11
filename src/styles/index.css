@@ -158,6 +158,9 @@
   /* Veg / Success */
   --pp-gray-bg: #E0E0E0;
   /* Backgrounds */
+
+  /* Global Layout Variables */
+  --sidebar-width: 240px;
 }
 
 
@@ -518,7 +521,7 @@ h4 {
 }
 
 /* Layout Components */
-.layout {
+.app-layout {
   display: flex;
   min-height: 100vh;
 }
@@ -590,12 +593,22 @@ h4 {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.main-content {
+.main-wrapper {
   flex: 1;
   margin-left: var(--sidebar-width);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+  position: relative; /* Ensure it stays in flow */
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--gray-50); /* Match potential gap color */
 }
 
 .header {

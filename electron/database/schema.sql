@@ -54,6 +54,19 @@ CREATE TABLE IF NOT EXISTS menu_items (
     is_deleted INTEGER DEFAULT 0
 );
 
+-- Global Add-ons
+CREATE TABLE IF NOT EXISTS addons (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    price REAL NOT NULL,
+    type TEXT CHECK(type IN ('veg', 'non-veg')) DEFAULT 'veg',
+    is_available INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    synced_at TEXT,
+    is_deleted INTEGER DEFAULT 0
+);
+
 -- Inventory Items
 CREATE TABLE IF NOT EXISTS inventory (
     id TEXT PRIMARY KEY,
@@ -242,3 +255,33 @@ VALUES
     ('cloud_api_url', ''),
     ('sync_enabled', 'true'),
     ('sync_interval', '30000');
+
+-- Seed Global Addons
+INSERT OR IGNORE INTO addons (id, name, price, type, is_available) VALUES 
+('addon-1', 'Extra Cheese', 30.00, 'veg', 1),
+('addon-2', 'Spicy Dip', 20.00, 'veg', 1),
+('addon-3', 'Peri Peri Sprinkler', 15.00, 'veg', 1),
+('addon-4', 'Mayo', 15.00, 'veg', 1),
+('addon-5', 'Extra Chicken', 60.00, 'non-veg', 1),
+('addon-6', 'Olives', 25.00, 'veg', 1),
+('addon-7', 'Jalapenos', 25.00, 'veg', 1);
+
+-- Seed Categories
+INSERT OR IGNORE INTO categories (id, name, display_order) VALUES
+('cat-1', 'Pizzas', 1),
+('cat-2', 'Burgers', 2),
+('cat-3', 'Pastas', 3),
+('cat-4', 'Beverages', 4),
+('cat-5', 'Chinese', 5),
+('cat-6', 'Breads', 6);
+
+-- Seed Items (Basic examples)
+INSERT OR IGNORE INTO menu_items (id, category_id, name, description, price, is_vegetarian, is_available, tax_rate) VALUES
+('item-1', 'cat-1', 'Margherita Pizza', 'Classic delight with 100% real mozzarella cheese', 199.00, 1, 1, 5.0),
+('item-2', 'cat-1', 'Farmhouse Pizza', 'Delightful combination of onion, capsicum, tomato & grilled mushroom', 259.00, 1, 1, 5.0),
+('item-3', 'cat-1', 'Chicken Pepperoni', 'A classic American taste! Relish the delectable flavor of Chicken Pepperoni', 319.00, 0, 1, 5.0),
+('item-4', 'cat-2', 'Crispy Veg Burger', 'Crispy veg patty with fresh lettuce and mayo', 129.00, 1, 1, 5.0),
+('item-5', 'cat-2', 'Chicken Whopper', 'Our signature flame-grilled chicken patty', 179.00, 0, 1, 5.0),
+('item-6', 'cat-3', 'White Sauce Pasta', 'Creamy white sauce pasta with corn and capsicum', 229.00, 1, 1, 5.0),
+('item-7', 'cat-4', 'Coke (300ml)', 'Refreshing cola drink', 40.00, 1, 1, 18.0),
+('item-8', 'cat-4', 'Cold Coffee', 'Rich and creamy cold coffee', 120.00, 1, 1, 5.0);

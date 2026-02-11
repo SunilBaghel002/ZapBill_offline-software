@@ -98,6 +98,23 @@ class Database {
        this.db.run("ALTER TABLE orders ADD COLUMN customer_paid REAL DEFAULT 0");
     } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
 
+    try {
+      // Create addons table if not exists (for existing databases)
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS addons (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            price REAL NOT NULL,
+            type TEXT CHECK(type IN ('veg', 'non-veg')) DEFAULT 'veg',
+            is_available INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            synced_at TEXT,
+            is_deleted INTEGER DEFAULT 0
+        )
+      `);
+    } catch (error) { console.log('Migration note:', error.message); }
+
     // Migrate orders table to support 'held' status in CHECK constraint
     this.migrateOrdersTableForHeldStatus();
 
@@ -519,6 +536,48 @@ class Database {
   deleteMenuItem(id) {
     this.delete('menu_items', { id });
     this.addToSyncQueue('menu_item', id, 'delete', { id });
+  }
+
+  // ===== Global Addons Operations =====
+  getAddons() {
+    return this.execute(
+      `SELECT * FROM addons WHERE is_deleted = 0 ORDER BY name`
+    );
+  }
+
+  saveAddon(addon) {
+    if (addon.id) {
+      this.update('addons', {
+        name: addon.name,
+        price: addon.price,
+        type: addon.type || 'veg',
+        is_available: addon.is_available,
+        updated_at: new Date().toISOString(),
+      }, { id: addon.id });
+      
+      this.addToSyncQueue('addon', addon.id, 'update', addon);
+      return addon.id;
+    } else {
+      const id = uuidv4();
+      this.insert('addons', {
+        id,
+        name: addon.name,
+        price: addon.price,
+        type: addon.type || 'veg',
+        is_available: addon.is_available,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_deleted: 0,
+      });
+      
+      this.addToSyncQueue('addon', id, 'create', addon);
+      return id;
+    }
+  }
+
+  deleteAddon(id) {
+    this.delete('addons', { id });
+    this.addToSyncQueue('addon', id, 'delete', { id });
   }
 
   // ===== Order Operations =====
