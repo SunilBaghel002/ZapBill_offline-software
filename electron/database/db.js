@@ -127,6 +127,23 @@ class Database {
       `);
     } catch (error) { console.log('Migration note:', error.message); }
 
+    try {
+      // Add inventory_transactions table for history
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS inventory_transactions (
+            id TEXT PRIMARY KEY,
+            inventory_id TEXT REFERENCES inventory(id),
+            type TEXT CHECK(type IN ('add', 'subtract', 'adjustment')),
+            quantity REAL NOT NULL,
+            current_stock_snapshot REAL,
+            reason TEXT,
+            notes TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            is_deleted INTEGER DEFAULT 0
+        )
+      `);
+    } catch (error) { console.log('Migration note:', error.message); }
+
     // Migrate orders table to support 'held' status in CHECK constraint
     this.migrateOrdersTableForHeldStatus();
 
@@ -998,6 +1015,14 @@ class Database {
     );
   }
 
+  getInventoryHistory(inventoryId) {
+    return this.execute(`
+      SELECT * FROM inventory_transactions 
+      WHERE inventory_id = ? AND is_deleted = 0 
+      ORDER BY created_at DESC
+    `, [inventoryId]);
+  }
+
   saveInventoryItem(item) {
     if (item.id) {
       this.update('inventory', {
@@ -1010,14 +1035,19 @@ class Database {
         updated_at: new Date().toISOString(),
       }, { id: item.id });
       
+      // If it's an edit that changes stock directly (not recommended but possible via edit modal),
+      // we might want to log it as an 'adjustment', but simpler to just update for now.
+      
       return item.id;
     } else {
       const id = uuidv4();
+      const initialStock = item.current_stock || 0;
+      
       this.insert('inventory', {
         id,
         name: item.name,
         unit: item.unit,
-        current_stock: item.current_stock || 0,
+        current_stock: initialStock,
         minimum_stock: item.minimum_stock || 0,
         cost_per_unit: item.cost_per_unit,
         supplier: item.supplier,
@@ -1025,24 +1055,63 @@ class Database {
         updated_at: new Date().toISOString(),
         is_deleted: 0,
       });
+
+      // Log initial stock
+      if (initialStock > 0) {
+        this.logInventoryTransaction(id, 'add', initialStock, initialStock, 'Initial Stock', 'Added during item creation');
+      }
       
       return id;
     }
   }
 
-  updateInventoryStock(id, quantity, operation) {
+  updateInventoryStock(id, quantity, operation, reason = '', notes = '') {
     const items = this.execute(`SELECT current_stock FROM inventory WHERE id = ?`, [id]);
     if (items.length === 0) return;
     
     const currentStock = items[0].current_stock;
-    const newStock = operation === 'add' 
-      ? currentStock + quantity 
-      : currentStock - quantity;
+    let newStock = currentStock;
+    let type = 'adjustment';
+
+    if (operation === 'add') {
+      newStock = currentStock + quantity;
+      type = 'add';
+    } else if (operation === 'subtract') {
+      newStock = Math.max(0, currentStock - quantity);
+      type = 'subtract';
+    } else if (operation === 'set') {
+      newStock = quantity;
+      type = 'adjustment'; // Direct set
+    }
     
     this.update('inventory', { 
-      current_stock: Math.max(0, newStock),
+      current_stock: newStock,
       updated_at: new Date().toISOString()
     }, { id });
+
+    // Log transaction
+    this.logInventoryTransaction(id, type, quantity, newStock, reason, notes);
+    
+    return { success: true, newStock };
+  }
+
+  logInventoryTransaction(inventoryId, type, quantity, snapshot, reason, notes) {
+    this.insert('inventory_transactions', {
+      id: uuidv4(),
+      inventory_id: inventoryId,
+      type,
+      quantity,
+      current_stock_snapshot: snapshot,
+      reason,
+      notes,
+      created_at: new Date().toISOString(),
+      is_deleted: 0
+    });
+  }
+
+  deleteInventoryItem(id) {
+    this.delete('inventory', { id });
+    return { success: true };
   }
 
   // ===== Settings Operations =====

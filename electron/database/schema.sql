@@ -91,6 +91,19 @@ CREATE TABLE IF NOT EXISTS menu_inventory (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Inventory Transactions (History)
+CREATE TABLE IF NOT EXISTS inventory_transactions (
+    id TEXT PRIMARY KEY,
+    inventory_id TEXT REFERENCES inventory(id),
+    type TEXT CHECK(type IN ('add', 'subtract', 'adjustment')),
+    quantity REAL NOT NULL,
+    current_stock_snapshot REAL,
+    reason TEXT,
+    notes TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    is_deleted INTEGER DEFAULT 0
+);
+
 -- Orders (Bills)
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,

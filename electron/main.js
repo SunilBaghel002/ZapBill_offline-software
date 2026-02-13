@@ -494,20 +494,38 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('inventory:updateStock', async (event, { id, quantity, operation }) => {
+  ipcMain.handle('inventory:save', async (event, { item }) => {
     try {
-      return db.updateInventoryStock(id, quantity, operation);
+      return db.saveInventoryItem(item);
+    } catch (error) {
+      log.error('Save inventory error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('inventory:updateStock', async (event, { id, quantity, operation, reason, notes }) => {
+    try {
+      return db.updateInventoryStock(id, quantity, operation, reason, notes);
     } catch (error) {
       log.error('Update inventory error:', error);
       return { success: false, error: error.message };
     }
   });
 
-  ipcMain.handle('inventory:save', async (event, { item }) => {
+  ipcMain.handle('inventory:getHistory', async (event, { id }) => {
     try {
-      return db.saveInventoryItem(item);
+      return db.getInventoryHistory(id);
     } catch (error) {
-      log.error('Save inventory error:', error);
+      log.error('Get inventory history error:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('inventory:delete', async (event, { id }) => {
+    try {
+      return db.deleteInventoryItem(id);
+    } catch (error) {
+      log.error('Delete inventory error:', error);
       return { success: false, error: error.message };
     }
   });

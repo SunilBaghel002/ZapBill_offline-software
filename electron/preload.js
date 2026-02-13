@@ -39,6 +39,8 @@ const validInvokeChannels = [
   'inventory:getAll',
   'inventory:updateStock',
   'inventory:save',
+  'inventory:getHistory',
+  'inventory:delete',
   // Reports
   'reports:daily',
   'reports:weekly',
