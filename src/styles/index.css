@@ -1320,10 +1320,8 @@ h4 {
    ======================================== */
 
 .top-nav {
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: var(--sidebar-width-expanded);
-  right: 0;
   height: var(--header-height);
   background: white;
   border-bottom: 1px solid var(--gray-200);
@@ -1332,13 +1330,13 @@ h4 {
   padding: 0 var(--spacing-4);
   gap: var(--spacing-4);
   z-index: 50;
-  transition: left var(--transition-base);
+  flex-shrink: 0; 
+  width: 100%;
 }
 
-.sidebar.collapsed~.main-wrapper .top-nav,
-.sidebar.collapsed+.main-wrapper .top-nav {
-  left: var(--sidebar-width-collapsed);
-}
+
+/* .sidebar.collapsed rules removed as no longer needed with flex layout */
+
 
 .top-nav-search {
   position: relative;
@@ -1533,8 +1531,8 @@ h4 {
 
 .main-content {
   flex: 1;
-  overflow: hidden;
-  /* Prevent double scrollbars */
+  overflow-y: auto; /* Enable scrolling for content */
+  overflow-x: hidden;
   position: relative;
   display: flex;
   flex-direction: column;

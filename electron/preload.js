@@ -58,6 +58,7 @@ const validInvokeChannels = [
   'print:receipt',
   'print:kot',
   'print:testPrint',
+  'print:getPrinters',
   // Settings
   'settings:getAll',
   'settings:get',

@@ -607,7 +607,21 @@ function setupIpcHandlers() {
   // ============ PRINTING ============
   ipcMain.handle('print:receipt', async (event, { order }) => {
     try {
-      return await printerService.printReceipt(order);
+      // Fetch settings to enrich receipt and get printer name
+      const settingsRows = db.execute('SELECT * FROM settings');
+      const settings = {};
+      settingsRows.forEach(row => { settings[row.key] = row.value; });
+      
+      const enrichedOrder = {
+        ...order,
+        restaurantName: settings.restaurant_name,
+        restaurantAddress: settings.restaurant_address,
+        restaurantPhone: settings.restaurant_phone,
+        gstNumber: settings.gst_number,
+        receiptFooter: settings.receipt_footer
+      };
+      
+      return await printerService.printReceipt(enrichedOrder, settings.printer_bill);
     } catch (error) {
       log.error('Print receipt error:', error);
       return { success: false, error: error.message };
@@ -616,19 +630,34 @@ function setupIpcHandlers() {
 
   ipcMain.handle('print:kot', async (event, { order, items }) => {
     try {
-      return await printerService.printKOT(order, items);
+      const printerName = db.getSetting('printer_kot');
+      return await printerService.printKOT(order, items, printerName);
     } catch (error) {
       log.error('Print KOT error:', error);
       return { success: false, error: error.message };
     }
   });
 
-  ipcMain.handle('print:testPrint', async () => {
+  ipcMain.handle('print:testPrint', async (event, { printerName } = {}) => {
     try {
-      return await printerService.testPrint();
+      // If no printer name provided, use default or fetch from settings?
+      // For test print, we might want to test a specific printer from settings page
+      return await printerService.testPrint(printerName);
     } catch (error) {
       log.error('Test print error:', error);
       return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('print:getPrinters', async () => {
+    try {
+      if (mainWindow) {
+        return await mainWindow.webContents.getPrintersAsync();
+      }
+      return [];
+    } catch (error) {
+      log.error('Get printers error:', error);
+      return [];
     }
   });
 

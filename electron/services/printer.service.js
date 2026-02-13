@@ -1,73 +1,39 @@
 const log = require('electron-log');
+const { BrowserWindow } = require('electron');
 
 /**
- * Printer Service for ESC/POS thermal printers
- * Supports USB thermal printers using ESC/POS commands
+ * Printer Service for printing HTML content
+ * Supports system printers using Electron's webContents.print
  */
 class PrinterService {
   constructor() {
-    this.device = null;
-    this.printer = null;
-    this.isConnected = false;
-    
-    // ESC/POS Commands
-    this.ESC = '\x1B';
-    this.GS = '\x1D';
-    this.INIT = '\x1B\x40';  // Initialize printer
-    this.CUT = '\x1D\x56\x00';  // Full cut
-    this.PARTIAL_CUT = '\x1D\x56\x01';  // Partial cut
-    this.BOLD_ON = '\x1B\x45\x01';
-    this.BOLD_OFF = '\x1B\x45\x00';
-    this.CENTER = '\x1B\x61\x01';
-    this.LEFT = '\x1B\x61\x00';
-    this.RIGHT = '\x1B\x61\x02';
-    this.DOUBLE_HEIGHT = '\x1B\x21\x10';
-    this.DOUBLE_WIDTH = '\x1B\x21\x20';
-    this.NORMAL = '\x1B\x21\x00';
-    this.LINE_FEED = '\x0A';
+    this.printWindow = null;
   }
 
   /**
-   * Initialize and connect to printer
+   * Get list of available printers
    */
-  async connect() {
+  async getPrinters() {
     try {
-      // Try to use escpos library if available
-      let escpos, USB;
-      
-      try {
-        escpos = require('escpos');
-        USB = require('escpos-usb');
-        escpos.USB = USB;
-        
-        this.device = new USB();
-        this.printer = new escpos.Printer(this.device);
-        this.isConnected = true;
-        
-        log.info('ESC/POS printer connected via USB');
-        return { success: true };
-      } catch (e) {
-        log.warn('ESC/POS USB not available, using fallback printing');
-        return { success: true, fallback: true };
-      }
+      // Create a dummy window if needed or use main window if accessible
+      // Since this runs in main process, we can use any window or create a temp one
+      const win = new BrowserWindow({ show: false, width: 100, height: 100 });
+      const printers = await win.webContents.getPrintersAsync();
+      win.close();
+      return printers;
     } catch (error) {
-      log.error('Printer connection error:', error);
-      return { success: false, error: error.message };
+      log.error('Get printers error:', error);
+      return [];
     }
   }
 
   /**
    * Print a receipt for an order
    */
-  async printReceipt(order) {
+  async printReceipt(order, printerName = null) {
     try {
-      const content = this.generateReceiptContent(order);
-      
-      if (this.printer && this.device) {
-        return await this.printWithEscPos(content);
-      } else {
-        return await this.printWithFallback(content, 'receipt');
-      }
+      const html = this.generateReceiptHtml(order);
+      return await this.printHtml(html, printerName);
     } catch (error) {
       log.error('Print receipt error:', error);
       return { success: false, error: error.message };
@@ -77,15 +43,10 @@ class PrinterService {
   /**
    * Print Kitchen Order Ticket (KOT)
    */
-  async printKOT(order, items) {
+  async printKOT(order, items, printerName = null) {
     try {
-      const content = this.generateKOTContent(order, items);
-      
-      if (this.printer && this.device) {
-        return await this.printWithEscPos(content);
-      } else {
-        return await this.printWithFallback(content, 'kot');
-      }
+      const html = this.generateKOTHtml(order, items);
+      return await this.printHtml(html, printerName);
     } catch (error) {
       log.error('Print KOT error:', error);
       return { success: false, error: error.message };
@@ -95,23 +56,20 @@ class PrinterService {
   /**
    * Test print functionality
    */
-  async testPrint() {
+  async testPrint(printerName = null) {
     try {
-      const content = {
-        lines: [
-          { text: 'TEST PRINT', style: 'header' },
-          { text: '================================', style: 'normal' },
-          { text: 'Printer is working correctly!', style: 'normal' },
-          { text: new Date().toLocaleString(), style: 'normal' },
-          { text: '================================', style: 'normal' },
-        ]
-      };
-      
-      if (this.printer && this.device) {
-        return await this.printWithEscPos(content);
-      } else {
-        return await this.printWithFallback(content, 'test');
-      }
+      const html = `
+        <html>
+          <body style="font-family: monospace; text-align: center; width: 300px; margin: 0 auto;">
+            <h1 style="font-size: 24px;">TEST PRINT</h1>
+            <hr/>
+            <p>Printer is working correctly!</p>
+            <p>${new Date().toLocaleString()}</p>
+            <hr/>
+          </body>
+        </html>
+      `;
+      return await this.printHtml(html, printerName);
     } catch (error) {
       log.error('Test print error:', error);
       return { success: false, error: error.message };
@@ -119,226 +77,269 @@ class PrinterService {
   }
 
   /**
-   * Generate receipt content
+   * Print HTML content to a specific printer
    */
-  generateReceiptContent(order) {
-    const lines = [];
-    const divider = '================================';
-    const thinDivider = '--------------------------------';
-    
-    // Header
-    lines.push({ text: order.restaurantName || 'RESTAURANT POS', style: 'header' });
-    if (order.restaurantAddress) {
-      lines.push({ text: order.restaurantAddress, style: 'center' });
-    }
-    if (order.restaurantPhone) {
-      lines.push({ text: `Tel: ${order.restaurantPhone}`, style: 'center' });
-    }
-    
-    lines.push({ text: divider, style: 'normal' });
-    
-    // Order details
-    lines.push({ text: `Bill No: ${order.order_number}`, style: 'bold' });
-    lines.push({ text: `Date: ${new Date(order.created_at).toLocaleString()}`, style: 'normal' });
-    if (order.table_number) {
-      lines.push({ text: `Table: ${order.table_number}`, style: 'normal' });
-    }
-    lines.push({ text: `Type: ${order.order_type?.replace('_', ' ').toUpperCase()}`, style: 'normal' });
-    if (order.cashier_name) {
-      lines.push({ text: `Cashier: ${order.cashier_name}`, style: 'normal' });
-    }
-    
-    lines.push({ text: divider, style: 'normal' });
-    
-    // Items header
-    lines.push({ text: 'ITEM                 QTY   AMOUNT', style: 'bold' });
-    lines.push({ text: thinDivider, style: 'normal' });
-    
-    // Items
-    if (order.items) {
-      order.items.forEach(item => {
-        const name = item.item_name.substring(0, 18).padEnd(18);
-        const qty = item.quantity.toString().padStart(3);
-        const amount = item.item_total.toFixed(2).padStart(8);
-        lines.push({ text: `${name}${qty}${amount}`, style: 'normal' });
-        
-        if (item.special_instructions) {
-          lines.push({ text: `  > ${item.special_instructions}`, style: 'small' });
+  async printHtml(htmlContent, printerName) {
+    return new Promise((resolve) => {
+      // Create a hidden window for printing
+      // Width set to match typical thermal paper (80mm ~ 300px-350px)
+      this.printWindow = new BrowserWindow({
+        show: false,
+        width: 300, // Reduced window width
+        height: 600,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true
         }
       });
-    }
-    
-    lines.push({ text: thinDivider, style: 'normal' });
-    
-    // Totals
-    lines.push({ text: `Subtotal:         ${order.subtotal.toFixed(2).padStart(12)}`, style: 'normal' });
-    if (order.tax_amount > 0) {
-      lines.push({ text: `Tax:              ${order.tax_amount.toFixed(2).padStart(12)}`, style: 'normal' });
-    }
-    if (order.discount_amount > 0) {
-      lines.push({ text: `Discount:         -${order.discount_amount.toFixed(2).padStart(11)}`, style: 'normal' });
-    }
-    
-    lines.push({ text: divider, style: 'normal' });
-    lines.push({ text: `TOTAL:            ${order.total_amount.toFixed(2).padStart(12)}`, style: 'bold' });
-    lines.push({ text: divider, style: 'normal' });
-    
-    // Payment
-    if (order.payment_method) {
-      lines.push({ text: `Payment: ${order.payment_method.toUpperCase()}`, style: 'normal' });
-    }
-    
-    // Footer
-    lines.push({ text: '', style: 'normal' });
-    lines.push({ text: order.receiptFooter || 'Thank you for dining with us!', style: 'center' });
-    if (order.gstNumber) {
-      lines.push({ text: `GST: ${order.gstNumber}`, style: 'center' });
-    }
-    
-    return { lines };
+
+      // Load HTML content
+      const html = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <style>
+              @page {
+                margin: 0;
+                size: 72mm auto; /* Attempt to force dynamic height */
+              }
+              body { 
+                margin: 0; 
+                padding: 5px; 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                font-size: 12px; 
+                color: black; 
+                background: white; 
+                width: 270px; /* Approx 72mm printable width for 80mm paper */
+                line-height: 1.2;
+              }
+              *, *::before, *::after { box-sizing: border-box; }
+              h1, h2, h3, h4, h5, h6 { margin: 0; padding: 0; }
+              p { margin: 0; padding: 0; }
+              table { width: 100%; border-collapse: collapse; }
+              th, td { text-align: left; padding: 2px 0; }
+              .text-right { text-align: right; }
+              .text-center { text-align: center; }
+              .bold { font-weight: bold; }
+              .divider { border-top: 1px dashed #000; margin: 6px 0; }
+              .header { font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 2px; text-transform: uppercase; }
+              .subheader { font-size: 12px; text-align: center; margin-bottom: 2px; }
+              .item-row { margin-bottom: 4px; padding-bottom: 2px; }
+              .instructions { font-size: 11px; font-style: italic; margin-top: 2px; }
+              .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-top: 4px; }
+            </style>
+          </head>
+          <body>
+            ${htmlContent}
+          </body>
+        </html>
+      `;
+
+      // Use a data URL to load the HTML
+      this.printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+
+      this.printWindow.webContents.on('did-finish-load', () => {
+        // Print options
+        const options = {
+          silent: true,
+          printBackground: false,
+          color: false,
+          margin: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 }
+        };
+
+        if (printerName) {
+          options.deviceName = printerName;
+        }
+
+        this.printWindow.webContents.print(options, (success, errorType) => {
+          if (!success) {
+            log.error('Print failed:', errorType);
+            resolve({ success: false, error: errorType });
+          } else {
+            resolve({ success: true });
+          }
+          
+          // Close window after printing
+          setTimeout(() => {
+            if (this.printWindow) {
+              this.printWindow.close();
+              this.printWindow = null;
+            }
+          }, 5000);
+        });
+      });
+    });
   }
 
   /**
-   * Generate KOT content
+   * Generate Receipt HTML
    */
-  generateKOTContent(order, items) {
-    const lines = [];
-    const divider = '================================';
+  generateReceiptHtml(order) {
+    const items = order.items || [];
     
-    // Header
-    lines.push({ text: 'KITCHEN ORDER TICKET', style: 'header' });
-    lines.push({ text: divider, style: 'normal' });
-    
-    // Order info
-    lines.push({ text: `Order #: ${order.order_number}`, style: 'bold' });
-    lines.push({ text: `Time: ${new Date().toLocaleTimeString()}`, style: 'normal' });
-    if (order.table_number) {
-      lines.push({ text: `TABLE: ${order.table_number}`, style: 'header' });
-    }
-    lines.push({ text: `Type: ${order.order_type?.replace('_', ' ').toUpperCase()}`, style: 'bold' });
-    
-    lines.push({ text: divider, style: 'normal' });
-    
-    // Items with variants and add-ons
-    items.forEach(item => {
-      lines.push({ text: `${item.quantity}x ${item.item_name}`, style: 'bold' });
-      
-      // Show variant if present
+    // Format items rows
+    const itemsHtml = items.map(item => {
+      let details = '';
       if (item.variant) {
         try {
-          const variant = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
-          if (variant && variant.name) {
-            lines.push({ text: `   Size: ${variant.name}`, style: 'normal' });
-          }
-        } catch (e) {
-          // Variant not parseable, skip
-        }
+          const v = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
+          if (v && v.name) details += `<div style="font-size: 11px; padding-left: 8px; color: #333;">- Size: ${v.name}</div>`;
+        } catch (e) {}
       }
-      
-      // Show add-ons if present
       if (item.addons) {
         try {
-          const addons = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
-          if (Array.isArray(addons) && addons.length > 0) {
-            lines.push({ text: `   Add-ons:`, style: 'normal' });
-            addons.forEach(addon => {
-              lines.push({ text: `   + ${addon.name}`, style: 'normal' });
+          const a = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
+          if (Array.isArray(a)) {
+            a.forEach(addon => {
+              details += `<div style="font-size: 11px; padding-left: 8px; color: #333;">+ ${addon.name}</div>`;
             });
           }
-        } catch (e) {
-          // Addons not parseable, skip
-        }
+        } catch (e) {}
       }
       
-      if (item.special_instructions) {
-        lines.push({ text: `   >> ${item.special_instructions}`, style: 'normal' });
-      }
-    });
+      return `
+        <div class="item-row">
+          <div style="display: flex; justify-content: space-between;">
+            <div style="flex: 1;">${item.item_name} <span style="font-size: 11px;">x${item.quantity}</span></div>
+            <div class="bold">${(item.item_total || 0).toFixed(2)}</div>
+          </div>
+          ${details}
+        </div>
+      `;
+    }).join('');
     
-    lines.push({ text: divider, style: 'normal' });
-    lines.push({ text: new Date().toLocaleString(), style: 'center' });
-    
-    return { lines };
+    // Restaurant Info
+    const restaurantName = order.restaurantName || 'RESTAURANT';
+    const address = order.restaurantAddress ? `<div class="subheader">${order.restaurantAddress}</div>` : '';
+    const phone = order.restaurantPhone ? `<div class="subheader">Tel: ${order.restaurantPhone}</div>` : '';
+    const gst = order.gstNumber ? `<div class="subheader">GST: ${order.gstNumber}</div>` : '';
+
+    return `
+      <div class="header">${restaurantName}</div>
+      ${address}
+      ${phone}
+      ${gst}
+      
+      <div class="divider"></div>
+      
+      <div style="display: flex; justify-content: space-between; font-size: 12px;">
+        <span>Bill No: ${order.order_number}</span>
+        <span>${new Date().toLocaleDateString()}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 12px;">
+        <span>${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+        <span>${order.order_type?.replace('_', ' ').toUpperCase()}</span>
+      </div>
+      ${order.table_number ? `<div style="font-size: 12px;">Table: <b>${order.table_number}</b></div>` : ''}
+      ${order.customer_name ? `<div style="font-size: 12px;">Cust: ${order.customer_name}</div>` : ''}
+      
+      <div class="divider"></div>
+      
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 4px;">ITEMS</div>
+      ${itemsHtml}
+      
+      <div class="divider"></div>
+      
+      <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+        <span>Subtotal</span>
+        <span>${(order.subtotal || 0).toFixed(2)}</span>
+      </div>
+      ${(order.tax_amount > 0) ? `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+          <span>Tax</span>
+          <span>${order.tax_amount.toFixed(2)}</span>
+        </div>
+      ` : ''}
+      ${(order.discount_amount > 0) ? `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+          <span>Discount</span>
+          <span>-${order.discount_amount.toFixed(2)}</span>
+        </div>
+      ` : ''}
+      
+      <div class="divider"></div>
+      
+      <div class="total-row">
+        <span>TOTAL</span>
+        <span style="font-size: 16px;">${(order.total_amount || 0).toFixed(2)}</span>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="subheader" style="margin-top: 8px; font-weight: 500;">${order.receiptFooter || 'Thank You!'}</div>
+      <div class="subheader" style="font-size: 10px; margin-top: 4px; color: #555;">Powered by Offline POS</div>
+    `;
   }
 
   /**
-   * Print using ESC/POS commands
+   * Generate KOT HTML
    */
-  async printWithEscPos(content) {
-    return new Promise((resolve, reject) => {
-      this.device.open((err) => {
-        if (err) {
-          log.error('Device open error:', err);
-          return reject(err);
-        }
-        
+  generateKOTHtml(order, items) {
+    // Format items
+    const itemsHtml = items.map(item => {
+      let details = '';
+      if (item.variant) {
         try {
-          this.printer.font('A').align('CT').style('B');
-          
-          content.lines.forEach(line => {
-            switch (line.style) {
-              case 'header':
-                this.printer.align('CT').size(2, 2).text(line.text).size(1, 1);
-                break;
-              case 'bold':
-                this.printer.align('LT').style('B').text(line.text).style('NORMAL');
-                break;
-              case 'center':
-                this.printer.align('CT').text(line.text);
-                break;
-              case 'small':
-                this.printer.align('LT').size(0, 0).text(line.text).size(1, 1);
-                break;
-              default:
-                this.printer.align('LT').text(line.text);
-            }
-          });
-          
-          this.printer.feed(3).cut().close();
-          resolve({ success: true });
-        } catch (e) {
-          reject(e);
-        }
-      });
-    });
-  }
-
-  /**
-   * Fallback printing using system printer
-   */
-  async printWithFallback(content, type) {
-    // For fallback, we'll create a simple text representation
-    // that can be printed using the system's default printer
-    
-    const text = content.lines.map(line => line.text).join('\n');
-    
-    log.info(`Print job (${type}):`);
-    log.info(text);
-    
-    // In a real implementation, you would use:
-    // - Windows: Use win32print or similar
-    // - Cross-platform: Use node-printer package
-    
-    return { 
-      success: true, 
-      message: 'Print job queued. Using fallback printing method.',
-      printContent: text
-    };
-  }
-
-  /**
-   * Disconnect from printer
-   */
-  disconnect() {
-    if (this.device) {
-      try {
-        this.device.close();
-      } catch (e) {
-        log.warn('Error closing printer device:', e);
+          const v = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
+          if (v && v.name) details += `<div style="font-size: 12px; padding-left: 10px;">Size: ${v.name}</div>`;
+        } catch (e) {}
       }
-    }
-    this.isConnected = false;
-    log.info('Printer disconnected');
+      if (item.addons) {
+        try {
+          const a = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
+          if (Array.isArray(a)) {
+            a.forEach(addon => {
+              details += `<div style="font-size: 12px; padding-left: 10px;">+ ${addon.name}</div>`;
+            });
+          }
+        } catch (e) {}
+      }
+      if (item.special_instructions) {
+        details += `<div style="font-size: 12px; background: #eee; font-weight: bold; padding: 2px; margin-top: 2px;">NOTE: ${item.special_instructions}</div>`;
+      }
+      
+      return `
+        <div class="item-row" style="margin-bottom: 8px; border-bottom: 1px dotted #ccc; padding-bottom: 4px;">
+          <div style="font-weight: bold; font-size: 14px;">${item.quantity} x ${item.item_name}</div>
+          ${details}
+        </div>
+      `;
+    }).join('');
+
+    const urgency = order.urgency || 'normal';
+    const urgencyBadge = urgency === 'urgent' || urgency === 'critical' 
+      ? `<div style="text-align: center; background: black; color: white; font-weight: bold; padding: 4px; margin-bottom: 6px;">${urgency.toUpperCase()}</div>`
+      : '';
+
+    return `
+      ${urgencyBadge}
+      <div class="header" style="font-size: 16px;">KITCHEN TICKET (KOT)</div>
+      <div class="subheader" style="font-size: 14px; font-weight: bold;">${order.order_type?.replace('_', ' ').toUpperCase()}</div>
+      
+      <div class="divider"></div>
+      
+      <div style="display: flex; justify-content: space-between; font-size: 14px;">
+        <span>Order #: <b>${order.order_number}</b></span>
+      </div>
+      <div style="font-size: 13px;">Date: ${new Date().toLocaleString([], {hour: '2-digit', minute:'2-digit'})}</div>
+      ${order.table_number ? `<div style="font-size: 18px; font-weight: bold; margin: 6px 0;">TABLE: ${order.table_number}</div>` : ''}
+      
+      <div class="divider"></div>
+      
+      <div style="margin-top: 8px;">
+        ${itemsHtml}
+      </div>
+      
+      ${order.chef_instructions ? `
+        <div style="margin-top: 8px; padding: 6px; border: 2px solid black; font-weight: bold; font-size: 14px;">
+          CHEF NOTE: ${order.chef_instructions}
+        </div>
+      ` : ''}
+      
+      <div class="divider" style="margin-top: 15px;"></div>
+      <div class="text-center" style="font-size: 11px;">--- Kitchen Copy ---</div>
+    `;
   }
 }
 
