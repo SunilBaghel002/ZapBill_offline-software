@@ -112,6 +112,8 @@ CREATE TABLE IF NOT EXISTS orders (
     status TEXT CHECK(status IN ('active', 'completed', 'cancelled', 'held')) DEFAULT 'active',
     is_hold INTEGER DEFAULT 0, -- 1 for held orders
     notes TEXT,
+    urgency TEXT CHECK(urgency IN ('normal', 'urgent', 'critical')) DEFAULT 'normal',
+    chef_instructions TEXT,
     cashier_id TEXT REFERENCES users(id),
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP,

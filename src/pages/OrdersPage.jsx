@@ -12,7 +12,11 @@ import {
   Download,
   Check,
   Clock,
-  XCircle
+  XCircle,
+  ShoppingCart,
+  DollarSign,
+  TrendingUp,
+  CheckCircle
 } from 'lucide-react';
 
 const OrdersPage = () => {
@@ -25,6 +29,7 @@ const OrdersPage = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
 
   useEffect(() => {
     loadOrders();
@@ -107,6 +112,11 @@ const OrdersPage = () => {
     }
   };
 
+  const handleCompleteOrderInput = (order) => {
+    setSelectedOrder(order);
+    setShowCompleteModal(true);
+  };
+
   const handleDeleteOrder = async (order) => {
     if (window.confirm(`Are you sure you want to delete Order #${order.order_number}? This cannot be undone.`)) {
       try {
@@ -159,15 +169,15 @@ const OrdersPage = () => {
 
   if (isLoading) {
     return (
-      <div className="empty-state">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 64px)', marginTop: '64px' }}>
         <div className="loading-spinner" />
-        <p className="mt-4">Loading orders...</p>
+        <p className="mt-4" style={{ marginLeft: '12px' }}>Loading orders...</p>
       </div>
     );
   }
 
   return (
-    <div>
+    <div style={{ padding: '24px 28px', marginTop: '64px', height: 'calc(100vh - 64px)', overflowY: 'auto', background: '#f8fafc' }}>
       {/* Header */}
       <div style={{ 
         display: 'flex', 
@@ -248,36 +258,42 @@ const OrdersPage = () => {
       {/* Stats Row */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
-        gap: 'var(--spacing-4)',
-        marginBottom: 'var(--spacing-4)'
+        gridTemplateColumns: 'repeat(4, 1fr)', 
+        gap: '16px',
+        marginBottom: '20px'
       }}>
-        <div className="stat-card" style={{ background: 'var(--primary-50)', borderColor: 'var(--primary-200)' }}>
-          <div className="stat-value" style={{ color: 'var(--primary-600)' }}>{filteredOrders.length}</div>
-          <div className="stat-label">Total Orders</div>
-        </div>
-        <div className="stat-card" style={{ background: 'var(--success-50)', borderColor: 'var(--success-200)' }}>
-          <div className="stat-value" style={{ color: 'var(--success-600)' }}>
-            ₹{filteredOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0).toFixed(0)}
+        <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', borderRadius: '14px', padding: '20px', color: 'white', boxShadow: '0 8px 24px rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: 48, height: 48, borderRadius: '12px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShoppingCart size={24} /></div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: 700, lineHeight: 1 }}>{filteredOrders.length}</div>
+            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginTop: '4px' }}>Total Orders</div>
           </div>
-          <div className="stat-label">Total Revenue</div>
         </div>
-        <div className="stat-card" style={{ background: 'var(--warning-50)', borderColor: 'var(--warning-200)' }}>
-          <div className="stat-value" style={{ color: 'var(--warning-600)' }}>
-            {filteredOrders.filter(o => o.status === 'active').length}
+        <div style={{ background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)', borderRadius: '14px', padding: '20px', color: 'white', boxShadow: '0 8px 24px rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: 48, height: 48, borderRadius: '12px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DollarSign size={24} /></div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: 700, lineHeight: 1 }}>₹{filteredOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0).toFixed(0)}</div>
+            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginTop: '4px' }}>Total Revenue</div>
           </div>
-          <div className="stat-label">Active Orders</div>
         </div>
-        <div className="stat-card" style={{ background: 'var(--gray-50)', borderColor: 'var(--gray-200)' }}>
-          <div className="stat-value" style={{ color: 'var(--gray-600)' }}>
-            {filteredOrders.filter(o => o.status === 'completed').length}
+        <div style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)', borderRadius: '14px', padding: '20px', color: 'white', boxShadow: '0 8px 24px rgba(245,158,11,0.25)', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: 48, height: 48, borderRadius: '12px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={24} /></div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: 700, lineHeight: 1 }}>{filteredOrders.filter(o => o.status === 'active').length}</div>
+            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginTop: '4px' }}>Active Orders</div>
           </div>
-          <div className="stat-label">Completed</div>
+        </div>
+        <div style={{ background: 'linear-gradient(135deg, #64748b 0%, #94a3b8 100%)', borderRadius: '14px', padding: '20px', color: 'white', boxShadow: '0 8px 24px rgba(100,116,139,0.25)', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ width: 48, height: 48, borderRadius: '12px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CheckCircle size={24} /></div>
+          <div>
+            <div style={{ fontSize: '28px', fontWeight: 700, lineHeight: 1 }}>{filteredOrders.filter(o => o.status === 'completed').length}</div>
+            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.8)', marginTop: '4px' }}>Completed</div>
+          </div>
         </div>
       </div>
 
       {/* Orders Table */}
-      <div className="table-container">
+      <div className="table-container" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
         <table className="table">
           <thead>
             <tr>
@@ -327,6 +343,16 @@ const OrdersPage = () => {
                     >
                       <Eye size={16} />
                     </button>
+                    {order.status === 'active' && (
+                      <button 
+                        className="btn btn-ghost btn-icon btn-sm"
+                        onClick={() => handleCompleteOrderInput(order)}
+                        title="Complete Order"
+                        style={{ color: 'var(--success-600)' }}
+                      >
+                        <CheckCircle size={16} />
+                      </button>
+                    )}
                     <button 
                       className="btn btn-ghost btn-icon btn-sm"
                       onClick={() => handleEditOrder(order)}
@@ -385,6 +411,77 @@ const OrdersPage = () => {
           }}
         />
       )}
+
+      {/* Complete Modal */}
+      {showCompleteModal && selectedOrder && (
+        <CompleteOrderModal 
+          order={selectedOrder}
+          onClose={() => setShowCompleteModal(false)}
+          onComplete={() => {
+            setShowCompleteModal(false);
+            loadOrders();
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// Complete Order Modal
+const CompleteOrderModal = ({ order, onClose, onComplete }) => {
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await window.electronAPI.invoke('order:complete', { 
+        id: order.id, 
+        paymentMethod 
+      });
+      onComplete();
+    } catch (error) {
+      console.error('Failed to complete order:', error);
+      alert('Failed to complete order: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+        <div className="modal-header">
+          <h3 className="modal-title">Complete Order #{order.order_number}</h3>
+          <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <p style={{ marginBottom: '16px', color: 'var(--gray-600)' }}>
+              Total Amount: <strong>₹{(order.total_amount || 0).toFixed(2)}</strong>
+            </p>
+            <div className="input-group">
+              <label className="input-label">Payment Method</label>
+              <select 
+                className="input select"
+                value={paymentMethod}
+                onChange={e => setPaymentMethod(e.target.value)}
+              >
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="upi">UPI</option>
+              </select>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-success" disabled={isSubmitting}>
+              {isSubmitting ? 'Completing...' : 'Complete Order'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
@@ -402,125 +499,67 @@ const BillViewModal = ({ order, onClose, onPrint }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-        <div className="modal-header">
-          <h3 className="modal-title">Bill #{order.order_number}</h3>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}>
-            <X size={20} />
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: 'white', borderRadius: '16px', width: '420px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', animation: 'fadeInUp 0.25s ease' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>Bill #{order.order_number}</h3>
+          <button onClick={onClose} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>
+            <X size={16} />
           </button>
         </div>
 
-        <div className="modal-body" style={{ padding: 0 }}>
-          <div style={{ 
-            background: '#fafafa', 
-            padding: 'var(--spacing-4)', 
-            border: '1px dashed var(--gray-300)',
-            margin: 'var(--spacing-3)',
-            borderRadius: 'var(--radius-md)',
-            fontFamily: 'monospace'
-          }}>
-            {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: 'var(--spacing-3)' }}>
-              <h3 style={{ marginBottom: '4px' }}>Restaurant POS</h3>
-              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--gray-600)' }}>
-                {formatDate(order.created_at)}
-              </div>
+        {/* Bill Content — scrollable */}
+        <div style={{ overflowY: 'auto', padding: '16px 20px', flex: '1 1 auto' }}>
+          <div style={{ background: '#fafafa', padding: '20px', border: '1px dashed #d1d5db', borderRadius: '10px', fontFamily: "'Courier New', monospace", fontSize: '13px' }}>
+            {/* Restaurant header */}
+            <div style={{ textAlign: 'center', marginBottom: '14px', paddingBottom: '14px', borderBottom: '1px dashed #9ca3af' }}>
+              <div style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '1px' }}>Restaurant POS</div>
+              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{formatDate(order.created_at)}</div>
             </div>
 
-            <div style={{ 
-              borderTop: '1px dashed var(--gray-400)', 
-              borderBottom: '1px dashed var(--gray-400)',
-              padding: 'var(--spacing-2) 0',
-              marginBottom: 'var(--spacing-2)',
-              fontSize: 'var(--font-size-sm)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Bill No:</span>
-                <strong>#{order.order_number}</strong>
-              </div>
-              {order.table_number && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Table:</span>
-                  <span>{order.table_number}</span>
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Type:</span>
-                <span>{order.order_type?.replace('_', ' ').toUpperCase()}</span>
-              </div>
-              {order.customer_name && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Customer:</span>
-                  <span>{order.customer_name}</span>
-                </div>
-              )}
+            {/* Order details */}
+            <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px dashed #d1d5db', lineHeight: 1.8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Bill No:</span><strong>#{order.order_number}</strong></div>
+              {order.table_number && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Table:</span><span>{order.table_number}</span></div>}
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Type:</span><span>{order.order_type?.replace('_', ' ').toUpperCase()}</span></div>
+              {order.customer_name && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Customer:</span><span>{order.customer_name}</span></div>}
+              {order.customer_phone && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Phone:</span><span>{order.customer_phone}</span></div>}
             </div>
 
             {/* Items */}
-            <div style={{ marginBottom: 'var(--spacing-2)' }}>
+            <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px dashed #d1d5db' }}>
               {order.items?.map((item, idx) => (
-                <div key={idx} style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between',
-                  fontSize: 'var(--font-size-sm)',
-                  padding: '4px 0'
-                }}>
-                  <span>{item.item_name} x {item.quantity}</span>
-                  <span>₹{(item.item_total || 0).toFixed(2)}</span>
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', lineHeight: 1.4 }}>
+                  <span>{item.item_name} × {item.quantity}</span>
+                  <span style={{ fontWeight: 600 }}>₹{(item.item_total || 0).toFixed(2)}</span>
                 </div>
               ))}
             </div>
 
             {/* Totals */}
-            <div style={{ 
-              borderTop: '1px dashed var(--gray-400)',
-              paddingTop: 'var(--spacing-2)',
-              fontSize: 'var(--font-size-sm)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Subtotal:</span>
-                <span>₹{(order.subtotal || 0).toFixed(2)}</span>
-              </div>
-              {order.tax_amount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Tax:</span>
-                  <span>₹{(order.tax_amount || 0).toFixed(2)}</span>
-                </div>
-              )}
-              {order.discount_amount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success-600)' }}>
-                  <span>Discount:</span>
-                  <span>-₹{(order.discount_amount || 0).toFixed(2)}</span>
-                </div>
-              )}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                fontWeight: 700,
-                fontSize: 'var(--font-size-lg)',
-                marginTop: 'var(--spacing-2)',
-                paddingTop: 'var(--spacing-2)',
-                borderTop: '2px solid var(--gray-900)'
-              }}>
-                <span>TOTAL:</span>
-                <span>₹{(order.total_amount || 0).toFixed(2)}</span>
+            <div style={{ lineHeight: 1.8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Subtotal:</span><span>₹{(order.subtotal || 0).toFixed(2)}</span></div>
+              {order.tax_amount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Tax:</span><span>₹{(order.tax_amount || 0).toFixed(2)}</span></div>}
+              {order.discount_amount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a' }}><span>Discount:</span><span>-₹{(order.discount_amount || 0).toFixed(2)}</span></div>}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '17px', marginTop: '8px', paddingTop: '10px', borderTop: '2px solid #111827' }}>
+                <span>TOTAL:</span><span>₹{(order.total_amount || 0).toFixed(2)}</span>
               </div>
             </div>
 
             {order.payment_method && (
-              <div style={{ textAlign: 'center', marginTop: 'var(--spacing-3)', color: 'var(--gray-600)' }}>
-                Paid via {order.payment_method.toUpperCase()}
+              <div style={{ textAlign: 'center', marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #d1d5db', color: '#6b7280', fontSize: '12px', letterSpacing: '0.5px' }}>
+                Paid via <strong style={{ color: '#1e293b' }}>{order.payment_method.toUpperCase()}</strong>
               </div>
             )}
           </div>
         </div>
 
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Close</button>
-          <button className="btn btn-primary" onClick={onPrint}>
-            <Printer size={18} />
-            Print Bill
+        {/* Footer — always visible */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '14px 20px', borderTop: '1px solid #f1f5f9' }}>
+          <button onClick={onClose} style={{ padding: '8px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', color: '#475569', cursor: 'pointer', fontWeight: 500, fontSize: '14px' }}>Close</button>
+          <button onClick={onPrint} style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontWeight: 500, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Printer size={16} /> Print Bill
           </button>
         </div>
       </div>

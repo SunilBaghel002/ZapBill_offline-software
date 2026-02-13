@@ -100,6 +100,12 @@ class Database {
     } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
 
     try {
+        // Add urgency and chef_instructions to orders
+        try { this.db.run("ALTER TABLE orders ADD COLUMN urgency TEXT DEFAULT 'normal'"); } catch (e) {}
+        try { this.db.run("ALTER TABLE orders ADD COLUMN chef_instructions TEXT"); } catch (e) {}
+     } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    try {
         // Add tax_rate to order_items
         try { this.db.run("ALTER TABLE order_items ADD COLUMN tax_rate REAL DEFAULT 0"); } catch (e) {}
      } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
@@ -621,6 +627,8 @@ class Database {
       payment_method: order.payment_method || null,
       payment_status: order.payment_status || 'pending',
       notes: order.notes || '',
+    urgency: order.urgency || 'normal',
+    chef_instructions: order.chef_instructions || '',
       status: order.status || 'active',
       is_hold: order.is_hold || 0,
       cashier_id: userId || null,
@@ -781,8 +789,10 @@ class Database {
   deleteOrder(id) {
     const order = this.getOrderById(id);
     if (!order) return { success: false, error: 'Order not found' };
+    if (order.is_deleted) return { success: true }; // Already deleted
 
-    const now = new Date().toISOString();
+    const now = new Date();
+    const isoNow = now.toISOString();
     const deletedOrderNumber = order.order_number;
     
     console.log(`[deleteOrder] Deleting order ID: ${id}, Number: ${deletedOrderNumber}`);
@@ -790,70 +800,76 @@ class Database {
     // 1. Soft delete and negate order number immediately
     this.update('orders', {
       is_deleted: 1,
-      order_number: -deletedOrderNumber, 
-      updated_at: now,
+      order_number: -Math.abs(deletedOrderNumber), // Ensure negative
+      updated_at: isoNow,
     }, { id });
 
-    // 2. Renumber subsequent orders for the same day
+    // 2. RE-INDEXING STRATEGY: Use ID Prefix to find all orders for this "Day" (Sequence)
+    // This avoids Date/Timezone parsing issues by relying on the integer structure YYMMDDxxx
     try {
-      // Extract prefix (YYMMDD)
-      const orderNumStr = Math.abs(deletedOrderNumber).toString();
-      
-      if (orderNumStr.length === 9) {
-         const prefix = orderNumStr.substring(0, 6); // e.g. "260213"
-         const minNum = parseInt(`${prefix}000`);
-         const maxNum = parseInt(`${prefix}999`);
+         const orderNumStr = Math.abs(deletedOrderNumber).toString();
+         if (orderNumStr.length === 9) {
+             const prefixStr = orderNumStr.substring(0, 6); // "260213"
+             const minNum = parseInt(`${prefixStr}000`);
+             const maxNum = parseInt(`${prefixStr}999`);
+             
+             console.log(`[deleteOrder] Re-indexing range: ${minNum} - ${maxNum}`);
 
-         // Find all active orders in this range with number > deletedNumber
-         console.log(`[deleteOrder] Searching for subsequent orders > ${deletedOrderNumber} in range ${minNum}-${maxNum}`);
-         
-         const subsequentOrders = this.execute(`
-            SELECT id, order_number FROM orders 
-            WHERE is_deleted = 0 
-            AND order_number > ? 
-            AND order_number >= ? 
-            AND order_number <= ?
-            ORDER BY order_number ASC
-         `, [deletedOrderNumber, minNum, maxNum]);
+             // Fetch all active orders in this ID range
+             const dailyOrders = this.execute(`
+                SELECT id, order_number, created_at FROM orders 
+                WHERE is_deleted = 0 
+                AND order_number BETWEEN ? AND ?
+                ORDER BY order_number ASC
+             `, [minNum, maxNum]);
 
-         console.log(`[deleteOrder] Found ${subsequentOrders.length} orders to renumber.`);
+             console.log(`[deleteOrder] Found ${dailyOrders.length} active orders to re-index.`);
 
-         // Shift them down by 1
-         for (const subOrder of subsequentOrders) {
-           const newNumber = subOrder.order_number - 1;
-           console.log(`[deleteOrder] Renumbering ${subOrder.order_number} -> ${newNumber}`);
-           
-           this.update('orders', {
-             order_number: newNumber,
-             updated_at: now
-           }, { id: subOrder.id });
-           
-           this.addToSyncQueue('order', subOrder.id, 'update', { order_number: newNumber });
+             // Re-assign numbers sequentially starting from prefix + 001
+             let needsSequenceUpdate = false;
+             
+             dailyOrders.forEach((subOrder, index) => {
+                 const seqNum = index + 1;
+                 const seqStr = seqNum.toString().padStart(3, '0');
+                 const expectedNumber = parseInt(`${prefixStr}${seqStr}`);
+                 
+                 if (subOrder.order_number !== expectedNumber) {
+                     console.log(`[deleteOrder] Correcting ${subOrder.order_number} -> ${expectedNumber}`);
+                     this.update('orders', {
+                         order_number: expectedNumber,
+                         updated_at: isoNow
+                     }, { id: subOrder.id });
+                     
+                     this.addToSyncQueue('order', subOrder.id, 'update', { order_number: expectedNumber });
+                 }
+             });
+
+             // 3. Update the sequence counter
+             // We verify if this batch corresponds to "today" before updating the global sequence
+             // (Though technically we should update that specific day's sequence regardless)
+             const today = new Date();
+             const todayYY = today.getFullYear().toString().slice(-2);
+             const todayMM = (today.getMonth() + 1).toString().padStart(2, '0');
+             const todayDD = today.getDate().toString().padStart(2, '0');
+             const todayPrefix = `${todayYY}${todayMM}${todayDD}`;
+
+             if (prefixStr === todayPrefix) {
+                 const newCount = dailyOrders.length;
+                 const todayDateStr = today.toLocaleDateString('en-CA');
+                 
+                 console.log(`[deleteOrder] Updating TODAY sequence (${todayDateStr}) to: ${newCount}`);
+                 this.run(
+                   `UPDATE sequences SET current_value = ? WHERE sequence_name = 'order_number' AND date = ?`,
+                   [newCount, todayDateStr]
+                 );
+             }
          }
-
-         // 3. Update the sequence counter
-         // We should decrement the current_value if we created a gap or reduced the count
-         // Logic: If there were orders after this, we shifted them down, so the "top" of the stack is now 1 lower.
-         // If there were NO orders after this, we simply removed the top, so the "top" is 1 lower.
-         // So in ALL valid renumbering cases for *today*, we decrement the sequence.
-         
-         const deletedDate = new Date(order.created_at).toLocaleDateString('en-CA');
-         const today = new Date().toLocaleDateString('en-CA');
-         
-         if (deletedDate === today) {
-            console.log(`[deleteOrder] Decrementing sequence for today: ${today}`);
-            this.run(
-              `UPDATE sequences SET current_value = current_value - 1 WHERE sequence_name = 'order_number' AND date = ? AND current_value > 0`,
-              [today]
-            );
-         }
-      }
     } catch (error) {
-      console.error('[deleteOrder] Error renumbering orders:', error);
+      console.error('[deleteOrder] Error during re-indexing:', error);
     }
 
     this.addToSyncQueue('order', id, 'delete', { id });
-    this.save(); // Ensure everything is written to disk
+    this.save(); 
     return { success: true };
   }
 
@@ -960,11 +976,14 @@ class Database {
   // ===== KOT Operations =====
   getPendingKOTs() {
     return this.execute(`
-      SELECT oi.*, o.order_number, o.table_number, o.order_type, o.created_at as order_time
+      SELECT oi.*, o.order_number, o.table_number, o.order_type, o.created_at as order_time,
+             o.customer_name, o.customer_phone, o.notes, o.urgency, o.chef_instructions
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE oi.kot_status != 'served' AND o.status != 'cancelled' AND o.is_deleted = 0 AND oi.is_deleted = 0
-      ORDER BY o.created_at ASC
+      ORDER BY 
+        CASE o.urgency WHEN 'critical' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END,
+        o.created_at ASC
     `);
   }
 
@@ -1165,22 +1184,29 @@ class Database {
     `, [date]);
   }
 
-  // Get detailed daily export (User-wise product sales)
+  // Get detailed daily export (User-wise product sales with all details)
   getDetailedDailyExport(date) {
     return this.execute(`
       SELECT 
         o.order_number,
+        o.id as order_id,
         COALESCE(u.full_name, u.username, 'Unknown') as cashier_name,
         oi.item_name,
         oi.quantity,
+        oi.unit_price,
         oi.item_total,
+        oi.addons,
         DATE(o.created_at, 'localtime') as order_date,
         TIME(o.created_at, 'localtime') as order_time,
         o.customer_name,
         o.customer_phone,
         o.payment_method,
         o.order_type,
-        o.table_number
+        o.table_number,
+        o.total_amount as order_total,
+        o.tax_amount,
+        o.discount_amount,
+        o.status
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       LEFT JOIN users u ON o.cashier_id = u.id
@@ -1188,7 +1214,7 @@ class Database {
         AND o.status != 'cancelled'
         AND o.is_deleted = 0
         AND oi.is_deleted = 0
-      ORDER BY cashier_name, o.created_at DESC
+      ORDER BY o.created_at DESC, o.order_number
     `, [date]);
   }
 

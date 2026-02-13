@@ -10,6 +10,8 @@ export const useCartStore = create(
       customerName: '',
       customerPhone: '',
       notes: '',
+      urgency: 'normal', // 'normal', 'urgent', 'critical'
+      chefInstructions: '',
       // Enhanced billing fields
       discountType: 'none', // 'none', 'percentage', 'flat', 'coupon'
       discountValue: 0,
@@ -117,6 +119,8 @@ export const useCartStore = create(
       setCustomerName: (name) => set({ customerName: name }),
       setCustomerPhone: (phone) => set({ customerPhone: phone }),
       setNotes: (notes) => set({ notes }),
+      setUrgency: (urgency) => set({ urgency }),
+      setChefInstructions: (instructions) => set({ chefInstructions: instructions }),
       
       // Enhanced discount setters
       setDiscountType: (type) => set({ discountType: type }),
@@ -253,6 +257,8 @@ export const useCartStore = create(
         customerName: '',
         customerPhone: '',
         notes: '',
+        urgency: 'normal',
+        chefInstructions: '',
         discountType: 'none',
         discountValue: 0,
         discountReason: '',
@@ -284,6 +290,8 @@ export const useCartStore = create(
           customer_name: state.customerName || null,
           customer_phone: state.customerPhone || null,
           notes: state.notes || null,
+          urgency: state.urgency || 'normal',
+          chef_instructions: state.chefInstructions || null,
           subtotal: state.getSubtotal(),
           tax_amount: state.getTax(),
           discount_amount: state.getDiscountAmount(),
@@ -342,6 +350,8 @@ export const useCartStore = create(
           customerName: state.customerName,
           customerPhone: state.customerPhone,
           notes: state.notes,
+          urgency: state.urgency,
+          chefInstructions: state.chefInstructions,
           discountType: state.discountType,
           discountValue: state.discountValue,
           discountReason: state.discountReason,
@@ -382,6 +392,8 @@ export const useCartStore = create(
           customerName: heldOrder.customerName || '',
           customerPhone: heldOrder.customerPhone || '',
           notes: heldOrder.notes || '',
+          urgency: heldOrder.urgency || 'normal',
+          chefInstructions: heldOrder.chefInstructions || '',
           discountType: heldOrder.discountType || 'none',
           discountValue: heldOrder.discountValue || 0,
           discountReason: heldOrder.discountReason || '',
@@ -408,6 +420,8 @@ export const useCartStore = create(
         customerName: state.customerName,
         customerPhone: state.customerPhone,
         notes: state.notes,
+        urgency: state.urgency,
+        chefInstructions: state.chefInstructions,
         discountType: state.discountType,
         discountValue: state.discountValue,
         discountReason: state.discountReason,

@@ -40,7 +40,9 @@ import {
   Utensils,
   Menu,
   ChevronDown,
-  Edit2
+  Edit2,
+  AlertTriangle,
+  MapPin
 } from 'lucide-react';
 import MainSidebar from '../components/layout/MainSidebar';
 import '../styles/pos-sheet.css';
@@ -176,6 +178,9 @@ const POSPage = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [customerAddress, setCustomerAddress] = useState('');
   const [customerLocality, setCustomerLocality] = useState('');
+  const [showTableDropdown, setShowTableDropdown] = useState(false);
+  const [showOrderInfo, setShowOrderInfo] = useState(false);
+  const [activeCartTab, setActiveCartTab] = useState(null); // 'table', 'user', 'chef', 'summary'
 
   const handlePhoneInput = async (e) => {
     const val = e.target.value;
@@ -369,6 +374,8 @@ const POSPage = () => {
         table_number: cart.tableNumber,
         customer_name: cart.customerName,
         notes: cart.notes,
+        urgency: cart.urgency || 'normal',
+        chef_instructions: cart.chefInstructions || null,
         items: cart.items.map(item => ({
           item_name: item.name,
           quantity: item.quantity,
@@ -675,28 +682,107 @@ const POSPage = () => {
             </button>
           </div>
 
-          {/* Customer Info Section - Icon Bar */}
+          {/* 4 Equal-Width Tab Buttons */}
           <div className="pos-customer-bar">
-            <div className="pos-customer-bar-actions">
-              <button className="pos-header-btn" title="Table"><Plus size={18} /> T1</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '4px', width: '100%', padding: '6px 8px' }}>
+              {/* Tab 1: Table */}
               <button
-                className={`pos-header-btn ${showCustomerForm ? 'active' : ''}`}
-                title="Customer"
-                onClick={() => setShowCustomerForm(!showCustomerForm)}
+                onClick={() => setActiveCartTab(activeCartTab === 'table' ? null : 'table')}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  padding: '8px 4px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                  background: activeCartTab === 'table' ? '#FFF3E0' : '#F5F5F5',
+                  color: activeCartTab === 'table' ? '#E65100' : '#546E7A',
+                  border: activeCartTab === 'table' ? '1.5px solid #FFB74D' : '1px solid #E0E0E0',
+                  transition: 'all 0.15s'
+                }}
               >
-                <User size={18} />
+                <MapPin size={15} /> {cart.tableNumber || 'Table'}
               </button>
-              <button className="pos-header-btn" title="Waiter"><User size={18} /></button>
-              <button className="pos-header-btn" title="Notes"><FileText size={18} /></button>
-            </div>
-            <div className="pos-order-mode-badge">
-              Outdoor
+
+              {/* Tab 2: User */}
+              <button
+                onClick={() => setActiveCartTab(activeCartTab === 'user' ? null : 'user')}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  padding: '8px 4px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                  background: activeCartTab === 'user' ? '#E3F2FD' : '#F5F5F5',
+                  color: activeCartTab === 'user' ? '#1565C0' : '#546E7A',
+                  border: activeCartTab === 'user' ? '1.5px solid #90CAF9' : '1px solid #E0E0E0',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <User size={15} /> User
+              </button>
+
+              {/* Tab 3: Chef */}
+              <button
+                onClick={() => setActiveCartTab(activeCartTab === 'chef' ? null : 'chef')}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  padding: '8px 4px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                  background: activeCartTab === 'chef' ? '#FFF8E1' : '#F5F5F5',
+                  color: activeCartTab === 'chef' ? '#F57F17' : '#546E7A',
+                  border: activeCartTab === 'chef' ? '1.5px solid #FFE082' : '1px solid #E0E0E0',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <ChefHat size={15} /> Chef
+              </button>
+
+              {/* Tab 4: Summary */}
+              <button
+                onClick={() => setActiveCartTab(activeCartTab === 'summary' ? null : 'summary')}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                  padding: '8px 4px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
+                  background: activeCartTab === 'summary' ? '#E8F5E9' : '#F5F5F5',
+                  color: activeCartTab === 'summary' ? '#2E7D32' : '#546E7A',
+                  border: activeCartTab === 'summary' ? '1.5px solid #A5D6A7' : '1px solid #E0E0E0',
+                  transition: 'all 0.15s'
+                }}
+              >
+                <FileText size={15} /> Info
+              </button>
             </div>
           </div>
 
-          {/* User Info Form - Inline Slide Down */}
-          {showCustomerForm && (
-            <div className="pos-user-info-form" style={{ background: 'white', padding: '12px', borderBottom: '1px solid #CFD8DC', fontSize: '13px', animation: 'slideDown 0.2s ease-out', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* Tab 1 Panel: Table Selection (only for Dine In) */}
+          {activeCartTab === 'table' && (
+            <div style={{ background: 'white', padding: '12px', borderBottom: '1px solid #E0E0E0', animation: 'slideDown 0.2s ease-out' }}>
+              {cart.orderType === 'dine_in' ? (
+                <>
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#37474F', marginBottom: '8px' }}>🪑 Select Table</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
+                    {Array.from({ length: 20 }, (_, i) => {
+                      const tNum = `T${i + 1}`;
+                      return (
+                        <button
+                          key={tNum}
+                          onClick={() => { cart.setTableNumber(tNum); setActiveCartTab(null); }}
+                          style={{ padding: '8px 4px', border: cart.tableNumber === tNum ? '2px solid #D32F2F' : '1px solid #eee', borderRadius: '4px', background: cart.tableNumber === tNum ? '#FFF3F3' : '#FAFAFA', cursor: 'pointer', fontWeight: cart.tableNumber === tNum ? 700 : 400, fontSize: '13px', color: cart.tableNumber === tNum ? '#D32F2F' : '#37474F' }}
+                        >
+                          {tNum}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => { cart.setTableNumber(''); }}
+                      style={{ gridColumn: 'span 5', padding: '6px', border: '1px solid #eee', borderRadius: '4px', background: '#FFF3E0', cursor: 'pointer', fontSize: '12px', color: '#E65100', fontWeight: 500, marginTop: '4px' }}
+                    >
+                      Clear Table
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '16px', color: '#90A4AE', fontSize: '13px' }}>Table selection is only available for Dine In orders.</div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 2 Panel: User Info Form */}
+          {activeCartTab === 'user' && (
+            <div className="pos-user-info-form" style={{ background: 'white', padding: '12px', borderBottom: '1px solid #E0E0E0', fontSize: '13px', animation: 'slideDown 0.2s ease-out', display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
               {/* Mobile Number with Autocomplete */}
               <div style={{ position: 'relative' }}>
@@ -753,7 +839,7 @@ const POSPage = () => {
                 />
               </div>
 
-              {/* Column Layout for Address & Locality */}
+              {/* Address */}
               <div>
                 <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Address:</label>
                 <input
@@ -765,6 +851,7 @@ const POSPage = () => {
                 />
               </div>
 
+              {/* Locality */}
               <div>
                 <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Locality:</label>
                 <input
@@ -775,6 +862,102 @@ const POSPage = () => {
                   style={{ border: '1px solid #CFD8DC', borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', width: '100%' }}
                 />
               </div>
+            </div>
+          )}
+
+          {/* Tab 3 Panel: Chef Instructions & Urgency */}
+          {activeCartTab === 'chef' && (
+            <div style={{ background: 'white', padding: '12px', borderBottom: '1px solid #E0E0E0', fontSize: '13px', animation: 'slideDown 0.2s ease-out' }}>
+              <div style={{ fontWeight: 700, fontSize: '13px', color: '#37474F', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ChefHat size={16} color="#E65100" /> Chef Instructions
+              </div>
+
+              {/* Urgency Selector */}
+              <div style={{ marginBottom: '10px' }}>
+                <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '6px', fontSize: '12px' }}>Order Urgency:</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                  {[
+                    { value: 'normal', label: '🟢 Normal', bg: '#E8F5E9', border: '#A5D6A7', activeBg: '#4CAF50', color: '#2E7D32' },
+                    { value: 'urgent', label: '🟠 Urgent', bg: '#FFF3E0', border: '#FFB74D', activeBg: '#FF9800', color: '#E65100' },
+                    { value: 'critical', label: '🔴 Critical', bg: '#FFEBEE', border: '#EF9A9A', activeBg: '#F44336', color: '#C62828' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => cart.setUrgency(opt.value)}
+                      style={{
+                        padding: '8px 6px',
+                        borderRadius: '6px',
+                        border: cart.urgency === opt.value ? `2px solid ${opt.activeBg}` : `1px solid ${opt.border}`,
+                        background: cart.urgency === opt.value ? opt.bg : '#FAFAFA',
+                        color: cart.urgency === opt.value ? opt.color : '#78909C',
+                        fontWeight: cart.urgency === opt.value ? 700 : 500,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chef Notes Textarea */}
+              <div>
+                <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px', fontSize: '12px' }}>Notes for Chef:</label>
+                <textarea
+                  placeholder="e.g. Customer is allergic to nuts, prepare with less oil, no onion in all items..."
+                  value={cart.chefInstructions || ''}
+                  onChange={(e) => cart.setChefInstructions(e.target.value)}
+                  style={{ width: '100%', border: '1px solid #CFD8DC', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', resize: 'vertical', minHeight: '60px', maxHeight: '100px', outline: 'none', fontFamily: 'inherit', color: '#37474F' }}
+                />
+              </div>
+
+              {/* Current urgency display */}
+              {cart.urgency !== 'normal' && (
+                <div style={{ marginTop: '8px', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, background: cart.urgency === 'critical' ? '#FFEBEE' : '#FFF3E0', color: cart.urgency === 'critical' ? '#C62828' : '#E65100', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <AlertTriangle size={14} /> This order is marked as {cart.urgency.toUpperCase()}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 4 Panel: Order Summary */}
+          {activeCartTab === 'summary' && (
+            <div style={{ background: 'white', padding: '12px', borderBottom: '1px solid #E0E0E0', fontSize: '13px', animation: 'slideDown 0.2s ease-out' }}>
+              <div style={{ fontWeight: 700, fontSize: '14px', color: '#37474F', marginBottom: '8px', borderBottom: '1px solid #ECEFF1', paddingBottom: '6px' }}>📋 Order Summary</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', marginBottom: '8px' }}>
+                <div><span style={{ color: '#78909C' }}>Type:</span> <strong>{cart.orderType?.replace('_', ' ').toUpperCase()}</strong></div>
+                {cart.tableNumber && <div><span style={{ color: '#78909C' }}>Table:</span> <strong>{cart.tableNumber}</strong></div>}
+                {cart.customerName && <div><span style={{ color: '#78909C' }}>Customer:</span> <strong>{cart.customerName}</strong></div>}
+                {cart.customerPhone && <div><span style={{ color: '#78909C' }}>Phone:</span> <strong>{cart.customerPhone}</strong></div>}
+                <div><span style={{ color: '#78909C' }}>Urgency:</span> <strong style={{ color: cart.urgency === 'critical' ? '#C62828' : cart.urgency === 'urgent' ? '#E65100' : '#2E7D32' }}>{(cart.urgency || 'normal').toUpperCase()}</strong></div>
+              </div>
+              {cart.chefInstructions && (
+                <div style={{ padding: '6px 8px', background: '#FFF8E1', borderRadius: '6px', border: '1px solid #FFE082', marginBottom: '8px', fontSize: '12px' }}>
+                  <strong style={{ color: '#E65100' }}>Chef Notes:</strong> {cart.chefInstructions}
+                </div>
+              )}
+              {cart.items.length > 0 && (
+                <div style={{ borderTop: '1px dashed #CFD8DC', paddingTop: '8px' }}>
+                  <div style={{ fontWeight: 600, color: '#546E7A', marginBottom: '6px' }}>Items ({cart.items.reduce((s, i) => s + i.quantity, 0)})</div>
+                  {cart.items.map((item, idx) => (
+                    <div key={idx} style={{ marginBottom: '6px', padding: '4px 0', borderBottom: '1px solid #f5f5f5' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{item.name} × {item.quantity}</span>
+                        <span style={{ fontWeight: 600 }}>₹{(item.unitPrice * item.quantity).toFixed(2)}</span>
+                      </div>
+                      {item.addons?.length > 0 && <div style={{ fontSize: '11px', color: '#78909C', marginTop: '2px' }}>+ {item.addons.map(a => a.name).join(', ')}</div>}
+                      {item.specialInstructions && <div style={{ fontSize: '11px', color: '#E65100', fontStyle: 'italic', marginTop: '2px' }}>📝 {item.specialInstructions}</div>}
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, paddingTop: '6px', fontSize: '14px', color: '#D32F2F' }}>
+                    <span>Grand Total</span>
+                    <span>₹{cart.getGrandTotal().toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+              {cart.notes && <div style={{ marginTop: '6px', fontSize: '12px', color: '#E65100', fontStyle: 'italic' }}>Notes: {cart.notes}</div>}
             </div>
           )}
 
@@ -804,6 +987,11 @@ const POSPage = () => {
                     {item.addons && item.addons.length > 0 && (
                       <div className="pos-cart-item-addons">
                         {item.addons.map(a => a.name).join(', ')}
+                      </div>
+                    )}
+                    {item.specialInstructions && (
+                      <div style={{ fontSize: '11px', color: '#E65100', fontStyle: 'italic', marginTop: '2px', paddingLeft: '22px' }}>
+                        📝 {item.specialInstructions}
                       </div>
                     )}
                   </div>
@@ -1186,6 +1374,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
   const [selectedVariant, setSelectedVariant] = useState(item.parsedVariants.length > 0 ? item.parsedVariants[0] : null);
   const [selectedAddons, setSelectedAddons] = useState([]);
   const [addonSearch, setAddonSearch] = useState('');
+  const [specialInstructions, setSpecialInstructions] = useState('');
 
   const calculateTotal = () => {
     let total = selectedVariant ? parseFloat(selectedVariant.price) : item.price;
@@ -1291,6 +1480,19 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
           )}
         </div>
 
+        {/* Special Instructions */}
+        <div style={{ padding: '12px 16px', borderTop: '1px solid #ECEFF1' }}>
+          <label style={{ fontWeight: 600, fontSize: '13px', color: '#546E7A', display: 'block', marginBottom: '6px' }}>
+            📝 Special Instructions
+          </label>
+          <textarea
+            placeholder="e.g. Less sugar, Extra spicy, No onions..."
+            value={specialInstructions}
+            onChange={(e) => setSpecialInstructions(e.target.value)}
+            style={{ width: '100%', border: '1px solid #CFD8DC', borderRadius: '6px', padding: '8px 10px', fontSize: '13px', resize: 'vertical', minHeight: '50px', maxHeight: '80px', outline: 'none', fontFamily: 'inherit', color: '#37474F' }}
+          />
+        </div>
+
         {/* Modal Footer */}
         <div className="addon-modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>
@@ -1298,7 +1500,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
           </button>
           <button
             className="btn btn-save"
-            onClick={() => onAddToCart(item, quantity, '', selectedVariant, selectedAddons)}
+            onClick={() => onAddToCart(item, quantity, specialInstructions, selectedVariant, selectedAddons)}
           >
             Save
           </button>
@@ -1400,15 +1602,22 @@ const BillPreviewModal = ({ order, onClose, onPrint }) => {
                 <span>Amount</span>
               </div>
               {order.items?.map((item, idx) => (
-                <div key={idx} style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: 'var(--font-size-sm)',
-                  padding: '2px 0'
-                }}>
-                  <span style={{ flex: 2 }}>{item.item_name}</span>
-                  <span style={{ flex: 0.5, textAlign: 'center' }}>{item.quantity}</span>
-                  <span style={{ flex: 1, textAlign: 'right' }}>₹{(item.item_total || 0).toFixed(2)}</span>
+                <div key={idx}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: 'var(--font-size-sm)',
+                    padding: '2px 0'
+                  }}>
+                    <span style={{ flex: 2 }}>{item.item_name}</span>
+                    <span style={{ flex: 0.5, textAlign: 'center' }}>{item.quantity}</span>
+                    <span style={{ flex: 1, textAlign: 'right' }}>₹{(item.item_total || 0).toFixed(2)}</span>
+                  </div>
+                  {item.special_instructions && (
+                    <div style={{ fontSize: '11px', color: '#E65100', fontStyle: 'italic', paddingLeft: '4px', marginBottom: '2px' }}>
+                      📝 {item.special_instructions}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
