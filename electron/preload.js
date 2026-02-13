@@ -42,8 +42,10 @@ const validInvokeChannels = [
   // Reports
   'reports:daily',
   'reports:weekly',
+  'reports:monthly',
   'reports:salesSummary',
   'reports:billerDaily',
+  'reports:dailyDetailed',
   'reports:allBillers',
   // Users
   'users:getAll',

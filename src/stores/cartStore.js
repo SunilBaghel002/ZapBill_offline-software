@@ -28,6 +28,7 @@ export const useCartStore = create(
 
       // Bill Sheet Edits
       deliveryCharge: 0,
+      containerCharge: 0,
       customerPaid: 0,
 
       // Add item to cart
@@ -149,6 +150,7 @@ export const useCartStore = create(
       setIsSalesReturn: (ret) => set({ isSalesReturn: ret }),
       
       setDeliveryCharge: (amount) => set({ deliveryCharge: amount }),
+      setContainerCharge: (amount) => set({ containerCharge: amount }),
       setCustomerPaid: (amount) => set({ customerPaid: amount }),
 
       // Calculate subtotal
@@ -225,11 +227,11 @@ export const useCartStore = create(
 
       // Calculate grand total
       getGrandTotal: () => {
-        const { isSalesReturn, deliveryCharge } = get();
+        const { isSalesReturn, deliveryCharge, containerCharge } = get();
         const taxableAmount = get().getTaxableAmount();
         const tax = get().getTaxBreakdown().total;
         const serviceCharge = get().getServiceCharge();
-        const total = taxableAmount + tax + serviceCharge + (deliveryCharge || 0);
+        const total = taxableAmount + tax + serviceCharge + (deliveryCharge || 0) + (containerCharge || 0);
         return isSalesReturn ? -total : total;
       },
 
@@ -262,6 +264,9 @@ export const useCartStore = create(
         isPaid: false,
         isComplimentary: false,
         isSalesReturn: false,
+        deliveryCharge: 0,
+        containerCharge: 0,
+        customerPaid: 0,
       }),
 
       // Create order from cart
@@ -290,6 +295,7 @@ export const useCartStore = create(
           is_complimentary: state.isComplimentary ? 1 : 0,
           is_sales_return: state.isSalesReturn ? 1 : 0,
           delivery_charge: state.deliveryCharge || 0,
+          container_charge: state.containerCharge || 0,
           customer_paid: state.customerPaid || 0,
           status: status,
           is_hold: isHold
@@ -345,6 +351,7 @@ export const useCartStore = create(
           isComplimentary: state.isComplimentary,
           isSalesReturn: state.isSalesReturn,
           deliveryCharge: state.deliveryCharge,
+          containerCharge: state.containerCharge,
           customerPaid: state.customerPaid,
           totalAmount: state.getGrandTotal()
         };
@@ -384,6 +391,7 @@ export const useCartStore = create(
           isComplimentary: heldOrder.isComplimentary,
           isSalesReturn: heldOrder.isSalesReturn,
           deliveryCharge: heldOrder.deliveryCharge || 0,
+          containerCharge: heldOrder.containerCharge || 0,
           customerPaid: heldOrder.customerPaid || 0,
         });
 
@@ -410,6 +418,9 @@ export const useCartStore = create(
         isComplimentary: state.isComplimentary,
         isSalesReturn: state.isSalesReturn,
         heldOrders: state.heldOrders, // Persist held orders
+        deliveryCharge: state.deliveryCharge,
+        containerCharge: state.containerCharge,
+        customerPaid: state.customerPaid,
       }),
     }
   )

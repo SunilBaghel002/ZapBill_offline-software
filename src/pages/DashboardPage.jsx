@@ -152,43 +152,70 @@ const OrderCard = ({ order, onClick }) => {
   };
 
   const StatusIcon = statusIcons[order.status] || AlertCircle;
+  
+  // Parse date
+  const orderDate = new Date(order.created_at);
+  const today = new Date();
+  const isToday = orderDate.toDateString() === today.toDateString();
+  const dateDisplay = isToday ? 'Today' : orderDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
   return (
-    <div className="order-card" onClick={() => onClick(order)} style={{ cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'translateY(-2px)' } }}>
-      <div className="order-card-header">
-        <div className="order-card-info">
-          <span className="order-card-number">#{order.order_number}</span>
-          <span className={`order-card-type ${order.order_type}`}>
-            {order.order_type.replace('_', ' ')}
-          </span>
+    <div className="order-card" onClick={() => onClick(order)} 
+        style={{ 
+            cursor: 'pointer', 
+            transition: 'all 0.2s ease', 
+            border: '1px solid #eef2f6',
+            background: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'; }}
+    >
+      <div className="order-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px dashed #f0f0f0' }}>
+        <div className="order-card-info" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span className="order-card-number" style={{ fontWeight: '700', color: '#1a1a1a', fontSize: '15px' }}>#{order.order_number}</span>
+          <span style={{ fontSize: '11px', color: '#888', background: '#f5f5f5', padding: '2px 6px', borderRadius: '4px' }}>{dateDisplay}</span>
         </div>
-        <span className={`order-card-status ${statusColors[order.status]}`}>
-          <StatusIcon size={14} />
+        <span className={`order-card-status ${statusColors[order.status]}`} 
+            style={{ 
+                fontSize: '11px', 
+                padding: '4px 8px', 
+                borderRadius: '20px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px',
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+            }}>
+          <StatusIcon size={12} />
           {order.status}
         </span>
       </div>
-      <div className="order-card-body">
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', borderBottom: '1px dashed #eee', paddingBottom: '4px' }}>
+      <div className="order-card-body" style={{ padding: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#555', marginBottom: '12px' }}>
             <div style={{ fontWeight: '600', color: '#333' }}>{order.customer_name || 'Walk-in'}</div>
-            <div>{order.customer_phone || '-'}</div>
+            <div style={{ color: '#888' }}>{order.order_type.replace('_', ' ')}</div>
         </div>
-        <div className="order-card-items">
-          {order.items?.slice(0, 3).map((item, idx) => (
-            <span key={idx} className="order-card-item">
-              {item.quantity}x {item.item_name || item.name}
-            </span>
+        <div className="order-card-items" style={{ minHeight: '40px' }}>
+          {order.items?.slice(0, 2).map((item, idx) => (
+            <div key={idx} className="order-card-item" style={{ fontSize: '13px', color: '#666', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontWeight: '600', color: '#333', marginRight: '6px' }}>{item.quantity}x</span> 
+              {item.item_name || item.name}
+            </div>
           ))}
-          {order.items?.length > 3 && (
-            <span className="order-card-more">+{order.items.length - 3} more</span>
+          {order.items?.length > 2 && (
+            <div className="order-card-more" style={{ fontSize: '12px', color: '#3498db', marginTop: '4px' }}>+{order.items.length - 2} more items</div>
           )}
         </div>
       </div>
-      <div className="order-card-footer">
-        <span className="order-card-time">
-          <Clock size={12} />
+      <div className="order-card-footer" style={{ padding: '12px 16px', background: '#fafafa', borderTop: '1px solid #f0f0f0', borderRadius: '0 0 12px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span className="order-card-time" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#888' }}>
+          <Clock size={14} />
           {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
         </span>
-        <span className="order-card-total">₹{order.total_amount?.toFixed(0) || 0}</span>
+        <span className="order-card-total" style={{ fontWeight: '700', fontSize: '16px', color: '#27ae60' }}>₹{order.total_amount?.toFixed(0) || 0}</span>
       </div>
     </div>
   );

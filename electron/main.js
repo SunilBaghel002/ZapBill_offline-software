@@ -531,6 +531,24 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('reports:monthly', async (event, { month }) => {
+    try {
+      return db.getMonthlyReport(month);
+    } catch (error) {
+      log.error('Get monthly report error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('reports:dailyDetailed', async (event, { date }) => {
+    try {
+      return db.getDetailedDailyExport(date);
+    } catch (error) {
+      log.error('Get detailed daily report error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('reports:salesSummary', async (event, { from, to }) => {
     try {
       return db.getSalesSummary(from, to);

@@ -93,10 +93,16 @@ class Database {
     } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
 
     try {
-       // Add delivery_charge and customer_paid to orders
-       this.db.run("ALTER TABLE orders ADD COLUMN delivery_charge REAL DEFAULT 0");
-       this.db.run("ALTER TABLE orders ADD COLUMN customer_paid REAL DEFAULT 0");
+       // Add delivery_charge, container_charge, and customer_paid to orders
+       try { this.db.run("ALTER TABLE orders ADD COLUMN delivery_charge REAL DEFAULT 0"); } catch (e) {}
+       try { this.db.run("ALTER TABLE orders ADD COLUMN container_charge REAL DEFAULT 0"); } catch (e) {}
+       try { this.db.run("ALTER TABLE orders ADD COLUMN customer_paid REAL DEFAULT 0"); } catch (e) {}
     } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    try {
+        // Add tax_rate to order_items
+        try { this.db.run("ALTER TABLE order_items ADD COLUMN tax_rate REAL DEFAULT 0"); } catch (e) {}
+     } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
 
     try {
       // Create addons table if not exists (for existing databases)
@@ -585,8 +591,17 @@ class Database {
     console.log('Creating order with:', JSON.stringify({ order, items, userId }, null, 2));
     
     const orderId = uuidv4();
-    const orderNumber = this.getNextOrderNumber();
-    const now = new Date().toISOString();
+    const sequence = this.getNextOrderNumber();
+    
+    // Generate YYMMDDxxx formatted order number
+    const now = new Date();
+    const yy = now.getFullYear().toString().slice(-2);
+    const mm = (now.getMonth() + 1).toString().padStart(2, '0');
+    const dd = now.getDate().toString().padStart(2, '0');
+    const seq = sequence.toString().padStart(3, '0');
+    const orderNumber = parseInt(`${yy}${mm}${dd}${seq}`);
+    
+    const isoNow = now.toISOString();
 
     // Insert order - ensure no undefined values
     const orderData = {
@@ -600,6 +615,7 @@ class Database {
       tax_amount: order.tax_amount || 0,
       discount_amount: order.discount_amount || 0,
       delivery_charge: order.delivery_charge || 0,
+      container_charge: order.container_charge || 0,
       customer_paid: order.customer_paid || 0,
       total_amount: order.total_amount || 0,
       payment_method: order.payment_method || null,
@@ -608,8 +624,8 @@ class Database {
       status: order.status || 'active',
       is_hold: order.is_hold || 0,
       cashier_id: userId || null,
-      created_at: now,
-      updated_at: now,
+      created_at: isoNow,
+      updated_at: isoNow,
     };
     
     console.log('Order data:', JSON.stringify(orderData, null, 2));
@@ -625,13 +641,15 @@ class Database {
         quantity: item.quantity || 1,
         unit_price: item.unit_price || 0,
         item_total: (item.quantity || 1) * (item.unit_price || 0),
+        tax_rate: item.tax_rate || 0,
         special_instructions: item.special_instructions || '',
         variant: item.variant || null,
         addons: item.addons || null,
         kot_status: 'pending',
-        created_at: now,
+        created_at: isoNow,
+        is_deleted: 0
       };
-      console.log('Item data:', JSON.stringify(itemData, null, 2));
+      // console.log('Item data:', JSON.stringify(itemData, null, 2));
       this.insert('order_items', itemData);
     }
 
@@ -643,7 +661,7 @@ class Database {
       items,
     });
 
-    return { id: orderId, orderNumber };
+    return { id: orderId, orderNumber: orderNumber };
   }
 
   getNextOrderNumber() {
@@ -761,15 +779,81 @@ class Database {
   }
 
   deleteOrder(id) {
-    // Soft delete the order
+    const order = this.getOrderById(id);
+    if (!order) return { success: false, error: 'Order not found' };
+
     const now = new Date().toISOString();
+    const deletedOrderNumber = order.order_number;
     
+    console.log(`[deleteOrder] Deleting order ID: ${id}, Number: ${deletedOrderNumber}`);
+
+    // 1. Soft delete and negate order number immediately
     this.update('orders', {
       is_deleted: 1,
+      order_number: -deletedOrderNumber, 
       updated_at: now,
     }, { id });
 
+    // 2. Renumber subsequent orders for the same day
+    try {
+      // Extract prefix (YYMMDD)
+      const orderNumStr = Math.abs(deletedOrderNumber).toString();
+      
+      if (orderNumStr.length === 9) {
+         const prefix = orderNumStr.substring(0, 6); // e.g. "260213"
+         const minNum = parseInt(`${prefix}000`);
+         const maxNum = parseInt(`${prefix}999`);
+
+         // Find all active orders in this range with number > deletedNumber
+         console.log(`[deleteOrder] Searching for subsequent orders > ${deletedOrderNumber} in range ${minNum}-${maxNum}`);
+         
+         const subsequentOrders = this.execute(`
+            SELECT id, order_number FROM orders 
+            WHERE is_deleted = 0 
+            AND order_number > ? 
+            AND order_number >= ? 
+            AND order_number <= ?
+            ORDER BY order_number ASC
+         `, [deletedOrderNumber, minNum, maxNum]);
+
+         console.log(`[deleteOrder] Found ${subsequentOrders.length} orders to renumber.`);
+
+         // Shift them down by 1
+         for (const subOrder of subsequentOrders) {
+           const newNumber = subOrder.order_number - 1;
+           console.log(`[deleteOrder] Renumbering ${subOrder.order_number} -> ${newNumber}`);
+           
+           this.update('orders', {
+             order_number: newNumber,
+             updated_at: now
+           }, { id: subOrder.id });
+           
+           this.addToSyncQueue('order', subOrder.id, 'update', { order_number: newNumber });
+         }
+
+         // 3. Update the sequence counter
+         // We should decrement the current_value if we created a gap or reduced the count
+         // Logic: If there were orders after this, we shifted them down, so the "top" of the stack is now 1 lower.
+         // If there were NO orders after this, we simply removed the top, so the "top" is 1 lower.
+         // So in ALL valid renumbering cases for *today*, we decrement the sequence.
+         
+         const deletedDate = new Date(order.created_at).toLocaleDateString('en-CA');
+         const today = new Date().toLocaleDateString('en-CA');
+         
+         if (deletedDate === today) {
+            console.log(`[deleteOrder] Decrementing sequence for today: ${today}`);
+            this.run(
+              `UPDATE sequences SET current_value = current_value - 1 WHERE sequence_name = 'order_number' AND date = ? AND current_value > 0`,
+              [today]
+            );
+         }
+      }
+    } catch (error) {
+      console.error('[deleteOrder] Error renumbering orders:', error);
+    }
+
     this.addToSyncQueue('order', id, 'delete', { id });
+    this.save(); // Ensure everything is written to disk
     return { success: true };
   }
 
@@ -977,29 +1061,50 @@ class Database {
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount,
-        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status = 'completed' THEN total_amount ELSE 0 END), 0) as cash_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status = 'completed' THEN total_amount ELSE 0 END), 0) as card_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status = 'completed' THEN total_amount ELSE 0 END), 0) as upi_amount
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as cash_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as card_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as upi_amount
       FROM orders 
       WHERE DATE(created_at, 'localtime') = ? 
         AND is_deleted = 0
     `, [date, date]);
     
     const orders = this.execute(`SELECT * FROM orders WHERE DATE(created_at, 'localtime') = ? AND is_deleted = 0 ORDER BY created_at DESC`, [date]);
+    
+    // Top Items (Include active/served orders too, not just completed)
     const topItems = this.execute(`
       SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
-      WHERE DATE(o.created_at, 'localtime') = ? AND o.status = 'completed' AND o.is_deleted = 0 AND oi.is_deleted = 0
+      WHERE DATE(o.created_at, 'localtime') = ? 
+        AND o.status != 'cancelled' 
+        AND o.is_deleted = 0 
+        AND oi.is_deleted = 0
       GROUP BY oi.item_name
       ORDER BY total_quantity DESC
       LIMIT 10
+    `, [date]);
+
+    // Category Wise Sales
+    const categorySales = this.execute(`
+      SELECT c.name as category_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      LEFT JOIN categories c ON mi.category_id = c.id
+      WHERE DATE(o.created_at, 'localtime') = ?
+        AND o.status != 'cancelled'
+        AND o.is_deleted = 0
+        AND oi.is_deleted = 0
+      GROUP BY c.name
+      ORDER BY total_revenue DESC
     `, [date]);
 
     return {
       sales: sales[0] || { total_orders: 0, total_revenue: 0, cash_amount: 0, card_amount: 0, upi_amount: 0 },
       orders,
       topItems,
+      categorySales
     };
   }
 
@@ -1060,18 +1165,42 @@ class Database {
     `, [date]);
   }
 
-  getWeeklyReport(startDate) {
-    // Calculate directly from orders table for accuracy
+  // Get detailed daily export (User-wise product sales)
+  getDetailedDailyExport(date) {
     return this.execute(`
+      SELECT 
+        o.order_number,
+        COALESCE(u.full_name, u.username, 'Unknown') as cashier_name,
+        oi.item_name,
+        oi.quantity,
+        oi.item_total,
+        DATE(o.created_at, 'localtime') as order_date,
+        TIME(o.created_at, 'localtime') as order_time,
+        o.customer_name,
+        o.customer_phone,
+        o.payment_method,
+        o.order_type,
+        o.table_number
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN users u ON o.cashier_id = u.id
+      WHERE DATE(o.created_at, 'localtime') = ?
+        AND o.status != 'cancelled'
+        AND o.is_deleted = 0
+        AND oi.is_deleted = 0
+      ORDER BY cashier_name, o.created_at DESC
+    `, [date]);
+  }
+
+  getWeeklyReport(startDate) {
+    // 1. Daily Trend
+    const dailyTrend = this.execute(`
       SELECT 
         DATE(created_at, 'localtime') as date,
         COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as total_orders,
-        SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END) as total_revenue,
-        SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END) as total_tax,
-        SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END) as total_discount,
-        SUM(CASE WHEN payment_method = 'cash' AND status = 'completed' THEN total_amount ELSE 0 END) as cash_amount,
-        SUM(CASE WHEN payment_method = 'card' AND status = 'completed' THEN total_amount ELSE 0 END) as card_amount,
-        SUM(CASE WHEN payment_method = 'upi' AND status = 'completed' THEN total_amount ELSE 0 END) as upi_amount
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount
       FROM orders 
       WHERE DATE(created_at, 'localtime') >= ? 
         AND DATE(created_at, 'localtime') < date(?, '+7 days')
@@ -1079,6 +1208,130 @@ class Database {
       GROUP BY DATE(created_at, 'localtime')
       ORDER BY date ASC
     `, [startDate, startDate]);
+
+    // 2. Top Items (Weekly)
+    const topItems = this.execute(`
+      SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE DATE(o.created_at, 'localtime') >= ? 
+        AND DATE(o.created_at, 'localtime') < date(?, '+7 days')
+        AND o.status != 'cancelled' 
+        AND o.is_deleted = 0 
+        AND oi.is_deleted = 0
+      GROUP BY oi.item_name
+      ORDER BY total_quantity DESC
+      LIMIT 10
+    `, [startDate, startDate]);
+
+    // 3. Category Sales (Weekly)
+    const categorySales = this.execute(`
+      SELECT c.name as category_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      LEFT JOIN categories c ON mi.category_id = c.id
+      WHERE DATE(o.created_at, 'localtime') >= ? 
+        AND DATE(o.created_at, 'localtime') < date(?, '+7 days')
+        AND o.status != 'cancelled'
+        AND o.is_deleted = 0
+        AND oi.is_deleted = 0
+      GROUP BY c.name
+      ORDER BY total_revenue DESC
+    `, [startDate, startDate]);
+
+    // 4. Total Sales Summary
+    const sales = this.execute(`
+      SELECT 
+        COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as total_orders,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount,
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as cash_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as card_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as upi_amount
+      FROM orders 
+      WHERE DATE(created_at, 'localtime') >= ? 
+        AND DATE(created_at, 'localtime') < date(?, '+7 days')
+        AND is_deleted = 0
+    `, [startDate, startDate])[0];
+
+    return {
+      sales: sales || { total_orders: 0, total_revenue: 0 },
+      dailyTrend,
+      topItems,
+      categorySales
+    };
+  }
+
+  getMonthlyReport(monthStr) {
+    // monthStr format: 'YYYY-MM'
+    
+    // 1. Daily Trend
+    const dailyTrend = this.execute(`
+      SELECT 
+        DATE(created_at, 'localtime') as date,
+        COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as total_orders,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount
+      FROM orders 
+      WHERE strftime('%Y-%m', created_at, 'localtime') = ?
+        AND is_deleted = 0
+      GROUP BY DATE(created_at, 'localtime')
+      ORDER BY date ASC
+    `, [monthStr]);
+
+    // 2. Top Items (Monthly)
+    const topItems = this.execute(`
+      SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE strftime('%Y-%m', o.created_at, 'localtime') = ?
+        AND o.status != 'cancelled' 
+        AND o.is_deleted = 0 
+        AND oi.is_deleted = 0
+      GROUP BY oi.item_name
+      ORDER BY total_quantity DESC
+      LIMIT 10
+    `, [monthStr]);
+
+    // 3. Category Sales (Monthly)
+    const categorySales = this.execute(`
+      SELECT c.name as category_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      LEFT JOIN categories c ON mi.category_id = c.id
+      WHERE strftime('%Y-%m', o.created_at, 'localtime') = ?
+        AND o.status != 'cancelled'
+        AND o.is_deleted = 0
+        AND oi.is_deleted = 0
+      GROUP BY c.name
+      ORDER BY total_revenue DESC
+    `, [monthStr]);
+
+    // 4. Total Sales Summary
+    const sales = this.execute(`
+      SELECT 
+        COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as total_orders,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount,
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as cash_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as card_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as upi_amount
+      FROM orders 
+      WHERE strftime('%Y-%m', created_at, 'localtime') = ?
+        AND is_deleted = 0
+    `, [monthStr])[0];
+
+    return {
+      sales: sales || { total_orders: 0, total_revenue: 0 },
+      dailyTrend,
+      topItems,
+      categorySales
+    };
   }
 
   // ===== Users =====

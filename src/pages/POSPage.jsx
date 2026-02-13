@@ -384,10 +384,51 @@ const POSPage = () => {
         items: kotOrder.items
       });
 
+      // Reset delivery and container charges after sending to KOT
+      cart.setDeliveryCharge(0);
+      cart.setContainerCharge(0);
+
       alert('KOT sent to kitchen!');
     } catch (error) {
       console.error('KOT print error:', error);
       alert('Error sending KOT: ' + error.message);
+    }
+  };
+
+  // Save & KOT - Create order and send to kitchen (no receipt)
+  const handleSaveAndKOT = async () => {
+    if (cart.items.length === 0) return;
+
+    try {
+      // Validate Customer Details
+      if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
+        setShowCustomerForm(true);
+        alert("Customer Name and Phone Number are mandatory!");
+        return;
+      }
+
+      // Create order
+      const result = await cart.createOrder(user?.id);
+
+      if (result.success) {
+        const order = await window.electronAPI.invoke('order:getById', { id: result.id });
+
+        // Print KOT
+        await window.electronAPI.invoke('print:kot', {
+          order: order,
+          items: order.items
+        });
+
+        // Charges are already reset by createOrder -> clearCart
+
+        alert(`Order #${result.orderNumber} Saved & Sent to KOT!`);
+        setShowBillSheet(false);
+      } else {
+        throw new Error(result.error || 'Failed to create order');
+      }
+    } catch (error) {
+      console.error('Save & KOT error:', error);
+      alert('Error: ' + error.message);
     }
   };
 
@@ -1047,19 +1088,22 @@ const POSPage = () => {
             <span>₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
           </div>
 
-          {/* Editable Container Charge */}
+          {/* Editable Container Charge - Only for delivery orders */}
+          {cart.orderType === 'delivery' && (
           <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
             <span>Container Charge</span>
             <input
               type="number"
-              value={cart.packagingCharge || ''}
-              onChange={(e) => cart.setPackagingCharge(parseFloat(e.target.value) || 0)}
+              value={cart.containerCharge || ''}
+              onChange={(e) => cart.setContainerCharge(parseFloat(e.target.value) || 0)}
               placeholder="0"
               style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
             />
           </div>
+          )}
 
-          {/* Editable Delivery Charge */}
+          {/* Editable Delivery Charge - Only for delivery orders */}
+          {cart.orderType === 'delivery' && (
           <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', fontSize: '14px', color: '#37474F' }}>
             <span>Delivery Charge</span>
             <input
@@ -1070,6 +1114,7 @@ const POSPage = () => {
               style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
             />
           </div>
+          )}
 
           {/* Divider */}
           <div style={{ height: '1px', background: '#eee', marginBottom: '16px' }}></div>
@@ -1098,6 +1143,32 @@ const POSPage = () => {
                 ₹{Math.max(0, (cart.customerPaid || 0) - cart.getGrandTotal()).toFixed(2)}
               </span>
             </div>
+          </div>
+
+          {/* Save & Send to KOT Button */}
+          <div style={{ marginTop: '16px' }}>
+            <button
+              onClick={handleSaveAndKOT}
+              disabled={cart.items.length === 0}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: cart.items.length === 0 ? '#ccc' : '#37474F',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                fontSize: '15px',
+                cursor: cart.items.length === 0 ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+            >
+              <ChefHat size={18} />
+              Save & Send to KOT
+            </button>
           </div>
         </div>
       </div>

@@ -104,6 +104,9 @@ CREATE TABLE IF NOT EXISTS orders (
     discount_amount REAL DEFAULT 0,
     discount_reason TEXT,
     total_amount REAL NOT NULL,
+    delivery_charge REAL DEFAULT 0,
+    container_charge REAL DEFAULT 0,
+    customer_paid REAL DEFAULT 0,
     payment_method TEXT CHECK(payment_method IN ('cash', 'card', 'upi', 'mixed')),
     payment_status TEXT CHECK(payment_status IN ('pending', 'partial', 'completed')) DEFAULT 'pending',
     status TEXT CHECK(status IN ('active', 'completed', 'cancelled', 'held')) DEFAULT 'active',
@@ -126,6 +129,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     quantity INTEGER NOT NULL,
     unit_price REAL NOT NULL,
     item_total REAL NOT NULL,
+    tax_rate REAL DEFAULT 0,
     variant TEXT, -- JSON {name, price}
     addons TEXT, -- JSON array of {name, price}
     special_instructions TEXT,
