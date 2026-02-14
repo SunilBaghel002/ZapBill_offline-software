@@ -56,6 +56,9 @@ const validInvokeChannels = [
   // Customers
   'customer:search',
   'customer:getHistory',
+  // Data Import
+  'data:importMenu',
+  'data:importInventory',
   // Printing
   'print:receipt',
   'print:kot',

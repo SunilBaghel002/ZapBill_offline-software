@@ -5,6 +5,7 @@ const log = require('electron-log');
 const { Database } = require('./database/db');
 const AuthService = require('./services/auth.service');
 const PrinterService = require('./services/printer.service');
+const dataImporter = require('./services/dataImporter');
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -526,6 +527,27 @@ function setupIpcHandlers() {
       return db.deleteInventoryItem(id);
     } catch (error) {
       log.error('Delete inventory error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // ============ DATA IMPORT ============
+  ipcMain.handle('data:importMenu', async (event, { filePath }) => {
+    try {
+      const items = dataImporter.parseMenu(filePath);
+      return db.importMenu(items);
+    } catch (error) {
+      log.error('Import menu error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('data:importInventory', async (event, { filePath }) => {
+    try {
+      const items = dataImporter.parseInventory(filePath);
+      return db.importInventory(items);
+    } catch (error) {
+      log.error('Import inventory error:', error);
       return { success: false, error: error.message };
     }
   });

@@ -5,7 +5,8 @@ import {
   Printer, 
   Cloud,
   Store,
-  RefreshCw
+  RefreshCw,
+  Upload
 } from 'lucide-react';
 
 const SettingsPage = () => {
@@ -14,6 +15,8 @@ const SettingsPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [importStats, setImportStats] = useState(null);
+  const [importing, setImporting] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -76,6 +79,45 @@ const SettingsPage = () => {
       }
     } catch (error) {
       alert('Print failed: ' + error.message);
+    }
+  };
+
+  const handleImport = async (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Electron specific: file.path exposes the full path
+    const filePath = file.path;
+    if (!filePath) {
+      alert('Unable to get file path. Please ensure you are using the Electron app.');
+      return;
+    }
+
+    setImporting(type);
+    setImportStats(null);
+
+    try {
+      const channel = type === 'menu' ? 'data:importMenu' : 'data:importInventory';
+      const result = await window.electronAPI.invoke(channel, { filePath });
+      
+      if (result.success) {
+        setImportStats({
+          type,
+          success: result.successCount,
+          error: result.errorCount,
+          details: result.errors
+        });
+        alert(`Import successful! Added: ${result.successCount}, Failed: ${result.errorCount}`);
+      } else {
+        alert('Import failed: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      alert('Error during import: ' + error.message);
+    } finally {
+      setImporting(null);
+      // Reset input
+      e.target.value = '';
     }
   };
 
@@ -279,6 +321,77 @@ const SettingsPage = () => {
                 placeholder="Thank you for dining with us!"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Data Management */}
+        <div className="card">
+          <div className="card-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+              <Upload size={20} />
+              <h3>Data Management (Import)</h3>
+            </div>
+          </div>
+          <div className="card-body">
+            <div className="alert alert-info" style={{ marginBottom: 'var(--spacing-4)' }}>
+              <p>Import data from Excel/CSV files. Compatible with PetPooja exports (ensure column names match).</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--spacing-4)' }}>
+              {/* Menu Import */}
+              <div style={{ padding: 'var(--spacing-4)', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)' }}>
+                <h4 style={{ marginBottom: 'var(--spacing-2)' }}>Import Menu Items</h4>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--gray-500)', marginBottom: 'var(--spacing-3)' }}>
+                  Updates existing items by Name, creates new Categories if needed.
+                </p>
+                <label className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <Upload size={16} />
+                  {importing === 'menu' ? 'Importing...' : 'Select Menu File'}
+                  <input 
+                    type="file" 
+                    accept=".xlsx,.xls,.csv" 
+                    style={{ display: 'none' }} 
+                    onChange={(e) => handleImport(e, 'menu')}
+                    disabled={importing !== null}
+                  />
+                </label>
+              </div>
+
+              {/* Inventory Import */}
+              <div style={{ padding: 'var(--spacing-4)', border: '1px solid var(--gray-200)', borderRadius: 'var(--radius-md)' }}>
+                <h4 style={{ marginBottom: 'var(--spacing-2)' }}>Import Inventory</h4>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--gray-500)', marginBottom: 'var(--spacing-3)' }}>
+                  Updates Stock and Unit details for inventory items.
+                </p>
+                <label className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <Upload size={16} />
+                  {importing === 'inventory' ? 'Importing...' : 'Select Inventory File'}
+                  <input 
+                    type="file" 
+                    accept=".xlsx,.xls,.csv" 
+                    style={{ display: 'none' }} 
+                    onChange={(e) => handleImport(e, 'inventory')}
+                    disabled={importing !== null}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {importStats && (
+               <div style={{ marginTop: 'var(--spacing-4)', padding: 'var(--spacing-3)', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
+                 <p style={{ fontWeight: 'bold' }}>Last Import Results ({importStats.type}):</p>
+                 <p style={{ color: 'var(--success-600)' }}>✅ Successfully Imported: {importStats.success}</p>
+                 {importStats.error > 0 && (
+                   <div style={{ color: 'var(--danger-600)', marginTop: 'var(--spacing-2)' }}>
+                     <p>❌ Failed: {importStats.error}</p>
+                     <ul style={{ fontSize: 'var(--font-size-sm)', paddingLeft: 'var(--spacing-4)' }}>
+                       {importStats.details.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
+                       {importStats.details.length > 5 && <li>...and {importStats.details.length - 5} more</li>}
+                     </ul>
+                   </div>
+                 )}
+               </div>
+            )}
           </div>
         </div>
 

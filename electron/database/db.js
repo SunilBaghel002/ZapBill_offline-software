@@ -567,6 +567,99 @@ class Database {
     this.addToSyncQueue('menu_item', id, 'delete', { id });
   }
 
+  importMenu(items) {
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    this.db.run('BEGIN TRANSACTION');
+    try {
+      for (const item of items) {
+        try {
+          // 1. Find or Create Category
+          let categoryId;
+          const catResult = this.execute('SELECT id FROM categories WHERE name = ? COLLATE NOCASE', [item.category]);
+          if (catResult.length > 0) {
+            categoryId = catResult[0].id;
+          } else {
+            categoryId = uuidv4();
+            this.run('INSERT INTO categories (id, name, display_order, is_active) VALUES (?, ?, ?, ?, ?)',
+              [categoryId, item.category, 99, 1]);
+          }
+
+          // 2. Insert or Update Menu Item
+          const existing = this.execute('SELECT id FROM menu_items WHERE name = ? COLLATE NOCASE', [item.name]);
+          if (existing.length > 0) {
+            // Update
+            this.run(`
+              UPDATE menu_items SET 
+                category_id = ?, price = ?, tax_rate = ?, is_vegetarian = ?, description = ?, updated_at = ?
+              WHERE id = ?
+            `, [categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), existing[0].id]);
+          } else {
+            // Insert
+            const id = uuidv4();
+            this.run(`
+              INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, is_available, created_at, updated_at, is_deleted)
+              VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
+            `, [id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), new Date().toISOString()]);
+          }
+          successCount++;
+        } catch (err) {
+          console.error(`Error importing item ${item.name}:`, err);
+          errorCount++;
+          errors.push(`Failed to import ${item.name}: ${err.message}`);
+        }
+      }
+      this.db.run('COMMIT');
+    } catch (e) {
+      this.db.run('ROLLBACK');
+      throw e;
+    }
+
+    return { success: true, successCount, errorCount, errors };
+  }
+
+  importInventory(items) {
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    this.db.run('BEGIN TRANSACTION');
+    try {
+      for (const item of items) {
+        try {
+          const existing = this.execute('SELECT id FROM inventory WHERE name = ? COLLATE NOCASE', [item.name]);
+          if (existing.length > 0) {
+            // Update
+            this.run(`
+              UPDATE inventory SET 
+                unit = ?, current_stock = ?, minimum_stock = ?, cost_per_unit = ?, supplier = ?, updated_at = ?
+              WHERE id = ?
+            `, [item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), existing[0].id]);
+          } else {
+            // Insert
+            const id = uuidv4();
+            this.run(`
+              INSERT INTO inventory (id, name, unit, current_stock, minimum_stock, cost_per_unit, supplier, created_at, updated_at, is_deleted)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            `, [id, item.name, item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), new Date().toISOString()]);
+          }
+          successCount++;
+        } catch (err) {
+          console.error(`Error importing inventory item ${item.name}:`, err);
+          errorCount++;
+          errors.push(`Failed to import ${item.name}: ${err.message}`);
+        }
+      }
+      this.db.run('COMMIT');
+    } catch (e) {
+      this.db.run('ROLLBACK');
+      throw e;
+    }
+    return { success: true, successCount, errorCount, errors };
+  }
+
   // ===== Global Addons Operations =====
   getAddons() {
     return this.execute(
