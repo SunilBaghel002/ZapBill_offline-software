@@ -334,7 +334,7 @@ const SettingsPage = () => {
           </div>
           <div className="card-body">
             <div className="alert alert-info" style={{ marginBottom: 'var(--spacing-4)' }}>
-              <p>Import data from Excel/CSV files. Compatible with PetPooja exports (ensure column names match).</p>
+              <p>Import data from Excel/CSV files. Compatible with ZapBill exports (ensure column names match).</p>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--spacing-4)' }}>

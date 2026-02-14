@@ -77,7 +77,7 @@ const LoginPage = () => {
             <UtensilsCrossed size={40} />
           </div>
           <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--spacing-2)' }}>
-            Restaurant POS
+            ZapBill POS
           </h1>
           <p style={{ opacity: 0.9, fontSize: 'var(--font-size-sm)' }}>
             Sign in to continue

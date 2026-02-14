@@ -46,7 +46,7 @@
   },
   "build": {
     "appId": "com.restaurant.pos",
-    "productName": "Restaurant POS",
+    "productName": "ZapBill POS",
     "directories": {
       "output": "dist-electron"
     },

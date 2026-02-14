@@ -86,7 +86,7 @@ const MainSidebar = ({ isOpen, onClose }) => {
                     <UtensilsCrossed size={24} color="white" />
                 </div>
                 <div>
-                    <div style={{ fontWeight: 'bold', fontSize: '18px' }}>PetPooja</div>
+                    <div style={{ fontWeight: 'bold', fontSize: '18px' }}>ZapBill</div>
                     <div style={{ fontSize: '12px', color: '#90A4AE' }}>POS System</div>
                 </div>
             </div>

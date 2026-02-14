@@ -55,7 +55,7 @@ const Sidebar = () => {
           <UtensilsCrossed size={28} />
         </div>
         <div className="sidebar-logo-text">
-          <span className="sidebar-brand">PetPooja</span>
+          <span className="sidebar-brand">ZapBill</span>
           <span className="sidebar-tagline">POS System</span>
         </div>
       </div>

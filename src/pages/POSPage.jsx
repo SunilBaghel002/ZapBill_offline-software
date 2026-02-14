@@ -578,7 +578,7 @@ const POSPage = () => {
           >
             <Menu size={24} color="#546E7A" />
           </button>
-          <div className="pos-logo-text">PetPooja</div>
+          <div className="pos-logo-text">ZapBill</div>
         </div>
 
         <div className="pos-search-wrapper">

@@ -5,17 +5,17 @@
 
 /* CSS Variables / Design Tokens */
 :root {
-  /* Primary Colors - PetPooja Vermillion Red */
-  --primary-50: #ffebee;
-  --primary-100: #ffcdd2;
-  --primary-200: #ef9a9a;
-  --primary-300: #e57373;
-  --primary-400: #ef5350;
-  --primary-500: #E53935;
-  --primary-600: #d32f2f;
-  --primary-700: #c62828;
-  --primary-800: #b71c1c;
-  --primary-900: #8e0000;
+  /* Primary Colors - ZapBill Orange */
+  --primary-50: #fefce8;
+  --primary-100: #fff7ed;
+  --primary-200: #ffedd5;
+  --primary-300: #fed7aa;
+  --primary-400: #fdba74;
+  --primary-500: #E49B0F;
+  --primary-600: #ca8a04;
+  --primary-700: #a16207;
+  --primary-800: #854d0e;
+  --primary-900: #713f12;
 
   /* Secondary Colors - Dark Navy */
   --secondary-50: #f0f4f8;
@@ -143,10 +143,10 @@
   --content-max-width: 100%;
   /* Full width */
 
-  /* PetPooja Specific Colors */
-  --pp-red: #D32F2F;
+  /* ZapBill Specific Colors */
+  --pp-red: #E49B0F; /* Replaced with Primary */
   /* Main Action / Header */
-  --pp-dark-red: #B71C1C;
+  --pp-dark-red: #A66808;
   /* Active States */
   --pp-black: #212121;
   /* UI Dark Elements */
