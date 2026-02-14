@@ -48,81 +48,8 @@
   opacity: 1 !important;
   pointer-events: auto !important;
 }
-/* Category Grid for Touch Friendly UI */
-.pos-category-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-2);
-  overflow-y: auto;
-  padding-right: var(--spacing-2);
-  width: 140px; /* Increased width */
-}
-
-.pos-category-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-4) var(--spacing-2);
-  background: white;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  border: 1px solid var(--gray-200);
-  transition: all 0.2s;
-  text-align: center;
-  min-height: 100px; /* Bigger touch target */
-}
-
-.pos-category-item.active {
-  background: var(--primary-600);
-  color: white;
-  border-color: var(--primary-600);
-  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.3);
-  transform: scale(1.02);
-}
-
-.pos-category-item:hover:not(.active) {
-  background: var(--gray-50);
-  border-color: var(--primary-200);
-}
-
-.pos-category-icon-wrapper {
-  margin-bottom: var(--spacing-2);
-}
-
-.pos-category-item span {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-/* Menu Grid */
-.pos-menu-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Slightly wider cards */
-  gap: var(--spacing-4);
-  padding: var(--spacing-1);
-}
-
-.pos-menu-card {
-  position: relative;
-  background: white;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  border: 1px solid var(--gray-200);
-  transition: all 0.2s;
-  overflow: hidden;
-  height: 140px; /* Fixed height for consistency */
-  display: flex;
-  flex-direction: column;
-}
-
-.pos-menu-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-color: var(--primary-300);
-}
+/* Category Grid overrides removed to restore previous design */
+/* Menu Grid overrides removed to restore previous design */
 
 /* Favorite Star Styling */
 .favorite-btn {

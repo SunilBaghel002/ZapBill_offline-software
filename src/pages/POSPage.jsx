@@ -42,6 +42,7 @@ import {
   ChevronDown,
   Edit2,
   AlertTriangle,
+  UtensilsCrossed,
   MapPin,
   Star
 } from 'lucide-react';
@@ -232,9 +233,8 @@ const POSPage = () => {
       const categoriesResult = await window.electronAPI.invoke('menu:getCategories');
       setCategories(categoriesResult);
 
-      if (categoriesResult.length > 0) {
-        setSelectedCategory(categoriesResult[0].id);
-      }
+      // Default to Favorites
+      setSelectedCategory('favorites');
 
       const itemsResult = await window.electronAPI.invoke('menu:getItems', {});
       setMenuItems(itemsResult);
