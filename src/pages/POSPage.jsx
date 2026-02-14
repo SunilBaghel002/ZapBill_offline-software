@@ -392,6 +392,7 @@ const POSPage = () => {
     // Validate Customer Details
     if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
       setShowCustomerForm(true);
+      setActiveCartTab('user');
       showAlert("Customer Name and Phone Number are mandatory!", "warning");
       return;
     }
@@ -533,7 +534,8 @@ const POSPage = () => {
       // Validate Customer Details
       if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
         setShowCustomerForm(true);
-        alert("Customer Name and Phone Number are mandatory!");
+        setActiveCartTab('user');
+        showAlert("Customer Name and Phone Number are mandatory!", "warning");
         return;
       }
 
@@ -570,7 +572,8 @@ const POSPage = () => {
       // Validate Customer Details
       if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
         setShowCustomerForm(true);
-        alert("Customer Name and Phone Number are mandatory!");
+        setActiveCartTab('user');
+        showAlert("Customer Name and Phone Number are mandatory!", "warning");
         return;
       }
 
@@ -607,7 +610,8 @@ const POSPage = () => {
       // Validate Customer Details
       if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
         setShowCustomerForm(true);
-        alert("Customer Name and Phone Number are mandatory!");
+        setActiveCartTab('user');
+        showAlert("Customer Name and Phone Number are mandatory!", "warning");
         return;
       }
 
@@ -1255,7 +1259,7 @@ const POSPage = () => {
             {/* Action Bar */}
             <div className="pos-action-bar">
               <button className="pos-action-btn btn-save" onClick={handleCheckout}>
-                <Save size={18} style={{ marginBottom: '4px' }} />
+                <Check size={20} style={{ marginBottom: '4px' }} strokeWidth={3} />
                 Save
               </button>
               <button className="pos-action-btn btn-print" onClick={handleSaveAndPrint}>

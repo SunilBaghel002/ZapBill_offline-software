@@ -1928,7 +1928,7 @@ h4 {
 
 /* Cart Panel (Right Side) */
 .pos-cart-panel {
-  width: 480px;
+  width: 600px;
   /* Increased width significantly */
   background: white;
   border-left: 1px solid var(--gray-300);
@@ -1952,7 +1952,7 @@ h4 {
   border: none;
   background: transparent;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
   text-transform: uppercase;
   color: var(--gray-600);
   cursor: pointer;
@@ -2006,7 +2006,7 @@ h4 {
   background: none;
   outline: none;
   width: 100%;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .pos-table-selector {
@@ -2019,7 +2019,7 @@ h4 {
   display: flex;
   align-items: center;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
 }
 
@@ -2090,7 +2090,7 @@ h4 {
 }
 
 .pos-cart-item-name {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   color: #333;
 }
@@ -2128,14 +2128,14 @@ h4 {
 }
 
 .pos-cart-item-actions span {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   width: 20px;
   text-align: center;
 }
 
 .pos-cart-item-price {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: #333;
   width: 50px;
@@ -2197,7 +2197,7 @@ h4 {
   display: flex;
   justify-content: space-between;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: 15px;
   color: #546E7A;
   font-weight: 500;
 }
@@ -2208,7 +2208,7 @@ h4 {
   padding-top: 12px;
   font-weight: 700;
   color: #263238;
-  font-size: 16px;
+  font-size: 18px;
   align-items: center;
 }
 
@@ -2256,7 +2256,7 @@ h4 {
 }
 
 .payment-mode-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   color: inherit;
 }
@@ -2271,7 +2271,7 @@ h4 {
 .pos-action-btn {
   border: none;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 15px;
   cursor: pointer;
   transition: background 0.2s;
   color: white;
@@ -2307,7 +2307,7 @@ h4 {
   padding: 6px 12px;
   border: 1px solid #CFD8DC;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: #546E7A;
   background: white;
@@ -2333,7 +2333,7 @@ h4 {
 }
 
 .total-amount {
-  font-size: 18px;
+  font-size: 24px;
 }
 
 .pos-footer-actions {
@@ -2359,27 +2359,27 @@ h4 {
   opacity: 0.9;
 }
 
-.pos-action-btn.save {
-  background: #D32F2F;
+.pos-action-btn.btn-save {
+  background: #2E7D32;
 }
 
 /* Red */
-.pos-action-btn.save-print {
-  background: #B71C1C;
+.pos-action-btn.btn-print {
+  background: #1565C0;
 }
 
 /* Dark Red */
-.pos-action-btn.kot {
-  background: #546E7A;
+.pos-action-btn.btn-kot {
+  background: #EF6C00;
 }
 
 /* Blue Grey */
-.pos-action-btn.kot-print {
+.pos-action-btn.btn-kot-print {
   background: #37474F;
 }
 
 /* Dark Blue Grey */
-.pos-action-btn.hold {
+.pos-action-btn.btn-hold {
   background: #FF8F00;
   color: white;
 }
