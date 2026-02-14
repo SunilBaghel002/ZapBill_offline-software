@@ -102,7 +102,7 @@ const MainSidebar = ({ isOpen, onClose }) => {
         {/* Header */}
         <div style={{ padding: '20px', borderBottom: '1px solid #37474F', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ background: '#E49B0F', padding: '8px', borderRadius: '8px' }}>
+                <div style={{ background: '#0096FF', padding: '8px', borderRadius: '8px' }}>
                     <UtensilsCrossed size={24} color="white" />
                 </div>
                 <div>
@@ -132,15 +132,15 @@ const MainSidebar = ({ isOpen, onClose }) => {
                     padding: '12px 24px',
                     color: isActive ? 'white' : '#B0BEC5',
                     textDecoration: 'none',
-                    background: isActive ? '#E49B0F' : 'transparent',
-                    borderLeft: isActive ? '4px solid #FFC107' : '4px solid transparent',
+                    background: isActive ? '#0284c7' : 'transparent',
+                    borderLeft: isActive ? '4px solid #0096FF' : '4px solid transparent',
                     transition: 'all 0.2s'
                 })}
             >
                 <item.icon size={20} />
                 <span style={{ fontSize: '14px', fontWeight: 500 }}>{item.label}</span>
                 {item.badge && (
-                <span style={{ marginLeft: 'auto', background: '#E49B0F', color: 'white', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', fontWeight: 'bold' }}>
+                <span style={{ marginLeft: 'auto', background: '#0096FF', color: 'white', padding: '2px 6px', borderRadius: '10px', fontSize: '10px', fontWeight: 'bold' }}>
                     {item.badge}
                 </span>
                 )}
@@ -171,9 +171,9 @@ const MainSidebar = ({ isOpen, onClose }) => {
                 </button>
                 <button 
                     onClick={handleLogout}
-                    style={{ padding: '10px 14px', background: '#E49B0F', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', transition: 'background 0.2s' }}
-                    onMouseOver={e => e.currentTarget.style.background = '#C4840C'}
-                    onMouseOut={e => e.currentTarget.style.background = '#E49B0F'}
+                    style={{ padding: '10px 14px', background: '#0096FF', border: 'none', borderRadius: '4px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', transition: 'background 0.2s' }}
+                    onMouseOver={e => e.currentTarget.style.background = '#0284c7'}
+                    onMouseOut={e => e.currentTarget.style.background = '#0096FF'}
                     title="Logout"
                 >
                     <LogOut size={14} />
