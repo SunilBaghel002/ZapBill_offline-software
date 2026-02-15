@@ -55,3 +55,19 @@ When you make changes to the code:
 2. Run `npm run build:win` again.
 3. Create a new Release on GitHub (e.g., `v1.0.1`).
 4. Upload the new `.exe`.
+
+## Troubleshooting Build Errors
+
+### "Cannot create symbolic link" or "Privilege not held"
+If you see an error like `Cannot create symbolic link` while building:
+
+1. **Run as Administrator**:
+   - Close your current terminal/VS Code.
+   - Right-click VS Code and select **"Run as administrator"**.
+   - Try the `npm run build:win` command again.
+
+2. **Enable Developer Mode**:
+   - Go to Windows Settings -> **System** -> **For developers**.
+   - Turn on **"Developer Mode"**.
+   - This allows the creation of symbolic links without full admin rights.
+
