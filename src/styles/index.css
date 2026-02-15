@@ -1710,53 +1710,62 @@ h4 {
   flex-direction: row;
 }
 
-/* Category Sidebar - Dark Theme (Matching Main Sidebar) */
+/* Category Sidebar - Light Theme Redesign */
 .pos-category-sidebar {
-  width: 100px; /* Reduced width for icon-centric look */
-  background: #1A2327; /* Dark Sidebar */
+  width: 120px; /* Increased from 100px */
+  background: #FFFFFF; /* White Background */
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  border-right: 1px solid #37474F;
+  padding: 12px 8px; /* Breathing room */
+  gap: 12px;
+  border-right: 1px solid #F1F5F9; /* Subtle separator */
+}
+
+/* Scrollbar styling */
+.pos-category-sidebar::-webkit-scrollbar {
+  width: 0px; /* Hide scrollbar for cleaner look */
 }
 
 .pos-category-item {
-  height: 80px; /* Taller items for icons */
+  height: 85px; /* Taller for elegance */
+  min-height: 85px;
   display: flex;
-  flex-direction: column; /* Stack symbol and text */
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 0 var(--spacing-2);
   cursor: pointer;
-  color: #B0BEC5; /* Light Gray Text */
-  font-weight: 500;
-  font-size: 11px; /* Smaller text */
-  border-bottom: 1px solid #37474F;
-  transition: all 0.2s;
+  color: #64748B; /* Slate 500 - Muted Dark Gray */
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  border-radius: 16px; /* Soft rounding */
+  transition: all 0.2s ease;
   text-align: center;
+  text-transform: uppercase;
 }
 
 .pos-category-item:hover {
-  background: #263238;
-  color: white;
+  background: #F8FAFC; /* Very light gray hover */
+  color: #334155; /* Darker text */
 }
 
 .pos-category-item.active {
-  background: var(--primary-600); /* Blue Active */
+  /* Deep Blue/Purple Gradient Pill */
+  background: linear-gradient(180deg, #1A237E 0%, #3949AB 100%); 
   color: white;
-  font-weight: 600;
-  box-shadow: none;
-  position: relative;
+  box-shadow: 0 8px 20px rgba(26, 35, 126, 0.25); /* Deep shadow */
+  transform: scale(1.02);
+  border-radius: 24px; /* Pill shape */
 }
 
+.pos-category-item.active .pos-category-icon-wrapper svg {
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+/* Remove old accent bar */
 .pos-category-item.active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: #FFC107; /* Orange Accent from Main Sidebar */
+  display: none;
 }
 
 .pos-category-icon-wrapper {
