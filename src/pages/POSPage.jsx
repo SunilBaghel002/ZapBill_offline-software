@@ -385,8 +385,6 @@ const POSPage = () => {
   };
 
   const handleCheckout = async () => {
-    if (cart.items.length === 0) return;
-
     // Direct Checkout: Create Order -> KOT -> Print -> Clear
     // Validate Customer Details
     if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
@@ -396,26 +394,25 @@ const POSPage = () => {
       return;
     }
 
-    triggerOrderConfirmation(async () => {
-      try {
-        const result = await cart.createOrder(user?.id);
-        if (result.success) {
-          // 1. KOT
-          // 2. Print Receipt
-          // 3. Clear Cart (done in createOrder)
-          // 4. Alert/Notify
-          const order = await window.electronAPI.invoke('order:getById', { id: result.id });
-          await window.electronAPI.invoke('print:kot', { order: order, items: order.items });
-          showAlert(`Order #${result.orderNumber} Placed Successfully!`, "success");
-          loadData();
-        } else {
-          showAlert('Order Failed: ' + result.error, "error");
-        }
-      } catch (error) {
-        console.error(error);
-        showAlert('Error processing order', "error");
+    // IMMEDIATE ACTION: Create Order -> KOT -> Print
+    try {
+      const result = await cart.createOrder(user?.id);
+      if (result.success) {
+        // 1. KOT
+        // 2. Print Receipt
+        // 3. Clear Cart (done in createOrder)
+        // 4. Alert/Notify
+        const order = await window.electronAPI.invoke('order:getById', { id: result.id });
+        await window.electronAPI.invoke('print:kot', { order: order, items: order.items });
+        showAlert(`Order #${result.orderNumber} Placed Successfully!`, "success");
+        loadData();
+      } else {
+        showAlert('Order Failed: ' + result.error, "error");
       }
-    });
+    } catch (error) {
+      console.error(error);
+      showAlert('Error processing order', "error");
+    }
   };
 
   const handleNewOrder = () => {
@@ -446,15 +443,13 @@ const POSPage = () => {
       return;
     }
 
-    // Logic for non-empty cart: Hold it
-    showAlert('Hold this order and clear cart?', "confirm", () => {
-      const result = cart.holdOrder();
-      if (result.success) {
-         showAlert('Order Held Successfully', "success");
-      } else {
-        showAlert('Failed to hold order: ' + result.error, "error");
-      }
-    });
+    // Logic for non-empty cart: Hold it IMMEDIATELY without confirmation
+    const result = cart.holdOrder();
+    if (result.success) {
+       showAlert('Order Held Successfully', "success");
+    } else {
+      showAlert('Failed to hold order: ' + result.error, "error");
+    }
   };
 
   const handleResumeOrder = (order) => {
@@ -582,14 +577,16 @@ const POSPage = () => {
       if (result.success) {
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
 
-        // Print KOT
-        await window.electronAPI.invoke('print:kot', {
-          order: order,
-          items: order.items
-        });
-
-        // Print Receipt
-        await window.electronAPI.invoke('print:receipt', { order: order });
+        // Print KOT & Payment Receipt concurrently (Side by Side)
+        await Promise.all([
+            window.electronAPI.invoke('print:kot', {
+              order: order,
+              items: order.items
+            }).catch(err => console.error("KOT Print Failed", err)),
+            
+            window.electronAPI.invoke('print:receipt', { order: order })
+              .catch(err => console.error("Receipt Print Failed", err))
+        ]);
 
         showAlert(`Order #${result.orderNumber} placed! KOT & Receipt printed.`, "success");
       } else {

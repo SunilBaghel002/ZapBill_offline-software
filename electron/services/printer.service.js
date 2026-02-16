@@ -7,7 +7,7 @@ const { BrowserWindow } = require('electron');
  */
 class PrinterService {
   constructor() {
-    this.printWindow = null;
+    this.printWindows = new Set();
   }
 
   /**
@@ -83,7 +83,7 @@ class PrinterService {
     return new Promise((resolve) => {
       // Create a hidden window for printing
       // Width set to match typical thermal paper (80mm ~ 300px-350px)
-      this.printWindow = new BrowserWindow({
+      const printWindow = new BrowserWindow({
         show: false,
         width: 300, // Reduced window width
         height: 600,
@@ -92,6 +92,9 @@ class PrinterService {
           contextIsolation: true
         }
       });
+
+      // Add to set to prevent GC
+      this.printWindows.add(printWindow);
 
       // Load HTML content
       const html = `
@@ -137,9 +140,9 @@ class PrinterService {
       `;
 
       // Use a data URL to load the HTML
-      this.printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+      printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
 
-      this.printWindow.webContents.on('did-finish-load', () => {
+      printWindow.webContents.on('did-finish-load', () => {
         // Print options
         const options = {
           silent: true,
@@ -152,7 +155,7 @@ class PrinterService {
           options.deviceName = printerName;
         }
 
-        this.printWindow.webContents.print(options, (success, errorType) => {
+        printWindow.webContents.print(options, (success, errorType) => {
           if (!success) {
             log.error('Print failed:', errorType);
             resolve({ success: false, error: errorType });
@@ -162,10 +165,10 @@ class PrinterService {
           
           // Close window after printing
           setTimeout(() => {
-            if (this.printWindow) {
-              this.printWindow.close();
-              this.printWindow = null;
+            if (!printWindow.isDestroyed()) {
+              printWindow.close();
             }
+            this.printWindows.delete(printWindow);
           }, 5000);
         });
       });
