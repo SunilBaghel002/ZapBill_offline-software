@@ -166,8 +166,92 @@ class Database {
     // Migrate orders table to support 'held' status in CHECK constraint
     this.migrateOrdersTableForHeldStatus();
 
+    // Migrate orders table to support 'due' payment method in CHECK constraint
+    this.migrateOrdersTableForDuePayment();
+
     // Seed sample products with variants
     this.seedSampleProducts();
+  }
+
+  migrateOrdersTableForDuePayment() {
+    try {
+      // Check if migration is needed by trying to check schema
+      const testResult = this.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'");
+      // If table exists and SQL doesn't contain 'due' in payment_method check
+      if (testResult.length > 0 && testResult[0].sql && !testResult[0].sql.includes("'due'")) {
+        console.log('Migrating orders table to support due payment method...');
+        
+        // Backup existing orders (chk if backup exists first to be safe, drop if so)
+        this.db.run(`DROP TABLE IF EXISTS orders_backup_due`);
+        this.db.run(`CREATE TABLE orders_backup_due AS SELECT * FROM orders`);
+        
+        // Drop old table
+        this.db.run(`DROP TABLE orders`);
+        
+        // Create new orders table with updated CHECK constraint for payment_method
+        this.db.run(`
+          CREATE TABLE orders (
+            id TEXT PRIMARY KEY,
+            order_number INTEGER NOT NULL,
+            order_type TEXT CHECK(order_type IN ('dine_in', 'takeaway', 'delivery')) DEFAULT 'dine_in',
+            table_number TEXT,
+            customer_name TEXT,
+            customer_phone TEXT,
+            subtotal REAL NOT NULL,
+            tax_amount REAL DEFAULT 0,
+            discount_amount REAL DEFAULT 0,
+            discount_reason TEXT,
+            total_amount REAL NOT NULL,
+            delivery_charge REAL DEFAULT 0,
+            container_charge REAL DEFAULT 0,
+            customer_paid REAL DEFAULT 0,
+            payment_method TEXT CHECK(payment_method IN ('cash', 'card', 'upi', 'mixed', 'due')),
+            payment_status TEXT CHECK(payment_status IN ('pending', 'partial', 'completed')) DEFAULT 'pending',
+            status TEXT CHECK(status IN ('active', 'completed', 'cancelled', 'held')) DEFAULT 'active',
+            is_hold INTEGER DEFAULT 0,
+            notes TEXT,
+            urgency TEXT CHECK(urgency IN ('normal', 'urgent', 'critical')) DEFAULT 'normal',
+            chef_instructions TEXT,
+            cashier_id TEXT REFERENCES users(id),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT,
+            synced_at TEXT,
+            is_deleted INTEGER DEFAULT 0
+          )
+        `);
+        
+        // Restore data
+        // We need to list columns explicitly to avoid issues if schema changed order or count invisibly, 
+        // but SELECT * is usually fine if structure is identical except constraints.
+        // However, safely assuming columns match name-for-name is better.
+        // For simplicity in this specific constraint update, we'll use SELECT * as we did in held status migration.
+        this.db.run(`INSERT INTO orders SELECT * FROM orders_backup_due`);
+        
+        // Re-create indexes
+        this.db.run(`CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at)`);
+        this.db.run(`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`);
+        this.db.run(`CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(date(created_at))`);
+
+        // Drop backup
+        this.db.run(`DROP TABLE orders_backup_due`);
+        
+        console.log('Orders table migration for due payment completed.');
+        this.save();
+      }
+    } catch (error) {
+      console.log('Orders table migration (due payment) note:', error.message);
+      // If it fails, restore from backup if main table is gone
+      try {
+         const checkMain = this.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'");
+         if (checkMain.length === 0) {
+             console.log('Restoring from backup due to migration failure...');
+             this.db.run(`ALTER TABLE orders_backup_due RENAME TO orders`);
+         }
+      } catch (e) {
+          console.error('Critical failure in migration recovery:', e);
+      }
+    }
   }
 
   migrateOrdersTableForHeldStatus() {

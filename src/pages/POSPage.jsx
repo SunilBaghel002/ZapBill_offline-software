@@ -1146,85 +1146,179 @@ const POSPage = () => {
             )}
           </div>
 
-          {/* Cart Total & Actions */}
-          <div className="pos-cart-footer">
-            {/* Billing Breakdown */}
-            {/* Strict Design Bill Breakdown - Matches pos2.jpeg */}
-            <div className="pos-bill-breakdown">
+          {/* 3. Bill Breakdown (Standard View) */}
+          <div className="pos-bill-breakdown" style={{ background: 'white', borderTop: '1px solid #ddd' }}>
+            <div className="pos-bill-row">
+              <span className="pos-bill-label">Sub Total</span>
+              <span className="pos-bill-value">₹{cart.getSubtotal().toFixed(2)}</span>
+            </div>
+
+            {cart.getDiscountAmount() > 0 && (
+              <div className="pos-bill-row discount">
+                <span className="pos-bill-label">Discount ({cart.discountType === 'percentage' ? `${cart.discountValue}%` : 'Flat'})</span>
+                <span className="pos-bill-value">- ₹{cart.getDiscountAmount().toFixed(2)}</span>
+              </div>
+            )}
+
+            <div className="pos-bill-row">
+              <span className="pos-bill-label">SGST 2.5%</span>
+              <span className="pos-bill-value">₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
+            </div>
+
+            <div className="pos-bill-row">
+              <span className="pos-bill-label">CGST 2.5%</span>
+              <span className="pos-bill-value">₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
+            </div>
+
+            {cart.getServiceCharge() > 0 && (
               <div className="pos-bill-row">
-                <span className="pos-bill-label">Sub Total</span>
-                <span className="pos-bill-value">₹{cart.getSubtotal().toFixed(2)}</span>
+                <span className="pos-bill-label">Service Charge ({cart.serviceChargePercent}%)</span>
+                <span className="pos-bill-value">₹{cart.getServiceCharge().toFixed(2)}</span>
               </div>
+            )}
 
-              {cart.getDiscountAmount() > 0 && (
-                <div className="pos-bill-row discount">
-                  <span className="pos-bill-label">Discount ({cart.discountType === 'percentage' ? `${cart.discountValue}%` : 'Flat'})</span>
-                  <span className="pos-bill-value">- ₹{cart.getDiscountAmount().toFixed(2)}</span>
-                </div>
-              )}
+            <div className="pos-bill-divider"></div>
 
-              <div className="pos-bill-row">
-                <span className="pos-bill-label">SGST 2.5%</span>
-                <span className="pos-bill-value">₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
-              </div>
-
-              <div className="pos-bill-row">
-                <span className="pos-bill-label">CGST 2.5%</span>
-                <span className="pos-bill-value">₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
-              </div>
-
-              {cart.getServiceCharge() > 0 && (
-                <div className="pos-bill-row">
-                  <span className="pos-bill-label">Service Charge ({cart.serviceChargePercent}%)</span>
-                  <span className="pos-bill-value">₹{cart.getServiceCharge().toFixed(2)}</span>
-                </div>
-              )}
-
-              <div className="pos-bill-divider"></div>
-
-              <div className="pos-bill-total-row">
-                <span className="pos-bill-total-label">Grand Total</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="pos-bill-total-value">₹{cart.getGrandTotal().toFixed(2)}</span>
-                  <button
-                    onClick={() => setShowBillSheet(true)}
-                    style={{ background: '#ECEFF1', border: '1px solid #CFD8DC', borderRadius: '4px', cursor: 'pointer', color: '#546E7A', padding: '4px', display: 'flex', alignItems: 'center' }}
-                    title="View Detailed Bill"
-                  >
-                    <ChevronDown size={20} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="pos-bill-controls">
+            <div className="pos-bill-total-row">
+              <span className="pos-bill-total-label">Grand Total</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="pos-bill-total-value">₹{cart.getGrandTotal().toFixed(2)}</span>
                 <button
-                  className="pos-bill-toggle-btn"
-                  onClick={() => setShowDiscountModal(true)}
+                  onClick={() => setShowBillSheet(true)}
+                  style={{ background: '#ECEFF1', border: '1px solid #CFD8DC', borderRadius: '4px', cursor: 'pointer', color: '#546E7A', padding: '4px', display: 'flex', alignItems: 'center' }}
+                  title="View Detailed Bill"
                 >
-                  <Percent size={14} /> Add Discount
+                  <ChevronDown size={20} />
                 </button>
-                <div className="pos-bill-toggles">
-                  <label className={`pos-bill-checkbox ${cart.isComplimentary ? 'checked' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={cart.isComplimentary}
-                      onChange={(e) => cart.setIsComplimentary(e.target.checked)}
-                    />
-                    <span>Complimentary</span>
-                  </label>
-                  <label className={`pos-bill-checkbox ${cart.isSalesReturn ? 'checked' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={cart.isSalesReturn}
-                      onChange={(e) => cart.setIsSalesReturn(e.target.checked)}
-                    />
-                    <span>Return</span>
-                  </label>
-                </div>
               </div>
             </div>
 
-            {/* Footer Controls */}
+            <div className="pos-bill-controls">
+              <button
+                className="pos-bill-toggle-btn"
+                onClick={() => setShowDiscountModal(true)}
+              >
+                <Percent size={14} /> Add Discount
+              </button>
+              <div className="pos-bill-toggles">
+                <label className={`pos-bill-checkbox ${cart.isComplimentary ? 'checked' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={cart.isComplimentary}
+                    onChange={(e) => cart.setIsComplimentary(e.target.checked)}
+                  />
+                  <span>Complimentary</span>
+                </label>
+                <label className={`pos-bill-checkbox ${cart.isSalesReturn ? 'checked' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={cart.isSalesReturn}
+                    onChange={(e) => cart.setIsSalesReturn(e.target.checked)}
+                  />
+                  <span>Return</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Bill Details Sheet - POSITIONED ABSOLUTE TO PANEL */}
+          <div className={`pos-bottom-sheet ${showBillSheet ? 'active' : ''}`} style={{ paddingBottom: '120px' }}>
+            <div className="sheet-header" style={{ padding: '12px 16px', background: '#37474F', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0' }}>
+              <h3 style={{ margin: 0, fontSize: '16px' }}>Bill Details</h3>
+              <button onClick={() => setShowBillSheet(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><ChevronDown size={24} /></button>
+            </div>
+            <div className="sheet-body" style={{ padding: '20px', background: 'white', flex: 1, overflowY: 'auto' }}>
+              <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
+                <span>Subtotal</span>
+                <span style={{ fontWeight: 600 }}>₹{cart.getSubtotal().toFixed(2)}</span>
+              </div>
+
+              {/* Editable Discount */}
+              <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#37474F' }}>
+                  Discount
+                  <button onClick={() => setShowDiscountModal(true)} style={{ background: '#E3F2FD', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#1565C0', padding: '2px 6px', display: 'flex', alignItems: 'center' }}>
+                    <Edit2 size={10} style={{ marginRight: '2px' }} /> Edit
+                  </button>
+                </span>
+                <span style={{ color: cart.discountValue > 0 ? '#388e3c' : '#78909c', fontWeight: cart.discountValue > 0 ? 600 : 400 }}>
+                  {cart.discountValue > 0 ? `-₹${cart.getDiscountAmount().toFixed(2)}` : '₹0.00'}
+                </span>
+              </div>
+
+              {/* Taxes breakdown */}
+              <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: '#78909C' }}>
+                <span>SGST 2.5%</span>
+                <span>₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
+              </div>
+              <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#78909C' }}>
+                <span>CGST 2.5%</span>
+                <span>₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
+              </div>
+
+              {/* Editable Container Charge */}
+              {cart.orderType === 'delivery' && (
+              <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
+                <span>Container Charge</span>
+                <input
+                  type="number"
+                  value={cart.containerCharge || ''}
+                  onChange={(e) => cart.setContainerCharge(parseFloat(e.target.value) || 0)}
+                  placeholder="0"
+                  style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
+                />
+              </div>
+              )}
+
+              {/* Editable Delivery Charge */}
+              {cart.orderType === 'delivery' && (
+              <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', fontSize: '14px', color: '#37474F' }}>
+                <span>Delivery Charge</span>
+                <input
+                  type="number"
+                  value={cart.deliveryCharge || ''}
+                  onChange={(e) => cart.setDeliveryCharge(parseFloat(e.target.value) || 0)}
+                  placeholder="0"
+                  style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
+                />
+              </div>
+              )}
+
+              {/* Divider */}
+              <div style={{ height: '1px', background: '#eee', marginBottom: '16px' }}></div>
+
+              {/* Grand Total */}
+              <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', color: '#D32F2F' }}>
+                <span>Grand Total</span>
+                <span>₹{cart.getGrandTotal().toFixed(2)}</span>
+              </div>
+
+              {/* Return Calculation */}
+              <div style={{ marginTop: '20px', padding: '16px', background: '#E0F2F1', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: '600', color: '#00695C' }}>Customer Paid</span>
+                  <input
+                    type="number"
+                    value={cart.customerPaid || ''}
+                    onChange={(e) => cart.setCustomerPaid(parseFloat(e.target.value) || 0)}
+                    placeholder="Amount"
+                    style={{ width: '100px', textAlign: 'right', border: '1px solid #80CBC4', padding: '6px', borderRadius: '4px', fontWeight: 'bold' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#004D40', fontWeight: 'bold' }}>
+                  <span>Return to Customer</span>
+                  <span style={{ fontSize: '18px' }}>
+                    ₹{Math.max(0, (cart.customerPaid || 0) - cart.getGrandTotal()).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Save & Send to KOT Button REMOVED as per request */}
+            </div>
+          </div>
+
+          {/* 5. Fixed Footer Controls - Z-INDEX 1000 to STAY ON TOP */}
+          <div className="pos-fixed-footer" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '130px', zIndex: 1000, background: 'white', boxShadow: '0 -2px 10px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
             {/* Payment Modes Grid */}
             <div className="pos-payment-modes">
               {[
@@ -1375,126 +1469,7 @@ const POSPage = () => {
         </div>
       </div>
 
-      {/* Strict Design: Bill Breakdown Sheet */}
-      <div className={`pos-sheet-overlay ${showBillSheet ? 'active' : ''}`} onClick={() => setShowBillSheet(false)}></div>
-      <div className={`pos-bottom-sheet ${showBillSheet ? 'active' : ''}`}>
-        <div className="sheet-header" style={{ padding: '12px 16px', background: '#37474F', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0' }}>
-          <h3 style={{ margin: 0, fontSize: '16px' }}>Bill Details</h3>
-          <button onClick={() => setShowBillSheet(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><ChevronDown size={24} /></button>
-        </div>
-        <div className="sheet-body" style={{ padding: '20px', background: 'white' }}>
-          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
-            <span>Subtotal</span>
-            <span style={{ fontWeight: 600 }}>₹{cart.getSubtotal().toFixed(2)}</span>
-          </div>
-
-          {/* Editable Discount */}
-          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#37474F' }}>
-              Discount
-              <button onClick={() => setShowDiscountModal(true)} style={{ background: '#E3F2FD', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#1565C0', padding: '2px 6px', display: 'flex', alignItems: 'center' }}>
-                <Edit2 size={10} style={{ marginRight: '2px' }} /> Edit
-              </button>
-            </span>
-            <span style={{ color: cart.discountValue > 0 ? '#388e3c' : '#78909c', fontWeight: cart.discountValue > 0 ? 600 : 400 }}>
-              {cart.discountValue > 0 ? `-₹${cart.getDiscountAmount().toFixed(2)}` : '₹0.00'}
-            </span>
-          </div>
-
-          {/* Taxes breakdown */}
-          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', color: '#78909C' }}>
-            <span>SGST 2.5%</span>
-            <span>₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
-          </div>
-          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#78909C' }}>
-            <span>CGST 2.5%</span>
-            <span>₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
-          </div>
-
-          {/* Editable Container Charge - Only for delivery orders */}
-          {cart.orderType === 'delivery' && (
-          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
-            <span>Container Charge</span>
-            <input
-              type="number"
-              value={cart.containerCharge || ''}
-              onChange={(e) => cart.setContainerCharge(parseFloat(e.target.value) || 0)}
-              placeholder="0"
-              style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
-            />
-          </div>
-          )}
-
-          {/* Editable Delivery Charge - Only for delivery orders */}
-          {cart.orderType === 'delivery' && (
-          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', fontSize: '14px', color: '#37474F' }}>
-            <span>Delivery Charge</span>
-            <input
-              type="number"
-              value={cart.deliveryCharge || ''}
-              onChange={(e) => cart.setDeliveryCharge(parseFloat(e.target.value) || 0)}
-              placeholder="0"
-              style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
-            />
-          </div>
-          )}
-
-          {/* Divider */}
-          <div style={{ height: '1px', background: '#eee', marginBottom: '16px' }}></div>
-
-          {/* Grand Total */}
-          <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', color: '#D32F2F' }}>
-            <span>Grand Total</span>
-            <span>₹{cart.getGrandTotal().toFixed(2)}</span>
-          </div>
-
-          {/* Return Calculation */}
-          <div style={{ marginTop: '20px', padding: '16px', background: '#E0F2F1', borderRadius: '8px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontWeight: '600', color: '#00695C' }}>Customer Paid</span>
-              <input
-                type="number"
-                value={cart.customerPaid || ''}
-                onChange={(e) => cart.setCustomerPaid(parseFloat(e.target.value) || 0)}
-                placeholder="Amount"
-                style={{ width: '100px', textAlign: 'right', border: '1px solid #80CBC4', padding: '6px', borderRadius: '4px', fontWeight: 'bold' }}
-              />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#004D40', fontWeight: 'bold' }}>
-              <span>Return to Customer</span>
-              <span style={{ fontSize: '18px' }}>
-                ₹{Math.max(0, (cart.customerPaid || 0) - cart.getGrandTotal()).toFixed(2)}
-              </span>
-            </div>
-          </div>
-
-          {/* Save & Send to KOT Button */}
-          <div style={{ marginTop: '16px' }}>
-            <button
-              onClick={handleSaveAndKOT}
-              disabled={cart.items.length === 0}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: cart.items.length === 0 ? '#ccc' : '#37474F',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 'bold',
-                fontSize: '15px',
-                cursor: cart.items.length === 0 ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
-            >
-              <ChefHat size={18} />
-              Save & Send to KOT
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Strict Design: Bill Breakdown Sheet - Moved to Cart Panel */ }
 
       {/* Main Sidebar Overlay */}
       <MainSidebar isOpen={showMainSidebar} onClose={() => setShowMainSidebar(false)} />

@@ -1,12 +1,12 @@
-/* POS Bottom Sheet Overlay */
+/* POS Bottom Sheet Overlay - Scoped to Cart Panel */
 .pos-sheet-overlay {
-  position: fixed;
+  position: absolute; /* Changed from fixed */
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.4);
-  z-index: 99;
+  z-index: 25; /* Below footer (30), above content */
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
@@ -18,35 +18,33 @@
 }
 
 /* POS Bottom Sheet - Center Screen Modal */
+/* POS Bottom Sheet - Sliding Panel inside Cart */
 .pos-bottom-sheet {
-  /* Center Screen Layout - FORCE OVERRIDE */
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  bottom: auto !important;
-  right: auto !important;
-  transform: translate(-50%, -50%) scale(0.95) !important;
-  width: 400px;
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important; /* Slide up from bottom */
+  top: auto !important;
+  transform: translateY(100%) !important; /* Start hidden below */
+  width: 100% !important;
   margin: 0 !important;
 
   /* Standard Styles */
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-  z-index: 1000;
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 40; /* Above items (30), below footer actions (100) */
+  opacity: 1 !important; /* Always opacity 1, just transform */
+  pointer-events: auto !important;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
-  max-height: 80vh;
+  max-height: 80%; /* Don't cover entire panel */
   display: flex;
   flex-direction: column;
 }
 
 .pos-bottom-sheet.active {
-  transform: translate(-50%, -50%) scale(1) !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
+  transform: translateY(0) !important;
 }
 /* Category Grid overrides removed to restore previous design */
 /* Menu Grid overrides removed to restore previous design */

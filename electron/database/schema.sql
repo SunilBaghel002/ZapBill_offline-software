@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS orders (
     delivery_charge REAL DEFAULT 0,
     container_charge REAL DEFAULT 0,
     customer_paid REAL DEFAULT 0,
-    payment_method TEXT CHECK(payment_method IN ('cash', 'card', 'upi', 'mixed')),
+    payment_method TEXT CHECK(payment_method IN ('cash', 'card', 'upi', 'mixed', 'due')),
     payment_status TEXT CHECK(payment_status IN ('pending', 'partial', 'completed')) DEFAULT 'pending',
     status TEXT CHECK(status IN ('active', 'completed', 'cancelled', 'held')) DEFAULT 'active',
     is_hold INTEGER DEFAULT 0, -- 1 for held orders
