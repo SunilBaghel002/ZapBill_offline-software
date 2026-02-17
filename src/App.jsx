@@ -11,8 +11,10 @@ import OrdersPage from './pages/OrdersPage';
 import InventoryPage from './pages/InventoryPage';
 import KOTPage from './pages/KOTPage';
 import ReportsPage from './pages/ReportsPage';
+// import UsersPage from './pages/UsersPage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
+import ExpensesPage from './pages/ExpensesPage';
 
 // Components
 import Layout from './components/common/Layout';
@@ -73,6 +75,11 @@ function App() {
           <Route path="settings" element={
             <ProtectedRoute allowedRoles={['admin']}>
               <SettingsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="expenses" element={
+            <ProtectedRoute allowedRoles={['admin', 'biller']}>
+               <ExpensesPage />
             </ProtectedRoute>
           } />
         </Route>

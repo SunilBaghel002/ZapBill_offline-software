@@ -595,6 +595,34 @@ function setupIpcHandlers() {
     }
   });
 
+  // ============ EXPENSES OPERATIONS ============
+  ipcMain.handle('expenses:create', async (event, { expenses }) => {
+    try {
+      return db.createExpenses(expenses);
+    } catch (error) {
+      log.error('Create expenses error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('expenses:getByDate', async (event, { date }) => {
+    try {
+      return db.getExpensesByDate(date);
+    } catch (error) {
+      log.error('Get expenses error:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('expenses:delete', async (event, { id }) => {
+    try {
+      return db.deleteExpense(id);
+    } catch (error) {
+      log.error('Delete expense error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // ============ DATA IMPORT ============
   ipcMain.handle('data:importMenu', async (event, { filePath }) => {
     try {

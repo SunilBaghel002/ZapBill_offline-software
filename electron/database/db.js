@@ -72,6 +72,25 @@ class Database {
     // Run migrations for existing databases
     this.migrateSchema();
     
+    // Create expenses table
+    this.db.run(`CREATE TABLE IF NOT EXISTS expenses (
+      id TEXT PRIMARY KEY,
+      reason TEXT,
+      amount REAL,
+      explanation TEXT,
+      employee_id TEXT,
+      employee_name TEXT,
+      paid_from TEXT,
+      date TEXT,
+      created_at TEXT,
+      updated_at TEXT
+    )`);
+
+    // Create indexes
+    try {
+      this.db.run("CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)");
+    } catch (e) {}
+
     // Save to disk
     this.save();
   }
@@ -1798,6 +1817,43 @@ class Database {
 
   logSession(userId, action) {
     // Implementation for session logging if needed
+  }
+  // ===== Expenses =====
+  createExpenses(expenses) {
+    const placeholders = expenses.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
+    const values = expenses.flatMap(exp => {
+      const id = uuidv4();
+      const now = new Date().toISOString();
+      return [
+        id,
+        exp.reason,
+        exp.amount,
+        exp.explanation,
+        exp.employee_id,
+        exp.employee_name,
+        exp.paid_from,
+        exp.date,
+        now,
+        now
+      ];
+    });
+
+    if (expenses.length > 0) {
+      this.db.run(
+        `INSERT INTO expenses (id, reason, amount, explanation, employee_id, employee_name, paid_from, date, created_at, updated_at) VALUES ${placeholders}`,
+        values
+      );
+    }
+    return { success: true };
+  }
+
+  getExpensesByDate(date) {
+    return this.execute('SELECT * FROM expenses WHERE date = ? ORDER BY created_at ASC', [date]);
+  }
+
+  deleteExpense(id) {
+    this.delete('expenses', { id });
+    return { success: true };
   }
 }
 

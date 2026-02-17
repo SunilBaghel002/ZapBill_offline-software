@@ -12,7 +12,9 @@ import {
   ChefHat,
   X,
   LogOut,
-  RefreshCw
+  // LogOut,
+  RefreshCw,
+  Wallet
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -51,6 +53,7 @@ const MainSidebar = ({ isOpen, onClose }) => {
     { path: '/kot', icon: ChefHat, label: 'Kitchen (KOT)', adminOnly: false },
     { path: '/inventory', icon: Package, label: 'Inventory', adminOnly: true },
     { path: '/reports', icon: BarChart3, label: 'Reports', adminOnly: true },
+    { path: '/expenses', icon: Wallet, label: 'Expenses', adminOnly: false },
     { path: '/users', icon: Users, label: 'Users', adminOnly: true },
     { path: '/settings', icon: Settings, label: 'Settings', adminOnly: true },
   ];
