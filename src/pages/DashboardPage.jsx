@@ -292,13 +292,14 @@ const DashboardPage = () => {
 
       setStats({
         todayRevenue: todaySales.total_revenue || 0,
+        todayExpenses: todaySales.total_expenses || 0,
+        netProfit: todaySales.net_revenue || 0,
         totalOrders: todaySales.total_orders || 0,
-        avgOrderValue: currentAvg,
         activeOrders: activeCount,
         revenueTrend,
         ordersTrend,
-        avgOrderTrend,
-        activeOrdersTrend: { direction: 'neutral', value: 0 } // Realtime active orders don't have historical trend easily
+        // avgOrderTrend, // Removing avg order trend for now to make space
+        activeOrdersTrend: { direction: 'neutral', value: 0 } 
       });
 
     } catch (error) {
@@ -358,35 +359,35 @@ const DashboardPage = () => {
       {/* Stats Grid */}
       <div className="stats-grid">
         <StatCard
-          title="Today's Revenue"
+          title="Today's Sales"
           value={`₹${stats.todayRevenue.toLocaleString()}`}
           trend={stats.revenueTrend.direction}
           trendValue={stats.revenueTrend.value}
-          icon={DollarSign}
+          icon={ShoppingCart}
           color="primary"
+        />
+        <StatCard
+          title="Today's Expenses"
+          value={`₹${stats.todayExpenses.toLocaleString()}`}
+          trend="neutral"
+          trendValue={0}
+          icon={TrendingDown}
+          color="danger"
+        />
+        <StatCard
+          title="Net Profit"
+          value={`₹${stats.netProfit.toLocaleString()}`}
+          trend={stats.revenueTrend.direction} // Assuming profit follows revenue trend for now
+          trendValue={stats.revenueTrend.value}
+          icon={DollarSign}
+          color="success"
         />
         <StatCard
           title="Total Orders"
           value={stats.totalOrders}
           trend={stats.ordersTrend.direction}
           trendValue={stats.ordersTrend.value}
-          icon={ShoppingCart}
-          color="success"
-        />
-        <StatCard
-          title="Avg Order Value"
-          value={`₹${stats.avgOrderValue.toFixed(0)}`}
-          trend={stats.avgOrderTrend.direction}
-          trendValue={stats.avgOrderTrend.value}
-          icon={TrendingUp}
-          color="warning"
-        />
-        <StatCard
-          title="Active Orders"
-          value={stats.activeOrders}
-          trend={stats.activeOrdersTrend.direction}
-          trendValue={stats.activeOrdersTrend.value}
-          icon={Clock}
+          icon={Users}
           color="info"
         />
       </div>

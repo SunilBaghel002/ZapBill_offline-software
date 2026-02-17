@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Calendar, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 const ExpensesPage = () => {
@@ -120,7 +120,6 @@ const ExpensesPage = () => {
         const newRows = validRows.filter(r => !r.id);
         
         if (newRows.length === 0) {
-            alert("No new changes to save.");
             setSaving(false);
             return;
         }
@@ -133,7 +132,7 @@ const ExpensesPage = () => {
 
         await window.electronAPI.invoke('expenses:create', { expenses: expensesToSave });
         
-        alert("Expenses saved successfully!");
+        // Silent success
         fetchExistingExpenses(date);
     } catch (error) {
         console.error("Failed to save expenses", error);
@@ -143,120 +142,136 @@ const ExpensesPage = () => {
     }
   };
 
+  const totalExpenses = rows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
+
   return (
-    <div className="h-full flex flex-col bg-gray-50 text-sm">
+    <div className="page-content" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+      
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-6)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)' }}>
           <button 
             onClick={() => navigate(-1)}
-            className="p-1.5 hover:bg-gray-100 rounded-full text-gray-600 transition-colors"
+            className="btn btn-ghost btn-icon"
+            style={{ borderRadius: '50%' }}
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={24} />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-800">Expense Details</h1>
-            <p className="text-xs text-gray-500">Manage daily expenses</p>
+            <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--spacing-1)' }}>Expense Details</h1>
+            <p style={{ color: 'var(--gray-500)' }}>Manage daily store expenses</p>
           </div>
         </div>
         
-        <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded border border-gray-300 shadow-sm">
-            <span className="text-gray-600 font-medium text-xs uppercase tracking-wider">Date</span>
-            <input 
-                type="date" 
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="font-bold text-gray-800 border-none focus:ring-0 cursor-pointer p-0 text-sm"
-            />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)' }}>
+            {/* Total Badge */}
+            <div className="card" style={{ padding: 'var(--spacing-2) var(--spacing-4)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', background: 'var(--primary-50)', border: '1px solid var(--primary-100)' }}>
+                <span style={{ color: 'var(--primary-700)', fontWeight: 600 }}>Total:</span>
+                <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, color: 'var(--primary-700)' }}>₹{totalExpenses.toFixed(2)}</span>
+            </div>
+
+            {/* Date Picker */}
+            <div className="card" style={{ padding: 'var(--spacing-2) var(--spacing-4)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+                <Calendar size={18} style={{ color: 'var(--gray-500)' }} />
+                <input 
+                    type="date" 
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    style={{ border: 'none', outline: 'none', fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--gray-700)', fontFamily: 'inherit' }}
+                />
+            </div>
         </div>
       </div>
 
-      {/* Warning/Note */}
-      <div className="px-4 py-1.5 bg-blue-50 text-blue-800 text-xs border-b border-blue-100 flex justify-between items-center flex-shrink-0">
-        <span><strong>Note:</strong> Only rows with both <u>Reason</u> & <u>Amount</u> will be saved.</span>
-        <span>Total Expenses: <strong>₹{rows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0).toFixed(2)}</strong></span>
+      {/* Info Warning */}
+      <div style={{ marginBottom: 'var(--spacing-6)', padding: 'var(--spacing-3) var(--spacing-4)', background: 'var(--info-50)', border: '1px solid var(--info-100)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)', color: 'var(--info-700)', fontSize: 'var(--font-size-sm)' }}>
+        <AlertCircle size={18} />
+        <span>Only rows with both <strong>Reason</strong> & <strong>Amount</strong> will be saved. Empty rows are ignored.</span>
       </div>
 
       {/* Table Container */}
-      <div className="flex-1 overflow-auto p-4">
-        <div className="bg-white shadow-sm border border-gray-300 min-w-[1000px] rounded overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-100 border-b border-gray-300 text-gray-700 text-xs uppercase tracking-wider">
-                <th className="p-3 border-r border-gray-300 w-12 text-center">#</th>
-                <th className="p-3 border-r border-gray-300 w-48">Reason</th>
-                <th className="p-3 border-r border-gray-300 w-32">Amount (₹)</th>
-                <th className="p-3 border-r border-gray-300">Explanation</th>
-                <th className="p-3 border-r border-gray-300 w-48">Employee</th>
-                <th className="p-3 border-r border-gray-300 w-32">Paid From</th>
-                <th className="p-3 w-16 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {rows.map((row, index) => (
-                <tr key={index} className={`hover:bg-blue-50/50 group transition-colors ${row.id ? 'bg-green-50/40' : ''}`}>
-                  {/* Serial # */}
-                  <td className="p-2 border-r border-gray-200 text-center text-gray-400 text-xs">
-                    {index + 1}
-                  </td>
+      <div className="table-container">
+        <table className="table">
+          <thead>
+            <tr>
+              <th style={{ width: '60px', textAlign: 'center' }}>#</th>
+              <th style={{ width: '20%' }}>Reason</th>
+              <th style={{ width: '15%' }}>Amount (₹)</th>
+              <th style={{ width: '25%' }}>Explanation</th>
+              <th style={{ width: '15%' }}>Employee</th>
+              <th style={{ width: '15%' }}>Paid From</th>
+              <th style={{ width: '80px', textAlign: 'center' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={index} style={{ backgroundColor: row.id ? 'var(--success-50)' : 'white' }}>
+                {/* Serial # */}
+                <td style={{ textAlign: 'center', color: 'var(--gray-400)', fontSize: 'var(--font-size-xs)' }}>
+                  {index + 1}
+                </td>
 
-                  {/* Reason */}
-                  <td className="p-0 border-r border-gray-200 h-10">
+                {/* Reason */}
+                <td style={{ padding: 'var(--spacing-2) var(--spacing-3)' }}>
                     {row.id ? (
-                        <div className="px-3 py-2 truncate font-medium text-gray-700">{row.reason}</div>
+                        <div style={{ fontWeight: 500 }}>{row.reason}</div>
                     ) : (
                         <select 
-                            className="w-full h-full px-3 py-2 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none text-gray-800 text-sm appearance-none"
+                            className="input select"
                             value={row.reason}
                             onChange={(e) => handleChange(index, 'reason', e.target.value)}
+                            style={{ width: '100%' }}
                         >
                             <option value="">Select Reason</option>
                             {reasons.map(r => <option key={r} value={r}>{r}</option>)}
                         </select>
                     )}
-                  </td>
+                </td>
 
-                  {/* Amount */}
-                  <td className="p-0 border-r border-gray-200 h-10">
+                {/* Amount */}
+                <td style={{ padding: 'var(--spacing-2) var(--spacing-3)' }}>
                     {row.id ? (
-                        <div className="px-3 py-2 font-mono text-gray-800">₹{row.amount}</div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600 }}>₹{row.amount}</div>
                     ) : (
                         <input 
                             type="number" 
                             placeholder="0.00"
-                            className="w-full h-full px-3 py-2 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none font-mono text-sm"
+                            className="input"
                             value={row.amount}
                             onChange={(e) => handleChange(index, 'amount', e.target.value)}
+                            style={{ width: '100%' }}
                         />
                     )}
-                  </td>
+                </td>
 
-                  {/* Explanation */}
-                  <td className="p-0 border-r border-gray-200 h-10">
+                {/* Explanation */}
+                <td style={{ padding: 'var(--spacing-2) var(--spacing-3)' }}>
                     {row.id ? (
-                        <div className="px-3 py-2 text-gray-600 truncate">{row.explanation || '-'}</div>
+                        <div style={{ color: 'var(--gray-600)', fontSize: 'var(--font-size-sm)' }}>{row.explanation || '-'}</div>
                     ) : (
                         <input 
                             type="text" 
                             placeholder="Optional explanation..."
-                            className="w-full h-full px-3 py-2 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none text-sm"
+                            className="input"
                             value={row.explanation}
                             onChange={(e) => handleChange(index, 'explanation', e.target.value)}
+                            style={{ width: '100%' }}
                         />
                     )}
-                  </td>
+                </td>
 
-                  {/* Employee */}
-                  <td className="p-0 border-r border-gray-200 h-10">
+                {/* Employee */}
+                <td style={{ padding: 'var(--spacing-2) var(--spacing-3)' }}>
                     {row.id ? (
-                        <div className="px-3 py-2 text-gray-700 truncate">
+                        <div style={{ fontSize: 'var(--font-size-sm)' }}>
                              {employees.find(e => e.id === row.employee_id)?.full_name || 'Unknown'}
                         </div>
                     ) : (
                         <select 
-                            className="w-full h-full px-3 py-2 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none text-gray-700 text-sm appearance-none"
+                            className="input select"
                             value={row.employee_id}
                             onChange={(e) => handleChange(index, 'employee_id', e.target.value)}
+                            style={{ width: '100%' }}
                         >
                             <option value="">Select Employee</option>
                             {employees.map(emp => (
@@ -264,63 +279,65 @@ const ExpensesPage = () => {
                             ))}
                         </select>
                     )}
-                  </td>
+                </td>
 
-                  {/* Paid From */}
-                  <td className="p-0 border-r border-gray-200 h-10">
+                {/* Paid From */}
+                <td style={{ padding: 'var(--spacing-2) var(--spacing-3)' }}>
                      {row.id ? (
-                        <div className="px-3 py-2 text-gray-700 capitalize">{row.paid_from}</div>
+                        <div style={{ textTransform: 'capitalize' }}>{row.paid_from}</div>
                     ) : (
                         <select 
-                            className="w-full h-full px-3 py-2 bg-transparent border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none text-gray-700 text-sm appearance-none"
+                            className="input select"
                             value={row.paid_from}
                             onChange={(e) => handleChange(index, 'paid_from', e.target.value)}
+                            style={{ width: '100%' }}
                         >
                             <option value="cash">Cash</option>
                             <option value="card">Card</option>
                             <option value="upi">UPI</option>
                         </select>
                     )}
-                  </td>
+                </td>
 
-                  {/* Action */}
-                  <td className="p-0 text-center h-10">
-                     <button 
-                        onClick={() => handleDeleteRow(index)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
-                        title="Delete Row"
-                    >
-                        <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                {/* Action */}
+                <td style={{ textAlign: 'center' }}>
+                   <button 
+                      onClick={() => handleDeleteRow(index)}
+                      className="btn btn-ghost btn-icon btn-sm"
+                      style={{ color: 'var(--error-500)' }}
+                      title="Delete Row"
+                  >
+                      <Trash2 size={16} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Footer Actions */}
-      <div className="bg-white border-t border-gray-200 p-3 flex justify-between items-center px-4 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] z-10 flex-shrink-0">
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--spacing-6)', paddingBottom: 'var(--spacing-10)' }}>
         <button 
             onClick={handleAddRows}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 text-gray-700 font-medium transition-colors text-sm"
+            className="btn btn-secondary"
         >
             <Plus size={16} />
             Add 10 Rows
         </button>
 
-        <div className="flex gap-3">
+        <div style={{ display: 'flex', gap: 'var(--spacing-3)' }}>
             <button 
                 onClick={() => navigate(-1)}
-                className="px-5 py-2 border border-gray-300 rounded hover:bg-gray-50 text-gray-700 font-medium transition-colors text-sm"
+                className="btn btn-secondary"
             >
                 Cancel
             </button>
             <button 
                 onClick={handleSave}
                 disabled={saving}
-                className={`flex items-center gap-2 px-6 py-2 bg-[#dc2626] hover:bg-red-700 text-white rounded font-medium transition-colors shadow-sm text-sm ${saving ? 'opacity-70 cursor-not-allowed' : ''}`}
+                className="btn btn-primary"
+                style={{ minWidth: '150px' }}
             >
                 <Save size={16} />
                 {saving ? 'Saving...' : 'Save Expenses'}

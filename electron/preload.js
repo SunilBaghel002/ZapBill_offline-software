@@ -45,6 +45,10 @@ const validInvokeChannels = [
   'inventory:save',
   'inventory:getHistory',
   'inventory:delete',
+  // Expenses
+  'expenses:create',
+  'expenses:getByDate',
+  'expenses:delete',
   // Reports
   'reports:daily',
   'reports:weekly',

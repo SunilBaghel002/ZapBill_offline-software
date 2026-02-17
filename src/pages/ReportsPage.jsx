@@ -229,6 +229,8 @@ const ReportsPage = () => {
       const summaryData = [{
         'Report Period': FormatDateRange(),
         'Total Revenue (₹)': (data.sales?.total_revenue || 0).toFixed(2),
+        'Total Expenses (₹)': (data.sales?.total_expenses || 0).toFixed(2),
+        'Net Revenue (₹)': (data.sales?.net_revenue || 0).toFixed(2),
         'Total Orders': data.sales?.total_orders || 0,
         'Avg Order Value (₹)': data.sales?.total_orders ? (data.sales.total_revenue / data.sales.total_orders).toFixed(2) : '0.00',
         'Total Tax (₹)': (data.sales?.total_tax || 0).toFixed(2),
@@ -520,26 +522,33 @@ const ReportsPage = () => {
             {viewMode === 'dashboard' && (
                 <>
                 {/* Stats Grid */}
-                <div className="stats-grid">
+                <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
                 <div className="stat-card" style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', color: 'white', boxShadow: '0 10px 40px rgba(99, 102, 241, 0.3)' }}>
                     <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)' }}><DollarSign size={24} /></div>
                     <div>
-                    <div className="stat-value">₹{(sales.total_revenue || 0).toFixed(2)}</div>
-                    <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Total Revenue</div>
+                    <div className="stat-value">₹{(sales.total_revenue || 0).toLocaleString()}</div>
+                    <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Total Sales</div>
+                    </div>
+                </div>
+                <div className="stat-card" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)', color: 'white', boxShadow: '0 10px 40px rgba(239, 68, 68, 0.3)' }}>
+                    <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)' }}><TrendingDown size={24} /></div>
+                    <div>
+                    <div className="stat-value">₹{(sales.total_expenses || 0).toLocaleString()}</div>
+                    <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Total Expenses</div>
                     </div>
                 </div>
                 <div className="stat-card" style={{ background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)', color: 'white', boxShadow: '0 10px 40px rgba(16, 185, 129, 0.3)' }}>
-                    <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)' }}><ShoppingCart size={24} /></div>
+                    <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)' }}><TrendingUp size={24} /></div>
                     <div>
-                    <div className="stat-value">{sales.total_orders || 0}</div>
-                    <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Total Orders</div>
+                    <div className="stat-value">₹{(sales.net_revenue || (sales.total_revenue - (sales.total_expenses || 0))).toLocaleString()}</div>
+                    <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Net Revenue</div>
                     </div>
                 </div>
                 <div className="stat-card" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)', color: 'white', boxShadow: '0 10px 40px rgba(245, 158, 11, 0.3)' }}>
-                    <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)' }}><TrendingUp size={24} /></div>
+                    <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)' }}><ShoppingCart size={24} /></div>
                     <div>
-                    <div className="stat-value">₹{sales.total_orders ? (sales.total_revenue / sales.total_orders).toFixed(2) : '0.00'}</div>
-                    <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Avg. Order Value</div>
+                    <div className="stat-value">{(sales.total_orders || 0)}</div>
+                    <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Total Orders</div>
                     </div>
                 </div>
                 </div>

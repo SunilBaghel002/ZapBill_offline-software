@@ -1411,21 +1411,32 @@ class Database {
 
     // Category Wise Sales
     const categorySales = this.execute(`
-      SELECT c.name as category_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      SELECT c.name as category_name, SUM(oi.item_total) as total_revenue, SUM(oi.quantity) as total_quantity
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
       LEFT JOIN categories c ON mi.category_id = c.id
-      WHERE DATE(o.created_at, 'localtime') = ?
-        AND o.status != 'cancelled'
-        AND o.is_deleted = 0
-        AND oi.is_deleted = 0
+      WHERE DATE(o.created_at) = ? AND o.status != 'cancelled'
       GROUP BY c.name
       ORDER BY total_revenue DESC
     `, [date]);
 
+    // Total Expenses for the day
+    const expenses = this.execute(`
+        SELECT COALESCE(SUM(amount), 0) as total_expenses 
+        FROM expenses 
+        WHERE date = ?
+    `, [date]);
+    
+    const totalExpenses = expenses[0]?.total_expenses || 0;
+    const totalRevenue = sales[0]?.total_revenue || 0;
+
     return {
-      sales: sales[0] || { total_orders: 0, total_revenue: 0, cash_amount: 0, card_amount: 0, upi_amount: 0 },
+      sales: {
+        ...sales[0],
+        total_expenses: totalExpenses,
+        net_revenue: totalRevenue - totalExpenses
+      },
       orders,
       topItems,
       categorySales
@@ -1454,11 +1465,6 @@ class Database {
       WHERE DATE(created_at, 'localtime') = ? AND cashier_id = ? AND is_deleted = 0 
       ORDER BY created_at DESC
     `, [date, userId]);
-
-    // Enrich with items
-    for (const order of orders) {
-      order.items = this.execute(`SELECT * FROM order_items WHERE order_id = ? AND is_deleted = 0`, [order.id]);
-    }
 
     return {
       sales: sales[0] || { total_orders: 0, total_revenue: 0, cash_amount: 0, card_amount: 0, upi_amount: 0 },
@@ -1577,18 +1583,29 @@ class Database {
         COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as total_orders,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
-        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount,
-        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as cash_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as card_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as upi_amount
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount
       FROM orders 
       WHERE DATE(created_at, 'localtime') >= ? 
         AND DATE(created_at, 'localtime') < date(?, '+7 days')
         AND is_deleted = 0
     `, [startDate, startDate])[0];
 
+    // Weekly Expenses
+    const weeklyExpenses = this.execute(`
+      SELECT COALESCE(SUM(amount), 0) as total_expenses 
+      FROM expenses 
+      WHERE date >= ? AND date < date(?, '+7 days')
+    `, [startDate, startDate]);
+
+    const totalExpenses = weeklyExpenses[0]?.total_expenses || 0;
+    const totalRevenue = (sales && sales.total_revenue) || 0;
+
     return {
-      sales: sales || { total_orders: 0, total_revenue: 0 },
+      sales: {
+        ...(sales || { total_orders: 0, total_revenue: 0 }),
+        total_expenses: totalExpenses,
+        net_revenue: totalRevenue - totalExpenses
+      },
       dailyTrend,
       topItems,
       categorySales
@@ -1657,8 +1674,22 @@ class Database {
         AND is_deleted = 0
     `, [monthStr])[0];
 
+    // Monthly Expenses
+    const monthlyExpenses = this.execute(`
+      SELECT COALESCE(SUM(amount), 0) as total_expenses 
+      FROM expenses 
+      WHERE strftime('%Y-%m', date) = ?
+    `, [monthStr]);
+
+    const totalExpenses = monthlyExpenses[0]?.total_expenses || 0;
+    const totalRevenue = (sales && sales.total_revenue) || 0;
+
     return {
-      sales: sales || { total_orders: 0, total_revenue: 0 },
+      sales: {
+        ...(sales || { total_orders: 0, total_revenue: 0 }),
+        total_expenses: totalExpenses,
+        net_revenue: totalRevenue - totalExpenses
+      },
       dailyTrend,
       topItems,
       categorySales
