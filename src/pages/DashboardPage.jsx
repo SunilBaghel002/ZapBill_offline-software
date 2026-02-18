@@ -14,6 +14,7 @@ import {
   Minus
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
+import { useAuthStore } from '../stores/authStore';
 
 // StatCard Component
 const StatCard = ({ title, value, trend, trendValue, icon: Icon, color }) => {
@@ -236,26 +237,26 @@ const DashboardPage = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const { user } = useAuthStore();
+
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (user) {
+      loadDashboardData();
+    }
+  }, [user]);
 
 
 
   const loadDashboardData = async () => {
     try {
+      setIsLoading(true);
       const today = format(new Date(), 'yyyy-MM-dd');
       const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-
-      // Fetch today's and yesterday's reports for comparison
-      const [todayReport, yesterdayReport, recentOrdersData] = await Promise.all([
-        window.electronAPI.invoke('reports:daily', { date: today }),
-        window.electronAPI.invoke('reports:daily', { date: yesterday }),
-        window.electronAPI.invoke('order:getRecent', { limit: 8 })
-      ]);
-
-      const todaySales = todayReport?.sales || {};
-      const yesterdaySales = yesterdayReport?.sales || {};
+      
+      let todaySales = {};
+      let yesterdaySales = {};
+      let revenueTrend = { direction: 'neutral', value: 0 };
+      let ordersTrend = { direction: 'neutral', value: 0 };
 
       // Helper to calculate trend
       const calculateTrend = (current, previous) => {
@@ -273,15 +274,42 @@ const DashboardPage = () => {
         };
       };
 
-      // Calculate Trends
-      const revenueTrend = calculateTrend(todaySales.total_revenue, yesterdaySales.total_revenue);
-      const ordersTrend = calculateTrend(todaySales.total_orders, yesterdaySales.total_orders);
-      
-      const currentAvg = todaySales.total_orders > 0 ? (todaySales.total_revenue / todaySales.total_orders) : 0;
-      const prevAvg = yesterdaySales.total_orders > 0 ? (yesterdaySales.total_revenue / yesterdaySales.total_orders) : 0;
-      const avgOrderTrend = calculateTrend(currentAvg, prevAvg);
+      if (user?.role === 'biller') {
+        // --- BILLER VIEW ---
+        // Fetch active shift or last closed shift for today
+        const shiftStatus = await window.electronAPI.invoke('shifts:getStatus', { userId: user.id });
+        
+        if (shiftStatus.success && shiftStatus.shift) {
+          const reportResult = await window.electronAPI.invoke('shifts:getReport', { shiftId: shiftStatus.shift.id });
+          if (reportResult.success && reportResult.report) {
+            todaySales = reportResult.report.sales;
+          }
+        } else {
+             // Try to get daily report for this biller specifically
+             const billerReport = await window.electronAPI.invoke('reports:billerDaily', { date: today, userId: user.id });
+             todaySales = billerReport || {};
+        }
 
-      // Active Orders
+      } else {
+        // --- ADMIN VIEW ---
+        // Fetch global today's and yesterday's reports for comparison
+        const [todayReport, yesterdayReport] = await Promise.all([
+          window.electronAPI.invoke('reports:daily', { date: today }),
+          window.electronAPI.invoke('reports:daily', { date: yesterday })
+        ]);
+
+        todaySales = todayReport?.sales || {};
+        yesterdaySales = yesterdayReport?.sales || {};
+
+        // Calculate Trends (Only for Admin)
+        revenueTrend = calculateTrend(todaySales.total_revenue, yesterdaySales.total_revenue);
+        ordersTrend = calculateTrend(todaySales.total_orders, yesterdaySales.total_orders);
+      }
+
+      // Common Data: Recent Orders
+      const recentOrdersData = await window.electronAPI.invoke('order:getRecent', { limit: 8 });
+
+      // Active Orders count from recent list (approximate)
       let activeCount = 0;
       if (Array.isArray(recentOrdersData)) {
         setRecentOrders(recentOrdersData);
@@ -293,12 +321,12 @@ const DashboardPage = () => {
       setStats({
         todayRevenue: todaySales.total_revenue || 0,
         todayExpenses: todaySales.total_expenses || 0,
-        netProfit: todaySales.net_revenue || 0,
+        netProfit: todaySales.net_revenue || 0, // Note: Biller report might not have expenses yet
         totalOrders: todaySales.total_orders || 0,
         activeOrders: activeCount,
         revenueTrend,
         ordersTrend,
-        // avgOrderTrend, // Removing avg order trend for now to make space
+        // avgOrderTrend, 
         activeOrdersTrend: { direction: 'neutral', value: 0 } 
       });
 

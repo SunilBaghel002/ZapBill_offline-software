@@ -34,60 +34,83 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   return children;
 };
 
+import { ShiftProvider, useShift } from './context/ShiftContext';
+import ShiftModal from './components/common/ShiftModal';
+
+// Component to handle shift logic and modal
+const ShiftManager = ({ children }) => {
+  const { showStartModal, setShowStartModal } = useShift();
+  
+  return (
+    <>
+      {children}
+      <ShiftModal 
+        isOpen={showStartModal} 
+        type="start" 
+        onClose={() => setShowStartModal(false)} // Optional: force start?
+      />
+    </>
+  );
+};
+
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
-        
-        {/* Protected routes */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="pos" element={<POSPage />} />
-          <Route path="menu" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <MenuPage />
-            </ProtectedRoute>
-          } />
-          <Route path="inventory" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <InventoryPage />
-            </ProtectedRoute>
-          } />
-          <Route path="orders" element={<OrdersPage />} />
-          <Route path="kot" element={<KOTPage />} />
-          <Route path="reports" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <ReportsPage />
-            </ProtectedRoute>
-          } />
-          <Route path="users" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <UsersPage />
-            </ProtectedRoute>
-          } />
-          <Route path="settings" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <SettingsPage />
-            </ProtectedRoute>
-          } />
-          <Route path="expenses" element={
-            <ProtectedRoute allowedRoles={['admin', 'biller']}>
-               <ExpensesPage />
-            </ProtectedRoute>
-          } />
-        </Route>
-        
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+    <ShiftProvider>
+      <Router>
+        <ShiftManager>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
+            
+            {/* Protected routes */}
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="pos" element={<POSPage />} />
+              <Route path="menu" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <MenuPage />
+                </ProtectedRoute>
+              } />
+              <Route path="inventory" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <InventoryPage />
+                </ProtectedRoute>
+              } />
+              <Route path="orders" element={<OrdersPage />} />
+              <Route path="kot" element={<KOTPage />} />
+              <Route path="reports" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <ReportsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="users" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <UsersPage />
+                </ProtectedRoute>
+              } />
+              <Route path="settings" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <SettingsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="expenses" element={
+                <ProtectedRoute allowedRoles={['admin', 'biller']}>
+                  <ExpensesPage />
+                </ProtectedRoute>
+              } />
+            </Route>
+            
+            {/* Catch all */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </ShiftManager>
+      </Router>
+    </ShiftProvider>
   );
 }
 

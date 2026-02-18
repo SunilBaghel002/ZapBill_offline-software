@@ -179,6 +179,11 @@ const ReportsPage = () => {
         const monthStr = format(selectedDate, 'yyyy-MM');
         result = await window.electronAPI.invoke('reports:monthly', { month: monthStr });
         setDetailedData([]); // Reset detailed data
+      } else if (reportType === 'shift') {
+        dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const shiftResult = await window.electronAPI.invoke('shifts:getByDate', { date: dateStr });
+        result = { shifts: shiftResult.shifts || [] };
+        setDetailedData([]);
       }
       
       setData(result);
@@ -418,9 +423,9 @@ const ReportsPage = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <h1 className="text-xl font-bold text-gray-800">Reports</h1>
           
-          {/* View Selector (Daily/Weekly/Monthly) */}
+          {/* View Selector (Daily/Weekly/Monthly/Shift) */}
           <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '4px' }}>
-            {['daily', 'weekly', 'monthly'].map(type => (
+            {['daily', 'weekly', 'monthly', 'shift'].map(type => (
               <button
                 key={type}
                 onClick={() => setReportType(type)}
@@ -518,8 +523,81 @@ const ReportsPage = () => {
           <div className="text-center p-8 text-gray-500">Loading...</div>
         ) : (
           <>
+            {/* --- SHIFT REPORT VIEW --- */}
+            {reportType === 'shift' && (
+              <div className="card" style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-4)' }}>
+                  <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Clock size={20} className="text-primary" />
+                    Shift Reports
+                  </h3>
+                </div>
+                <div className="card-body" style={{ padding: 0 }}>
+                  <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--gray-200)' }}>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Biller</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Start Time</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>End Time</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Status</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Orders</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Revenue</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Cash</th>
+                         {/* <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Opened With</th> */}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data?.shifts?.length > 0 ? (
+                        data.shifts.map((shift) => (
+                          <tr key={shift.id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                            <td style={{ padding: '12px 16px' }}>
+                              <div style={{ fontWeight: 500, color: '#1e293b' }}>{shift.user_name}</div>
+                              <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'capitalize' }}>{shift.user_role}</div>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: '#475569', fontSize: '13px' }}>
+                              {new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                            <td style={{ padding: '12px 16px', color: '#475569', fontSize: '13px' }}>
+                              {shift.end_time ? new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                background: shift.status === 'active' ? '#dcfce7' : '#f1f5f9',
+                                color: shift.status === 'active' ? '#166534' : '#64748b',
+                                textTransform: 'uppercase'
+                              }}>
+                                {shift.status}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 500 }}>{shift.sales?.total_orders || 0}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                              ₹{shift.sales?.total_revenue?.toLocaleString() || '0'}
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right', color: '#64748b' }}>
+                              <div style={{ fontSize: '11px' }}>Open: ₹{shift.opening_cash || 0}</div>
+                              {shift.closing_cash !== null && <div style={{ fontSize: '11px' }}>Close: ₹{shift.closing_cash}</div>}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="7" style={{ padding: '32px', textAlign: 'center', color: '#94a3b8' }}>
+                            No shifts found for this date.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* --- DASHBOARD VIEW --- */}
-            {viewMode === 'dashboard' && (
+            {reportType !== 'shift' && viewMode === 'dashboard' && (
                 <>
                 {/* Stats Grid */}
                 <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
@@ -786,7 +864,7 @@ const ReportsPage = () => {
             )}
 
             {/* --- DETAILED REPORT VIEW --- */}
-            {viewMode === 'detailed' && (
+            {reportType !== 'shift' && viewMode === 'detailed' && (
                 <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
                     {/* Filter Bar */}
                     <div className="card-header" style={{ background: '#f8fafc', borderBottom: '1px solid var(--gray-200)', padding: '16px' }}>

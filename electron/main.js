@@ -595,6 +595,62 @@ function setupIpcHandlers() {
     }
   });
 
+  // ============ SHIFT MANAGEMENT OPERATIONS ============
+  ipcMain.handle('shifts:start', async (event, { userId, startCash }) => {
+    try {
+      return db.startShift(userId, startCash);
+    } catch (error) {
+      log.error('Start shift error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('shifts:end', async (event, { userId, endCash }) => {
+    try {
+      return db.endShift(userId, endCash);
+    } catch (error) {
+      log.error('End shift error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('shifts:getStatus', async (event, { userId }) => {
+    try {
+      const shift = db.getActiveShift(userId);
+      return { success: true, shift };
+    } catch (error) {
+      log.error('Get shift status error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('shifts:getReport', async (event, { shiftId }) => {
+    try {
+      const report = db.getShiftReport(shiftId);
+      return { success: true, report };
+    } catch (error) {
+      log.error('Get shift report error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('shifts:getByDate', async (event, { date }) => {
+    try {
+      const shifts = db.getShiftsByDate(date);
+      return { success: true, shifts };
+    } catch (error) {
+      log.error('Get shifts by date error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Auto-close shifts on startup (optional, but good practice)
+  // try {
+  //   db.autoCloseShifts();
+  // } catch (e) {
+  //   log.error('Auto close shifts error:', e);
+  // }
+
   // ============ EXPENSES OPERATIONS ============
   ipcMain.handle('expenses:create', async (event, { expenses }) => {
     try {

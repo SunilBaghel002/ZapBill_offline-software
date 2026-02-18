@@ -76,6 +76,12 @@ const validInvokeChannels = [
   'settings:getAll',
   'settings:get',
   'settings:update',
+  // Shift Management
+  'shifts:start',
+  'shifts:end',
+  'shifts:getStatus',
+  'shifts:getReport',
+  'shifts:getByDate',
   // App
   'app:getVersion',
   'app:checkForUpdates',

@@ -16,10 +16,14 @@ import {
   Wallet
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import { useShift } from '../../context/ShiftContext';
+import ShiftModal from '../common/ShiftModal';
 
 const Sidebar = () => {
   const { user, logout } = useAuthStore();
+  const { endShift } = useShift();
   const navigate = useNavigate();
+  const [showEndShiftModal, setShowEndShiftModal] = React.useState(false);
 
   const isAdmin = user?.role === 'admin';
 
@@ -97,7 +101,30 @@ const Sidebar = () => {
             )}
           </NavLink>
         ))}
+
+        {/* End Shift Button for Billers */}
+        <button
+          onClick={() => setShowEndShiftModal(true)}
+          className="sidebar-nav-item"
+          style={{ 
+            width: '100%', 
+            border: 'none', 
+            background: 'none', 
+            cursor: 'pointer',
+            marginTop: 'auto',
+            color: 'var(--gray-400)'
+          }}
+        >
+          <LogOut size={22} className="sidebar-nav-icon" />
+          <span className="sidebar-nav-label">End Day</span>
+        </button>
       </nav>
+
+      <ShiftModal 
+        isOpen={showEndShiftModal} 
+        type="end" 
+        onClose={() => setShowEndShiftModal(false)} 
+      />
 
       {/* User Section */}
       <div className="sidebar-user">

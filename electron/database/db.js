@@ -86,6 +86,19 @@ class Database {
       updated_at TEXT
     )`);
 
+    // Create shifts table
+    this.db.run(`CREATE TABLE IF NOT EXISTS shifts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT REFERENCES users(id),
+      start_time TEXT NOT NULL,
+      end_time TEXT,
+      start_cash REAL DEFAULT 0,
+      end_cash REAL,
+      status TEXT CHECK(status IN ('active', 'closed')) DEFAULT 'active',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     // Create indexes
     try {
       this.db.run("CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)");
@@ -1493,6 +1506,129 @@ class Database {
       GROUP BY u.id
       ORDER BY total_revenue DESC
     `, [date]);
+  }
+
+  // ===== Shift Management =====
+  startShift(userId, startCash) {
+    // Check if user already has an active shift
+    const existing = this.execute(`
+      SELECT * FROM shifts WHERE user_id = ? AND status = 'active'
+    `, [userId]);
+
+    if (existing.length > 0) {
+      throw new Error('User already has an active shift');
+    }
+
+    const id = uuidv4();
+    const startTime = new Date().toISOString();
+
+    this.db.run(`
+      INSERT INTO shifts (id, user_id, start_time, start_cash, status)
+      VALUES (?, ?, ?, ?, 'active')
+    `, [id, userId, startTime, startCash]);
+
+    return { id, userId, startTime, startCash, status: 'active' };
+  }
+
+  endShift(userId, endCash) {
+    const shift = this.getActiveShift(userId);
+    if (!shift) {
+      throw new Error('No active shift found for user');
+    }
+
+    const endTime = new Date().toISOString();
+    
+    this.db.run(`
+      UPDATE shifts 
+      SET end_time = ?, end_cash = ?, status = 'closed', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [endTime, endCash, shift.id]);
+
+    return { ...shift, endTime, endCash, status: 'closed' };
+  }
+
+  getActiveShift(userId) {
+    const shifts = this.execute(`
+      SELECT * FROM shifts WHERE user_id = ? AND status = 'active'
+    `, [userId]);
+    return shifts[0] || null;
+  }
+
+  autoCloseShifts() {
+    // Close any shifts that are still active from previous days
+    // This is a simple logic: if start_time is not today, close it.
+    // In a real scenario, we might want more complex logic (e.g. shifts spanning midnight)
+    // For now, we'll just close shifts started before today 00:00
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    this.db.run(`
+      UPDATE shifts 
+      SET status = 'closed', end_time = datetime('now'), end_cash = 0, updated_at = CURRENT_TIMESTAMP
+      WHERE status = 'active' AND date(start_time) < ?
+    `, [today]);
+  }
+
+  getShiftReport(shiftId) {
+    const shift = this.execute(`SELECT * FROM shifts WHERE id = ?`, [shiftId])[0];
+    if (!shift) return null;
+
+    // Get orders within this shift window
+    // If shift is active, use current time as end time for report
+    const endTime = shift.end_time || new Date().toISOString();
+
+    const sales = this.execute(`
+      SELECT 
+        COUNT(*) as total_orders,
+        COALESCE(SUM(total_amount), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END), 0) as cash_sales,
+        COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total_amount ELSE 0 END), 0) as card_sales,
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' THEN total_amount ELSE 0 END), 0) as upi_sales
+      FROM orders
+      WHERE cashier_id = ? 
+        AND created_at >= ? 
+        AND created_at <= ?
+        AND status != 'cancelled'
+        AND is_deleted = 0
+    `, [shift.user_id, shift.start_time, endTime])[0];
+
+    return {
+      shift,
+      sales: sales || { total_orders: 0, total_revenue: 0, cash_sales: 0, card_sales: 0, upi_sales: 0 }
+    };
+  }
+
+  getShiftsByDate(date) {
+    // date format: YYYY-MM-DD
+    // Get all shifts that started on this date
+    const shifts = this.execute(`
+      SELECT s.*, u.full_name as user_name, u.role as user_role
+      FROM shifts s
+      JOIN users u ON s.user_id = u.id
+      WHERE date(s.start_time, 'localtime') = ?
+      ORDER BY s.start_time DESC
+    `, [date]);
+
+    // For each shift, calculate the sales summary
+    return shifts.map(shift => {
+      const endTime = shift.end_time || new Date().toISOString();
+      const sales = this.execute(`
+        SELECT 
+          COUNT(*) as total_orders,
+          COALESCE(SUM(total_amount), 0) as total_revenue
+        FROM orders
+        WHERE cashier_id = ? 
+          AND created_at >= ? 
+          AND created_at <= ?
+          AND status != 'cancelled'
+          AND is_deleted = 0
+      `, [shift.user_id, shift.start_time, endTime])[0];
+      
+      return {
+        ...shift,
+        sales: sales || { total_orders: 0, total_revenue: 0 }
+      };
+    });
   }
 
   // Get detailed daily export (User-wise product sales with all details)
