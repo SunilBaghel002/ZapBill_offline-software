@@ -2147,6 +2147,46 @@ class Database {
   // ============ ADVANCED REPORTS ============
 
   // --- SALES REPORTS ---
+  getAddonSales(startDate, endDate) {
+    const items = this.execute(`
+      SELECT oi.addons
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.is_deleted = 0 
+        AND o.status != 'cancelled'
+        AND date(o.created_at, 'localtime') BETWEEN date(?) AND date(?)
+        AND oi.addons IS NOT NULL 
+        AND oi.addons != '[]'
+        AND oi.addons != ''
+    `, [startDate, endDate]);
+
+    const addonStats = {};
+
+    for (const item of items) {
+      try {
+        const addons = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
+        if (Array.isArray(addons)) {
+          for (const addon of addons) {
+            const name = addon.name || addon.addon_name;
+            const price = parseFloat(addon.price || addon.addon_price || 0);
+            
+            if (name) {
+              if (!addonStats[name]) {
+                addonStats[name] = { name, quantity: 0, revenue: 0 };
+              }
+              addonStats[name].quantity += 1; // Assuming 1 per item, or check if qty is in addon object
+              addonStats[name].revenue += price;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing addons:', e);
+      }
+    }
+
+    return Object.values(addonStats).sort((a, b) => b.revenue - a.revenue);
+  }
+
   getItemWiseSales(startDate, endDate) {
     return this.execute(`
       SELECT 
@@ -2160,8 +2200,8 @@ class Database {
       LEFT JOIN categories c ON mi.category_id = c.id
       JOIN orders o ON oi.order_id = o.id
       WHERE o.is_deleted = 0 
-        AND o.status = 'completed'
-        AND date(o.created_at) BETWEEN date(?) AND date(?)
+        AND o.status != 'cancelled'
+        AND date(o.created_at, 'localtime') BETWEEN date(?) AND date(?)
       GROUP BY mi.name, c.name
       ORDER BY total_revenue DESC
     `, [startDate, endDate]);
@@ -2179,8 +2219,8 @@ class Database {
       LEFT JOIN categories c ON mi.category_id = c.id
       JOIN orders o ON oi.order_id = o.id
       WHERE o.is_deleted = 0 
-        AND o.status = 'completed'
-        AND date(o.created_at) BETWEEN date(?) AND date(?)
+        AND o.status != 'cancelled'
+        AND date(o.created_at, 'localtime') BETWEEN date(?) AND date(?)
       GROUP BY c.name
       ORDER BY total_revenue DESC
     `, [startDate, endDate]);
@@ -2189,13 +2229,13 @@ class Database {
   getHourlySales(date) {
     return this.execute(`
       SELECT 
-        strftime('%H', created_at) as hour,
+        strftime('%H', created_at, 'localtime') as hour,
         COUNT(*) as total_orders,
         SUM(total_amount) as total_revenue
       FROM orders
       WHERE is_deleted = 0 
-        AND status = 'completed'
-        AND date(created_at) = date(?)
+        AND status != 'cancelled'
+        AND date(created_at, 'localtime') = date(?)
       GROUP BY hour
       ORDER BY hour ASC
     `, [date]);
@@ -2213,7 +2253,7 @@ class Database {
       FROM orders o
       LEFT JOIN users u ON o.cashier_id = u.id
       WHERE o.status = 'cancelled'
-        AND date(o.created_at) BETWEEN date(?) AND date(?)
+        AND date(o.created_at, 'localtime') BETWEEN date(?) AND date(?)
       ORDER BY o.updated_at DESC
     `, [startDate, endDate]);
   }
@@ -2231,9 +2271,9 @@ class Database {
       FROM orders o
       LEFT JOIN users u ON o.cashier_id = u.id
       WHERE o.is_deleted = 0 
-        AND o.status = 'completed'
+        AND o.status != 'cancelled'
         AND o.discount_amount > 0
-        AND date(o.created_at) BETWEEN date(?) AND date(?)
+        AND date(o.created_at, 'localtime') BETWEEN date(?) AND date(?)
       ORDER BY o.created_at DESC
     `, [startDate, endDate]);
   }
@@ -2241,15 +2281,15 @@ class Database {
   getGSTReport(startDate, endDate) {
     return this.execute(`
       SELECT 
-        date(created_at) as date,
+        date(created_at, 'localtime') as date,
         COUNT(*) as total_orders,
         SUM(subtotal) as taxable_amount,
         SUM(tax_amount) as total_tax,
         SUM(total_amount) as total_amount
       FROM orders
       WHERE is_deleted = 0 
-        AND status = 'completed'
-        AND date(created_at) BETWEEN date(?) AND date(?)
+        AND status != 'cancelled'
+        AND date(created_at, 'localtime') BETWEEN date(?) AND date(?)
       GROUP BY date
       ORDER BY date DESC
     `, [startDate, endDate]);
@@ -2285,7 +2325,7 @@ class Database {
       FROM inventory_transactions it
       JOIN inventory i ON it.inventory_id = i.id
       WHERE it.is_deleted = 0
-        AND date(it.created_at) BETWEEN date(?) AND date(?)
+        AND date(it.created_at, 'localtime') BETWEEN date(?) AND date(?)
       ORDER BY it.created_at DESC
     `, [startDate, endDate]);
   }
@@ -2301,10 +2341,10 @@ class Database {
         MAX(created_at) as last_visit
       FROM orders
       WHERE is_deleted = 0 
-        AND status = 'completed'
+        AND status != 'cancelled'
         AND customer_phone IS NOT NULL 
         AND customer_phone != ''
-        AND date(created_at) BETWEEN date(?) AND date(?)
+        AND date(created_at, 'localtime') BETWEEN date(?) AND date(?)
       GROUP BY customer_phone
       ORDER BY visit_count DESC
     `, [startDate, endDate]);
@@ -2332,8 +2372,8 @@ class Database {
       FROM orders o
       LEFT JOIN users u ON o.cashier_id = u.id
       WHERE o.is_deleted = 0 
-        AND o.status = 'completed'
-        AND date(o.created_at) BETWEEN date(?) AND date(?)
+        AND o.status != 'cancelled'
+        AND date(o.created_at, 'localtime') BETWEEN date(?) AND date(?)
       GROUP BY u.id
     `, [startDate, endDate]);
   }
@@ -2347,8 +2387,8 @@ class Database {
         SUM(total_amount) as total_amount
       FROM orders
       WHERE is_deleted = 0 
-        AND status = 'completed'
-        AND date(created_at) BETWEEN date(?) AND date(?)
+        AND status != 'cancelled'
+        AND date(created_at, 'localtime') BETWEEN date(?) AND date(?)
       GROUP BY payment_method
     `, [startDate, endDate]);
   }

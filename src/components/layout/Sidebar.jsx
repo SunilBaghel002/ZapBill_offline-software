@@ -21,31 +21,21 @@ import ShiftModal from '../common/ShiftModal';
 
 // ... imports
 
+// ... imports
+
 const Sidebar = () => {
   const { user, logout } = useAuthStore();
   const { endShift } = useShift();
   const navigate = useNavigate();
   const [showEndShiftModal, setShowEndShiftModal] = React.useState(false);
-  const [hoveredItem, setHoveredItem] = React.useState(null);
+  // Changed from hover to toggle
+  const [expandedMenu, setExpandedMenu] = React.useState(null);
 
   const isAdmin = user?.role === 'admin';
 
   const [activeOrdersCount, setActiveOrdersCount] = React.useState(0);
 
-  React.useEffect(() => {
-    const fetchCount = async () => {
-      try {
-        const count = await window.electronAPI.invoke('order:getActiveCount');
-        setActiveOrdersCount(count);
-      } catch (err) {
-        console.error('Failed to fetch active order count', err);
-      }
-    };
-
-    fetchCount();
-    const interval = setInterval(fetchCount, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
-  }, []);
+  // ... useEffect for order count
 
   const allNavItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
@@ -86,6 +76,11 @@ const Sidebar = () => {
     navigate('/login');
   };
 
+  const toggleMenu = (path, e) => {
+    e.preventDefault();
+    setExpandedMenu(expandedMenu === path ? null : path);
+  };
+
   return (
     <aside className="sidebar">
       {/* Logo Section */}
@@ -101,17 +96,55 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <nav className="sidebar-nav">
-        {navItems.map((item) => (
-          <div 
-            key={item.path} 
-            style={{ position: 'relative' }}
-            onMouseEnter={() => item.children && setHoveredItem(item.path)}
-            onMouseLeave={() => item.children && setHoveredItem(null)}
-          >
+        {navItems.map((item) => {
+           if (item.children) {
+             const isExpanded = expandedMenu === item.path;
+             const isActive = location.pathname.startsWith(item.path);
+             
+             return (
+               <div key={item.path}>
+                 <div 
+                   className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                   onClick={(e) => toggleMenu(item.path, e)}
+                   style={{ cursor: 'pointer', justifyContent: 'space-between' }}
+                 >
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                     <item.icon size={22} className="sidebar-nav-icon" />
+                     <span className="sidebar-nav-label">{item.label}</span>
+                   </div>
+                   <span style={{ fontSize: '10px', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+                 </div>
+                 
+                 {isExpanded && (
+                   <div style={{ background: 'rgba(0,0,0,0.03)', paddingBottom: '4px' }}>
+                     {item.children.map((child) => (
+                       <NavLink
+                         key={child.path}
+                         to={child.path}
+                         className={({ isActive }) => 
+                           `sidebar-nav-item ${isActive ? 'active' : ''}`
+                         }
+                         style={{ 
+                           paddingLeft: '48px', 
+                           fontSize: '13px',
+                           height: '40px'
+                         }}
+                       >
+                         <span className="sidebar-nav-label">{child.label}</span>
+                       </NavLink>
+                     ))}
+                   </div>
+                 )}
+               </div>
+             );
+           }
+
+           return (
             <NavLink
+              key={item.path}
               to={item.path}
               className={({ isActive }) => 
-                `sidebar-nav-item ${isActive || (item.children && location.pathname.startsWith(item.path)) ? 'active' : ''}`
+                `sidebar-nav-item ${isActive ? 'active' : ''}`
               }
             >
               <item.icon size={22} className="sidebar-nav-icon" />
@@ -120,46 +153,8 @@ const Sidebar = () => {
                 <span className="sidebar-badge">{item.badge}</span>
               )}
             </NavLink>
-            
-            {/* Dropdown Menu */}
-            {item.children && hoveredItem === item.path && (
-              <div style={{
-                position: 'absolute',
-                left: '100%',
-                top: 0,
-                background: 'white',
-                minWidth: '200px',
-                boxShadow: '4px 0 10px rgba(0,0,0,0.1)',
-                borderRadius: '0 8px 8px 0',
-                zIndex: 100,
-                padding: '8px 0',
-                border: '1px solid #eee'
-              }}>
-                {item.children.map((child) => (
-                  <NavLink
-                    key={child.path}
-                    to={child.path}
-                    className={({ isActive }) => 
-                      `sidebar-subnav-item ${isActive ? 'active' : ''}`
-                    }
-                    style={{
-                      display: 'block',
-                      padding: '10px 20px',
-                      textDecoration: 'none',
-                      color: '#4b5563',
-                      fontSize: '14px',
-                      transition: 'background 0.2s',
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
-                  >
-                    {child.label}
-                  </NavLink>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
 
         {/* End Shift Button for Billers */}
         <button

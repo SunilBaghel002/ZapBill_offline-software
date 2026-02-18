@@ -780,6 +780,10 @@ function setupIpcHandlers() {
     try { return db.getItemWiseSales(startDate, endDate); } catch (e) { log.error(e); return []; }
   });
 
+  ipcMain.handle('reports:addonSales', async (event, { startDate, endDate }) => {
+    try { return db.getAddonSales(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
   ipcMain.handle('reports:categoryWiseSales', async (event, { startDate, endDate }) => {
     try { return db.getCategoryWiseSales(startDate, endDate); } catch (e) { log.error(e); return []; }
   });

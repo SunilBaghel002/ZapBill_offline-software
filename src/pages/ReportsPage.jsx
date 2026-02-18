@@ -426,11 +426,17 @@ const ReportsPage = () => {
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category');
 
-  if (category === 'sales') return <SalesReports />;
-  if (category === 'inventory') return <InventoryReports />;
-  if (category === 'crm') return <CRMReports />;
-  if (category === 'staff') return <StaffReports />;
-  if (category === 'payment') return <PaymentReports />;
+  const SubReportWrapper = ({ children }) => (
+    <div style={{ padding: '20px', height: 'calc(100vh - 64px)', marginTop: '64px', overflowY: 'auto', background: '#f8fafc' }}>
+      {children}
+    </div>
+  );
+
+  if (category === 'sales') return <SubReportWrapper><SalesReports /></SubReportWrapper>;
+  if (category === 'inventory') return <SubReportWrapper><InventoryReports /></SubReportWrapper>;
+  if (category === 'crm') return <SubReportWrapper><CRMReports /></SubReportWrapper>;
+  if (category === 'staff') return <SubReportWrapper><StaffReports /></SubReportWrapper>;
+  if (category === 'payment') return <SubReportWrapper><PaymentReports /></SubReportWrapper>;
 
   return (
     <div style={{ padding: '20px', height: 'calc(100vh - 64px)', marginTop: '64px', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
