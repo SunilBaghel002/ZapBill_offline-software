@@ -1508,6 +1508,100 @@ class Database {
     `, [date]);
   }
 
+  // Get custom date range report with add-on statistics
+  getCustomReport(startDate, endDate) {
+    // 1. Sales Summary
+    const sales = this.execute(`
+      SELECT 
+        COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as total_orders,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount,
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as cash_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as card_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as upi_amount
+      FROM orders 
+      WHERE DATE(created_at, 'localtime') BETWEEN ? AND ?
+        AND is_deleted = 0
+    `, [startDate, endDate]);
+
+    // 2. Top Items
+    const topItems = this.execute(`
+      SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE DATE(o.created_at, 'localtime') BETWEEN ? AND ?
+        AND o.status != 'cancelled' 
+        AND o.is_deleted = 0 
+        AND oi.is_deleted = 0
+      GROUP BY oi.item_name
+      ORDER BY total_quantity DESC
+      LIMIT 10
+    `, [startDate, endDate]);
+
+    // 3. Category Sales
+    const categorySales = this.execute(`
+      SELECT c.name as category_name, SUM(oi.item_total) as total_revenue, SUM(oi.quantity) as total_quantity
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      LEFT JOIN categories c ON mi.category_id = c.id
+      WHERE DATE(o.created_at, 'localtime') BETWEEN ? AND ? 
+        AND o.status != 'cancelled'
+      GROUP BY c.name
+      ORDER BY total_revenue DESC
+    `, [startDate, endDate]);
+
+    // 4. Add-on Statistics
+    // Fetch all order items with addons in the date range
+    const itemsWithAddons = this.execute(`
+      SELECT oi.addons, oi.quantity
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE DATE(o.created_at, 'localtime') BETWEEN ? AND ?
+        AND o.status != 'cancelled'
+        AND oi.addons IS NOT NULL 
+        AND oi.addons != ''
+        AND oi.addons != '[]'
+    `, [startDate, endDate]);
+
+    const addonStats = {};
+    let totalAddonRevenue = 0;
+
+    itemsWithAddons.forEach(row => {
+      try {
+        const addons = JSON.parse(row.addons);
+        if (Array.isArray(addons)) {
+          addons.forEach(addon => {
+            const name = addon.name;
+            const price = parseFloat(addon.price || 0);
+            const qty = row.quantity; // Addon quantity matches item quantity usually
+            
+            if (!addonStats[name]) {
+              addonStats[name] = { name, quantity: 0, revenue: 0 };
+            }
+            addonStats[name].quantity += qty;
+            addonStats[name].revenue += (price * qty);
+            totalAddonRevenue += (price * qty);
+          });
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    });
+
+    const topAddons = Object.values(addonStats)
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 10);
+
+    return {
+      sales: { ...sales[0], total_addon_revenue: totalAddonRevenue },
+      topItems,
+      categorySales,
+      topAddons
+    };
+  }
+
   // ===== Shift Management =====
   startShift(userId, startCash) {
     // Check if user already has an active shift

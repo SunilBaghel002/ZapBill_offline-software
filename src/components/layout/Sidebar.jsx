@@ -45,7 +45,7 @@ const Sidebar = () => {
   }, []);
 
   const allNavItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: true },
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
     { path: '/pos', icon: ShoppingCart, label: 'POS / Billing', adminOnly: false },
     { path: '/orders', icon: ClipboardList, label: 'Orders', badge: activeOrdersCount > 0 ? activeOrdersCount : null, adminOnly: false },
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu', adminOnly: true },
@@ -133,7 +133,7 @@ const Sidebar = () => {
         </div>
         <div className="sidebar-user-info">
           <span className="sidebar-user-name">{user?.fullName || user?.username || 'User'}</span>
-          <span className="sidebar-user-role">{user?.role || 'Staff'}</span>
+          <span className="sidebar-user-role">{user?.role || 'Staff'} ({user?.role})</span>
         </div>
         <button 
           className="sidebar-logout" 

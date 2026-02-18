@@ -274,7 +274,7 @@ const DashboardPage = () => {
         };
       };
 
-      if (user?.role === 'biller') {
+      if (user?.role === 'biller' || user?.role === 'cashier') {
         // --- BILLER VIEW ---
         // Fetch active shift or last closed shift for today
         const shiftStatus = await window.electronAPI.invoke('shifts:getStatus', { userId: user.id });

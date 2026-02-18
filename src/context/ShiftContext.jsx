@@ -35,8 +35,8 @@ export const ShiftProvider = ({ children }) => {
       const result = await window.electronAPI.invoke('shifts:getStatus', { userId: user.id });
       if (result.success) {
         setActiveShift(result.shift);
-        if (!result.shift && (user.role === 'biller' || user.role === 'admin')) {
-          // If no active shift and user is biller (or admin acting as biller), prompt to start
+        if (!result.shift && (user.role === 'biller' || user.role === 'cashier')) {
+          // If no active shift and user is biller/cashier, prompt to start
           setShowStartModal(true);
         }
       }

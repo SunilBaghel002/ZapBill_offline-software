@@ -737,6 +737,15 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('reports:custom', async (event, { startDate, endDate }) => {
+    try {
+      return db.getCustomReport(startDate, endDate);
+    } catch (error) {
+      log.error('Get custom report error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('reports:salesSummary', async (event, { from, to }) => {
     try {
       return db.getSalesSummary(from, to);

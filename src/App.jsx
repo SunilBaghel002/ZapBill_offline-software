@@ -27,7 +27,13 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     return <Navigate to="/login" replace />;
   }
   
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user?.role)) {
+  // Debug role check - Case insensitive
+  const normalizeRole = (r) => r?.toLowerCase() || '';
+  const userRole = normalizeRole(user?.role);
+  const normalizedAllowed = allowedRoles.map(normalizeRole);
+
+  if (allowedRoles.length > 0 && !normalizedAllowed.includes(userRole)) {
+    // console.log('Access denied. User role:', user?.role, 'Allowed:', allowedRoles);
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -99,7 +105,7 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="expenses" element={
-                <ProtectedRoute allowedRoles={['admin', 'biller']}>
+                <ProtectedRoute allowedRoles={['admin', 'biller', 'cashier']}>
                   <ExpensesPage />
                 </ProtectedRoute>
               } />

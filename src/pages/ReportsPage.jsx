@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   BarChart3, 
   TrendingUp, 
+  TrendingDown,
   ShoppingCart,
   DollarSign,
   Calendar,
@@ -148,9 +149,13 @@ const ReportsPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // Custom Range State
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+
   useEffect(() => {
     loadReport();
-  }, [selectedDate, reportType]);
+  }, [selectedDate, reportType, startDate, endDate]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -184,6 +189,11 @@ const ReportsPage = () => {
         const shiftResult = await window.electronAPI.invoke('shifts:getByDate', { date: dateStr });
         result = { shifts: shiftResult.shifts || [] };
         setDetailedData([]);
+      } else if (reportType === 'custom') {
+        const startStr = format(startDate, 'yyyy-MM-dd');
+        const endStr = format(endDate, 'yyyy-MM-dd');
+        result = await window.electronAPI.invoke('reports:custom', { startDate: startStr, endDate: endStr });
+        setDetailedData([]); // Detailed data not yet implemented for custom range list view
       }
       
       setData(result);
@@ -423,9 +433,9 @@ const ReportsPage = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <h1 className="text-xl font-bold text-gray-800">Reports</h1>
           
-          {/* View Selector (Daily/Weekly/Monthly/Shift) */}
+          {/* View Selector (Daily/Weekly/Monthly/Shift/Custom) */}
           <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '4px' }}>
-            {['daily', 'weekly', 'monthly', 'shift'].map(type => (
+            {['daily', 'weekly', 'monthly', 'shift', 'custom'].map(type => (
               <button
                 key={type}
                 onClick={() => setReportType(type)}
@@ -491,25 +501,47 @@ const ReportsPage = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
-          <div className="date-navigator" style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-md)', position: 'relative' }}>
-            <button onClick={() => navigateDate('prev')} className="icon-btn" style={{ padding: '8px' }}>
-              <ChevronLeft size={20} />
-            </button>
-            <div style={{ padding: '0 16px', fontWeight: 500, minWidth: '200px', textAlign: 'center', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>
-              <Calendar size={16} className="text-gray-400" />
-              <span>{FormatDateRange()}</span>
-              {/* Hidden Date Input for Calendar Picker */}
-              <input 
-                type="date" 
-                value={format(selectedDate, 'yyyy-MM-dd')} 
-                onChange={handleDateChange} 
-                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} 
-              />
+          {reportType === 'custom' ? (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'white', padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="date"
+                  value={format(startDate, 'yyyy-MM-dd')}
+                  onChange={(e) => setStartDate(new Date(e.target.value))}
+                  style={{ padding: '6px 8px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
+                />
+              </div>
+              <span style={{ color: '#64748b' }}>to</span>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="date"
+                  value={format(endDate, 'yyyy-MM-dd')}
+                  onChange={(e) => setEndDate(new Date(e.target.value))}
+                  style={{ padding: '6px 8px', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '13px' }}
+                />
+              </div>
             </div>
-            <button onClick={() => navigateDate('next')} className="icon-btn" style={{ padding: '8px' }}>
-              <ChevronRight size={20} />
-            </button>
-          </div>
+          ) : (
+            <div className="date-navigator" style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid var(--gray-300)', borderRadius: 'var(--radius-md)', position: 'relative' }}>
+              <button onClick={() => navigateDate('prev')} className="icon-btn" style={{ padding: '8px' }}>
+                <ChevronLeft size={20} />
+              </button>
+              <div style={{ padding: '0 16px', fontWeight: 500, minWidth: '200px', textAlign: 'center', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>
+                <Calendar size={16} className="text-gray-400" />
+                <span>{FormatDateRange()}</span>
+                {/* Hidden Date Input for Calendar Picker */}
+                <input 
+                  type="date" 
+                  value={format(selectedDate, 'yyyy-MM-dd')} 
+                  onChange={handleDateChange} 
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} 
+                />
+              </div>
+              <button onClick={() => navigateDate('next')} className="icon-btn" style={{ padding: '8px' }}>
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          )}
 
           <button className="btn btn-secondary" onClick={exportToExcel} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <Download size={18} />
@@ -860,6 +892,44 @@ const ReportsPage = () => {
                     </table>
                     </div>
                 </div>
+
+
+                {/* Add-on Statistics (Only for Custom Reports) */}
+                {(reportType === 'custom' && data?.topAddons?.length > 0) && (
+                    <div className="card" style={{ marginTop: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--spacing-4)' }}>
+                        <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <List size={20} className="text-secondary" />
+                        Add-on Statistics
+                        </h3>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#10b981' }}>
+                            Total Revenue: ₹{data.sales?.total_addon_revenue?.toLocaleString() || '0'}
+                        </div>
+                    </div>
+                    <div className="card-body" style={{ padding: 0 }}>
+                        <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                            <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--gray-200)' }}>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Add-on Name</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Quantity</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.topAddons.map((addon, index) => (
+                            <tr key={index} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                                <td style={{ padding: '12px 16px', fontWeight: 500, color: '#1e293b' }}>{addon.name}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>{addon.quantity}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
+                                ₹{addon.revenue?.toLocaleString()}
+                                </td>
+                            </tr>
+                            ))}
+                        </tbody>
+                        </table>
+                    </div>
+                    </div>
+                )}
                 </>
             )}
 
