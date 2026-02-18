@@ -1594,8 +1594,23 @@ class Database {
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 10);
 
+    // 5. Total Expenses
+    const expenses = this.execute(`
+      SELECT COALESCE(SUM(amount), 0) as total_expenses 
+      FROM expenses 
+      WHERE date BETWEEN ? AND ?
+    `, [startDate, endDate]);
+
+    const totalExpenses = expenses[0]?.total_expenses || 0;
+    const totalRevenue = sales[0]?.total_revenue || 0;
+
     return {
-      sales: { ...sales[0], total_addon_revenue: totalAddonRevenue },
+      sales: { 
+        ...sales[0], 
+        total_addon_revenue: totalAddonRevenue,
+        total_expenses: totalExpenses,
+        net_revenue: totalRevenue - totalExpenses
+      },
       topItems,
       categorySales,
       topAddons
