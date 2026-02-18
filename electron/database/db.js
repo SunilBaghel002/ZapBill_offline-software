@@ -1602,11 +1602,23 @@ class Database {
     `, [startDate, endDate]);
 
     const totalExpenses = expenses[0]?.total_expenses || 0;
-    const totalRevenue = sales[0]?.total_revenue || 0;
+    
+    // Ensure sales data exists
+    const salesData = sales[0] || {
+      total_orders: 0,
+      total_revenue: 0,
+      total_tax: 0,
+      total_discount: 0,
+      cash_amount: 0,
+      card_amount: 0,
+      upi_amount: 0
+    };
+
+    const totalRevenue = salesData.total_revenue || 0;
 
     return {
       sales: { 
-        ...sales[0], 
+        ...salesData, 
         total_addon_revenue: totalAddonRevenue,
         total_expenses: totalExpenses,
         net_revenue: totalRevenue - totalExpenses
@@ -2130,6 +2142,215 @@ class Database {
   deleteExpense(id) {
     this.delete('expenses', { id });
     return { success: true };
+  }
+
+  // ============ ADVANCED REPORTS ============
+
+  // --- SALES REPORTS ---
+  getItemWiseSales(startDate, endDate) {
+    return this.execute(`
+      SELECT 
+        mi.name as item_name,
+        c.name as category_name,
+        SUM(oi.quantity) as total_quantity,
+        SUM(oi.item_total) as total_revenue,
+        COUNT(DISTINCT oi.order_id) as orders_count
+      FROM order_items oi
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      LEFT JOIN categories c ON mi.category_id = c.id
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.is_deleted = 0 
+        AND o.status = 'completed'
+        AND date(o.created_at) BETWEEN date(?) AND date(?)
+      GROUP BY mi.name, c.name
+      ORDER BY total_revenue DESC
+    `, [startDate, endDate]);
+  }
+
+  getCategoryWiseSales(startDate, endDate) {
+    return this.execute(`
+      SELECT 
+        c.name as category_name,
+        COUNT(DISTINCT oi.order_id) as orders_count,
+        SUM(oi.quantity) as total_quantity,
+        SUM(oi.item_total) as total_revenue
+      FROM order_items oi
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      LEFT JOIN categories c ON mi.category_id = c.id
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.is_deleted = 0 
+        AND o.status = 'completed'
+        AND date(o.created_at) BETWEEN date(?) AND date(?)
+      GROUP BY c.name
+      ORDER BY total_revenue DESC
+    `, [startDate, endDate]);
+  }
+
+  getHourlySales(date) {
+    return this.execute(`
+      SELECT 
+        strftime('%H', created_at) as hour,
+        COUNT(*) as total_orders,
+        SUM(total_amount) as total_revenue
+      FROM orders
+      WHERE is_deleted = 0 
+        AND status = 'completed'
+        AND date(created_at) = date(?)
+      GROUP BY hour
+      ORDER BY hour ASC
+    `, [date]);
+  }
+
+  getCancelledOrders(startDate, endDate) {
+    return this.execute(`
+      SELECT 
+        o.order_number,
+        o.created_at,
+        o.updated_at as cancelled_at,
+        o.total_amount,
+        o.notes as reason,
+        u.username as cashier_name
+      FROM orders o
+      LEFT JOIN users u ON o.cashier_id = u.id
+      WHERE o.status = 'cancelled'
+        AND date(o.created_at) BETWEEN date(?) AND date(?)
+      ORDER BY o.updated_at DESC
+    `, [startDate, endDate]);
+  }
+
+  getDiscountReport(startDate, endDate) {
+    return this.execute(`
+      SELECT 
+        o.order_number,
+        o.created_at,
+        o.subtotal,
+        o.discount_amount,
+        o.discount_reason,
+        o.total_amount,
+        u.username as cashier_name
+      FROM orders o
+      LEFT JOIN users u ON o.cashier_id = u.id
+      WHERE o.is_deleted = 0 
+        AND o.status = 'completed'
+        AND o.discount_amount > 0
+        AND date(o.created_at) BETWEEN date(?) AND date(?)
+      ORDER BY o.created_at DESC
+    `, [startDate, endDate]);
+  }
+
+  getGSTReport(startDate, endDate) {
+    return this.execute(`
+      SELECT 
+        date(created_at) as date,
+        COUNT(*) as total_orders,
+        SUM(subtotal) as taxable_amount,
+        SUM(tax_amount) as total_tax,
+        SUM(total_amount) as total_amount
+      FROM orders
+      WHERE is_deleted = 0 
+        AND status = 'completed'
+        AND date(created_at) BETWEEN date(?) AND date(?)
+      GROUP BY date
+      ORDER BY date DESC
+    `, [startDate, endDate]);
+  }
+
+  // --- INVENTORY REPORTS ---
+  getStockLevelReport() {
+    return this.execute(`
+      SELECT 
+        name,
+        unit,
+        current_stock,
+        minimum_stock,
+        cost_per_unit,
+        supplier,
+        (current_stock * cost_per_unit) as stock_value,
+        CASE 
+          WHEN current_stock <= minimum_stock THEN 'Low Stock' 
+          ELSE 'In Stock' 
+        END as status
+      FROM inventory
+      WHERE is_deleted = 0
+      ORDER BY current_stock ASC
+    `);
+  }
+
+  getInventoryHistory(startDate, endDate) {
+    return this.execute(`
+      SELECT 
+        it.*,
+        i.name as item_name,
+        i.unit
+      FROM inventory_transactions it
+      JOIN inventory i ON it.inventory_id = i.id
+      WHERE it.is_deleted = 0
+        AND date(it.created_at) BETWEEN date(?) AND date(?)
+      ORDER BY it.created_at DESC
+    `, [startDate, endDate]);
+  }
+
+  // --- CRM REPORTS ---
+  getCustomerVisitFrequency(startDate, endDate) {
+    return this.execute(`
+      SELECT 
+        customer_phone,
+        customer_name,
+        COUNT(*) as visit_count,
+        SUM(total_amount) as total_spent,
+        MAX(created_at) as last_visit
+      FROM orders
+      WHERE is_deleted = 0 
+        AND status = 'completed'
+        AND customer_phone IS NOT NULL 
+        AND customer_phone != ''
+        AND date(created_at) BETWEEN date(?) AND date(?)
+      GROUP BY customer_phone
+      ORDER BY visit_count DESC
+    `, [startDate, endDate]);
+  }
+
+  getCustomerOrderHistory(phone) {
+    return this.execute(`
+      SELECT * 
+      FROM orders 
+      WHERE is_deleted = 0 
+        AND customer_phone = ?
+      ORDER BY created_at DESC
+    `, [phone]);
+  }
+
+  // --- STAFF REPORTS ---
+  getStaffPerformance(startDate, endDate) {
+    return this.execute(`
+      SELECT 
+        u.username as staff_name,
+        u.role,
+        COUNT(o.id) as orders_handled,
+        SUM(o.total_amount) as total_sales,
+        AVG(o.total_amount) as avg_order_value
+      FROM orders o
+      LEFT JOIN users u ON o.cashier_id = u.id
+      WHERE o.is_deleted = 0 
+        AND o.status = 'completed'
+        AND date(o.created_at) BETWEEN date(?) AND date(?)
+      GROUP BY u.id
+    `, [startDate, endDate]);
+  }
+
+  // --- PAYMENT REPORTS ---
+  getPaymentModeReport(startDate, endDate) {
+    return this.execute(`
+      SELECT 
+        payment_method,
+        COUNT(*) as count,
+        SUM(total_amount) as total_amount
+      FROM orders
+      WHERE is_deleted = 0 
+        AND status = 'completed'
+        AND date(created_at) BETWEEN date(?) AND date(?)
+      GROUP BY payment_method
+    `, [startDate, endDate]);
   }
 }
 

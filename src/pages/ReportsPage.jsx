@@ -1,4 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import SalesReports from './Reports/SalesReports';
+import InventoryReports from './Reports/InventoryReports';
+import CRMReports from './Reports/CRMReports';
+import StaffReports from './Reports/StaffReports';
+import PaymentReports from './Reports/PaymentReports';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -416,6 +422,16 @@ const ReportsPage = () => {
   const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#0ea5e9', '#14b8a6', '#f43f5e', '#a855f7'];
   const PAYMENT_COLORS = { Cash: '#10b981', Card: '#6366f1', UPI: '#f59e0b' };
 
+  // --- Sub-report Routing ---
+  const [searchParams] = useSearchParams();
+  const category = searchParams.get('category');
+
+  if (category === 'sales') return <SalesReports />;
+  if (category === 'inventory') return <InventoryReports />;
+  if (category === 'crm') return <CRMReports />;
+  if (category === 'staff') return <StaffReports />;
+  if (category === 'payment') return <PaymentReports />;
+
   return (
     <div style={{ padding: '20px', height: 'calc(100vh - 64px)', marginTop: '64px', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
       {/* Header */}
@@ -650,7 +666,7 @@ const ReportsPage = () => {
                 <div className="stat-card" style={{ background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)', color: 'white', boxShadow: '0 10px 40px rgba(16, 185, 129, 0.3)' }}>
                     <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)' }}><TrendingUp size={24} /></div>
                     <div>
-                    <div className="stat-value">₹{(sales.net_revenue || (sales.total_revenue - (sales.total_expenses || 0))).toLocaleString()}</div>
+                    <div className="stat-value">₹{(sales.net_revenue !== undefined ? sales.net_revenue : (sales.total_revenue - (sales.total_expenses || 0))).toLocaleString()}</div>
                     <div className="stat-label" style={{ color: 'rgba(255,255,255,0.8)' }}>Net Revenue</div>
                     </div>
                 </div>

@@ -19,11 +19,14 @@ import { useAuthStore } from '../../stores/authStore';
 import { useShift } from '../../context/ShiftContext';
 import ShiftModal from '../common/ShiftModal';
 
+// ... imports
+
 const Sidebar = () => {
   const { user, logout } = useAuthStore();
   const { endShift } = useShift();
   const navigate = useNavigate();
   const [showEndShiftModal, setShowEndShiftModal] = React.useState(false);
+  const [hoveredItem, setHoveredItem] = React.useState(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -51,7 +54,19 @@ const Sidebar = () => {
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu', adminOnly: true },
     { path: '/kot', icon: ChefHat, label: 'Kitchen (KOT)', adminOnly: false },
     { path: '/inventory', icon: Package, label: 'Inventory', adminOnly: true },
-    { path: '/reports', icon: BarChart3, label: 'Reports', adminOnly: true },
+    { 
+      path: '/reports', 
+      icon: BarChart3, 
+      label: 'Reports', 
+      adminOnly: true,
+      children: [
+        { path: '/reports?category=sales', label: 'Sales Reports' },
+        { path: '/reports?category=inventory', label: 'Inventory Reports' },
+        { path: '/reports?category=crm', label: 'CRM Reports' },
+        { path: '/reports?category=staff', label: 'Staff Reports' },
+        { path: '/reports?category=payment', label: 'Payment Reports' },
+      ]
+    },
     { path: '/expenses', icon: Wallet, label: 'Expenses', adminOnly: false },
     { path: '/users', icon: Users, label: 'Users', adminOnly: true },
     { path: '/settings', icon: Settings, label: 'Settings', adminOnly: true },
@@ -87,19 +102,63 @@ const Sidebar = () => {
       {/* Navigation */}
       <nav className="sidebar-nav">
         {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) => 
-              `sidebar-nav-item ${isActive ? 'active' : ''}`
-            }
+          <div 
+            key={item.path} 
+            style={{ position: 'relative' }}
+            onMouseEnter={() => item.children && setHoveredItem(item.path)}
+            onMouseLeave={() => item.children && setHoveredItem(null)}
           >
-            <item.icon size={22} className="sidebar-nav-icon" />
-            <span className="sidebar-nav-label">{item.label}</span>
-            {item.badge && (
-              <span className="sidebar-badge">{item.badge}</span>
+            <NavLink
+              to={item.path}
+              className={({ isActive }) => 
+                `sidebar-nav-item ${isActive || (item.children && location.pathname.startsWith(item.path)) ? 'active' : ''}`
+              }
+            >
+              <item.icon size={22} className="sidebar-nav-icon" />
+              <span className="sidebar-nav-label">{item.label}</span>
+              {item.badge && (
+                <span className="sidebar-badge">{item.badge}</span>
+              )}
+            </NavLink>
+            
+            {/* Dropdown Menu */}
+            {item.children && hoveredItem === item.path && (
+              <div style={{
+                position: 'absolute',
+                left: '100%',
+                top: 0,
+                background: 'white',
+                minWidth: '200px',
+                boxShadow: '4px 0 10px rgba(0,0,0,0.1)',
+                borderRadius: '0 8px 8px 0',
+                zIndex: 100,
+                padding: '8px 0',
+                border: '1px solid #eee'
+              }}>
+                {item.children.map((child) => (
+                  <NavLink
+                    key={child.path}
+                    to={child.path}
+                    className={({ isActive }) => 
+                      `sidebar-subnav-item ${isActive ? 'active' : ''}`
+                    }
+                    style={{
+                      display: 'block',
+                      padding: '10px 20px',
+                      textDecoration: 'none',
+                      color: '#4b5563',
+                      fontSize: '14px',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                    onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {child.label}
+                  </NavLink>
+                ))}
+              </div>
             )}
-          </NavLink>
+          </div>
         ))}
 
         {/* End Shift Button for Billers */}

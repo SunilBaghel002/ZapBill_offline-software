@@ -773,6 +773,61 @@ function setupIpcHandlers() {
     }
   });
 
+  // --- Advanced Reports IPC ---
+  
+  // Sales
+  ipcMain.handle('reports:itemWiseSales', async (event, { startDate, endDate }) => {
+    try { return db.getItemWiseSales(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
+  ipcMain.handle('reports:categoryWiseSales', async (event, { startDate, endDate }) => {
+    try { return db.getCategoryWiseSales(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
+  ipcMain.handle('reports:hourlySales', async (event, { date }) => {
+    try { return db.getHourlySales(date); } catch (e) { log.error(e); return []; }
+  });
+
+  ipcMain.handle('reports:cancelledOrders', async (event, { startDate, endDate }) => {
+    try { return db.getCancelledOrders(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
+  ipcMain.handle('reports:discounts', async (event, { startDate, endDate }) => {
+    try { return db.getDiscountReport(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
+  ipcMain.handle('reports:gst', async (event, { startDate, endDate }) => {
+    try { return db.getGSTReport(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
+  // Inventory
+  ipcMain.handle('reports:stockLevel', async () => {
+    try { return db.getStockLevelReport(); } catch (e) { log.error(e); return []; }
+  });
+
+  ipcMain.handle('reports:inventoryHistory', async (event, { startDate, endDate }) => {
+    try { return db.getInventoryHistory(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
+  // CRM
+  ipcMain.handle('reports:customerVisitFrequency', async (event, { startDate, endDate }) => {
+    try { return db.getCustomerVisitFrequency(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
+  ipcMain.handle('reports:customerOrderHistory', async (event, { phone }) => {
+    try { return db.getCustomerOrderHistory(phone); } catch (e) { log.error(e); return []; }
+  });
+
+  // Staff
+  ipcMain.handle('reports:staffPerformance', async (event, { startDate, endDate }) => {
+    try { return db.getStaffPerformance(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
+  // Payment
+  ipcMain.handle('reports:paymentMode', async (event, { startDate, endDate }) => {
+    try { return db.getPaymentModeReport(startDate, endDate); } catch (e) { log.error(e); return []; }
+  });
+
   // ============ USER MANAGEMENT ============
   ipcMain.handle('users:getAll', async () => {
     try {
