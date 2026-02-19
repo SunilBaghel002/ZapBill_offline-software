@@ -118,6 +118,9 @@ async function initializeServices() {
   db = new Database();
   await db.initialize();
   
+  // Ensure printing tables exist (migration for existing databases)
+  try { db.ensurePrintingTables(); } catch (e) { log.warn('ensurePrintingTables:', e.message); }
+  
   // Initialize services (fully offline - no sync)
   authService = new AuthService(db);
   printerService = new PrinterService();
@@ -874,7 +877,16 @@ function setupIpcHandlers() {
         restaurantAddress: settings.restaurant_address,
         restaurantPhone: settings.restaurant_phone,
         gstNumber: settings.gst_number,
-        receiptFooter: settings.receipt_footer
+        receiptFooter: settings.receipt_footer,
+        fssaiNumber: settings.bill_fssai_number,
+        showLogo: settings.bill_show_logo === 'true',
+        logoPath: settings.bill_logo_path,
+        showQR: settings.bill_show_qr === 'true',
+        qrUpiId: settings.bill_qr_upi_id,
+        showItemwiseTax: settings.bill_show_itemwise_tax === 'true',
+        showCustomerDetails: settings.bill_show_customer_details !== 'false',
+        paperWidth: settings.bill_paper_width || '80',
+        currencySymbol: settings.currency_symbol || '₹'
       };
       
       return await printerService.printReceipt(enrichedOrder, settings.printer_bill);
@@ -914,6 +926,128 @@ function setupIpcHandlers() {
     } catch (error) {
       log.error('Get printers error:', error);
       return [];
+    }
+  });
+
+  // ============ PRINTER STATIONS & KOT ============
+  ipcMain.handle('printer:getStations', async () => {
+    try { return db.getPrinterStations(); }
+    catch (e) { log.error('Get printer stations error:', e); return []; }
+  });
+
+  ipcMain.handle('printer:saveStation', async (event, { station }) => {
+    try { return db.savePrinterStation(station); }
+    catch (e) { log.error('Save printer station error:', e); return { success: false, error: e.message }; }
+  });
+
+  ipcMain.handle('printer:deleteStation', async (event, { id }) => {
+    try { return db.deletePrinterStation(id); }
+    catch (e) { log.error('Delete printer station error:', e); return { success: false, error: e.message }; }
+  });
+
+  ipcMain.handle('printer:getCategoryMap', async () => {
+    try { return db.getCategoryStationMap(); }
+    catch (e) { log.error('Get category map error:', e); return []; }
+  });
+
+  ipcMain.handle('printer:saveCategoryMap', async (event, { categoryId, stationIds }) => {
+    try { return db.saveCategoryStationMap(categoryId, stationIds); }
+    catch (e) { log.error('Save category map error:', e); return { success: false, error: e.message }; }
+  });
+
+  ipcMain.handle('kot:log', async (event, data) => {
+    try { return db.logKOT(data); }
+    catch (e) { log.error('Log KOT error:', e); return { success: false, error: e.message }; }
+  });
+
+  ipcMain.handle('kot:getLogs', async (event, { orderId }) => {
+    try { return db.getKOTLogs(orderId); }
+    catch (e) { log.error('Get KOT logs error:', e); return []; }
+  });
+
+  // Station-wise KOT printing: routes items to correct kitchen station printers
+  ipcMain.handle('print:kotStation', async (event, { order, items, stationId, kotNumber }) => {
+    try {
+      // Get station printer name
+      const stations = db.getPrinterStations();
+      const station = stations.find(s => s.id === stationId);
+      const printerName = station ? station.printer_name : db.getSetting('printer_kot');
+      return await printerService.printKOT(order, items, printerName, kotNumber, station?.station_name);
+    } catch (e) {
+      log.error('Print KOT station error:', e);
+      return { success: false, error: e.message };
+    }
+  });
+
+  // Void KOT
+  ipcMain.handle('print:voidKOT', async (event, { order, items, reason, kotNumber }) => {
+    try {
+      const printerName = db.getSetting('printer_kot');
+      return await printerService.printVoidKOT(order, items, reason, printerName, kotNumber);
+    } catch (e) {
+      log.error('Print void KOT error:', e);
+      return { success: false, error: e.message };
+    }
+  });
+
+  // Reprint receipt (marks as REPRINT)
+  ipcMain.handle('print:reprint', async (event, { order, type }) => {
+    try {
+      const settingsRows = db.execute('SELECT * FROM settings');
+      const settings = {};
+      settingsRows.forEach(row => { settings[row.key] = row.value; });
+      
+      const enrichedOrder = {
+        ...order,
+        restaurantName: settings.restaurant_name,
+        restaurantAddress: settings.restaurant_address,
+        restaurantPhone: settings.restaurant_phone,
+        gstNumber: settings.gst_number,
+        receiptFooter: settings.receipt_footer,
+        fssaiNumber: settings.bill_fssai_number,
+        showLogo: settings.bill_show_logo === 'true',
+        logoPath: settings.bill_logo_path,
+        showQR: settings.bill_show_qr === 'true',
+        qrUpiId: settings.bill_qr_upi_id,
+        showItemwiseTax: settings.bill_show_itemwise_tax === 'true',
+        showCustomerDetails: settings.bill_show_customer_details === 'true',
+        paperWidth: settings.bill_paper_width || '80',
+        isReprint: true
+      };
+      
+      const printerName = type === 'kot' ? settings.printer_kot : settings.printer_bill;
+      
+      if (type === 'kot') {
+        return await printerService.printKOT(enrichedOrder, order.items || [], printerName, null, null, true);
+      } else {
+        return await printerService.printReceipt(enrichedOrder, printerName);
+      }
+    } catch (e) {
+      log.error('Reprint error:', e);
+      return { success: false, error: e.message };
+    }
+  });
+
+  // Logo file picker for bill customization
+  ipcMain.handle('print:selectLogo', async () => {
+    try {
+      const { dialog } = require('electron');
+      const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'bmp'] }]
+      });
+      if (result.canceled || !result.filePaths.length) return { cancelled: true };
+      
+      // Read file and convert to base64
+      const fs = require('fs');
+      const filePath = result.filePaths[0];
+      const buffer = fs.readFileSync(filePath);
+      const ext = require('path').extname(filePath).slice(1).toLowerCase();
+      const base64 = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${buffer.toString('base64')}`;
+      return { success: true, base64, filePath };
+    } catch (e) {
+      log.error('Select logo error:', e);
+      return { success: false, error: e.message };
     }
   });
 

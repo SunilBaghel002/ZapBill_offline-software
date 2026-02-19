@@ -254,9 +254,42 @@ VALUES
     ('item_007', 'cat_004', 'Gulab Jamun', 'Sweet milk dumplings', 100.00, 5, 1, 1, 1),
     ('item_008', 'cat_004', 'Ice Cream', 'Vanilla ice cream', 80.00, 5, 1, 1, 2);
 
+-- Printer Stations (station-wise KOT routing)
+CREATE TABLE IF NOT EXISTS printer_stations (
+    id TEXT PRIMARY KEY,
+    station_name TEXT NOT NULL,
+    printer_name TEXT NOT NULL,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Category-to-Station mapping (many-to-many)
+CREATE TABLE IF NOT EXISTS category_station_map (
+    category_id TEXT REFERENCES categories(id),
+    station_id TEXT REFERENCES printer_stations(id),
+    PRIMARY KEY (category_id, station_id)
+);
+
+-- KOT Log (track every KOT printed — supports reprint, void, numbering)
+CREATE TABLE IF NOT EXISTS kot_logs (
+    id TEXT PRIMARY KEY,
+    kot_number INTEGER NOT NULL,
+    order_id TEXT REFERENCES orders(id),
+    station_id TEXT,
+    type TEXT CHECK(type IN ('new', 'reprint', 'void', 'update')) DEFAULT 'new',
+    items TEXT NOT NULL,
+    printed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    printed_by TEXT REFERENCES users(id),
+    notes TEXT
+);
+
 -- Initialize order sequence
 INSERT OR IGNORE INTO sequences (sequence_name, current_value, date)
 VALUES ('order_number', 0, date('now'));
+
+-- Initialize KOT sequence
+INSERT OR IGNORE INTO sequences (sequence_name, current_value, date)
+VALUES ('kot_number', 0, date('now'));
 
 -- Default settings
 INSERT OR IGNORE INTO settings (key, value)
@@ -273,7 +306,19 @@ VALUES
     ('receipt_footer', 'Thank you for dining with us!'),
     ('cloud_api_url', ''),
     ('sync_enabled', 'true'),
-    ('sync_interval', '30000');
+    ('sync_interval', '30000'),
+    ('bill_show_logo', 'false'),
+    ('bill_logo_path', ''),
+    ('bill_show_qr', 'false'),
+    ('bill_qr_upi_id', ''),
+    ('bill_show_itemwise_tax', 'false'),
+    ('bill_show_customer_details', 'true'),
+    ('bill_paper_width', '80'),
+    ('bill_fssai_number', ''),
+    ('auto_print_kot', 'true'),
+    ('auto_print_bill', 'false'),
+    ('printer_bill', ''),
+    ('printer_kot', '');
 
 -- Seed Global Addons
 INSERT OR IGNORE INTO addons (id, name, price, type, is_available) VALUES 

@@ -1429,7 +1429,8 @@ class Database {
       JOIN orders o ON oi.order_id = o.id
       LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
       LEFT JOIN categories c ON mi.category_id = c.id
-      WHERE DATE(o.created_at) = ? AND o.status != 'cancelled'
+      WHERE DATE(o.created_at, 'localtime') = ? AND o.status != 'cancelled'
+        AND o.is_deleted = 0 AND oi.is_deleted = 0
       GROUP BY c.name
       ORDER BY total_revenue DESC
     `, [date]);
@@ -2391,6 +2392,202 @@ class Database {
         AND date(created_at, 'localtime') BETWEEN date(?) AND date(?)
       GROUP BY payment_method
     `, [startDate, endDate]);
+  }
+
+  // ─── Settings Helper ────────────────────────────────
+  getSetting(key) {
+    const rows = this.execute(`SELECT value FROM settings WHERE key = ?`, [key]);
+    return rows.length > 0 ? rows[0].value : null;
+  }
+
+  // ============ PRINTING SYSTEM ============
+
+  // KOT Number Sequencing (daily reset, same pattern as order numbers)
+  getNextKOTNumber() {
+    const today = new Date().toLocaleDateString('en-CA');
+    
+    const results = this.execute(
+      `SELECT current_value, date FROM sequences WHERE sequence_name = 'kot_number'`
+    );
+    
+    if (results.length > 0) {
+      if (results[0].date !== today) {
+        // New day — reset
+        this.run(
+          `UPDATE sequences SET current_value = 1, date = ? WHERE sequence_name = 'kot_number'`,
+          [today]
+        );
+        return 1;
+      } else {
+        const nextValue = results[0].current_value + 1;
+        this.run(
+          `UPDATE sequences SET current_value = ? WHERE sequence_name = 'kot_number'`,
+          [nextValue]
+        );
+        return nextValue;
+      }
+    } else {
+      this.run(
+        `INSERT OR REPLACE INTO sequences (sequence_name, current_value, date) VALUES ('kot_number', 1, ?)`,
+        [today]
+      );
+      return 1;
+    }
+  }
+
+  // Log a KOT print event
+  logKOT({ orderId, stationId, type, items, printedBy, notes }) {
+    const id = uuidv4();
+    const kotNumber = this.getNextKOTNumber();
+    
+    this.insert('kot_logs', {
+      id,
+      kot_number: kotNumber,
+      order_id: orderId || null,
+      station_id: stationId || null,
+      type: type || 'new',
+      items: typeof items === 'string' ? items : JSON.stringify(items),
+      printed_at: new Date().toISOString(),
+      printed_by: printedBy || null,
+      notes: notes || null
+    });
+
+    return { id, kotNumber };
+  }
+
+  // Get all KOT logs for an order (for reprint support)
+  getKOTLogs(orderId) {
+    return this.execute(`
+      SELECT kl.*, ps.station_name, ps.printer_name as station_printer
+      FROM kot_logs kl
+      LEFT JOIN printer_stations ps ON kl.station_id = ps.id
+      WHERE kl.order_id = ?
+      ORDER BY kl.printed_at DESC
+    `, [orderId]);
+  }
+
+  // --- Printer Station CRUD ---
+  getPrinterStations() {
+    return this.execute(`SELECT * FROM printer_stations WHERE is_active = 1 ORDER BY station_name`);
+  }
+
+  savePrinterStation(station) {
+    if (station.id) {
+      // Update existing
+      this.run(`
+        UPDATE printer_stations SET station_name = ?, printer_name = ?, is_active = ?
+        WHERE id = ?
+      `, [station.station_name, station.printer_name, station.is_active ?? 1, station.id]);
+      return { id: station.id };
+    } else {
+      // Create new
+      const id = uuidv4();
+      this.insert('printer_stations', {
+        id,
+        station_name: station.station_name,
+        printer_name: station.printer_name,
+        is_active: 1,
+        created_at: new Date().toISOString()
+      });
+      return { id };
+    }
+  }
+
+  deletePrinterStation(id) {
+    // Remove associated mappings first
+    this.run(`DELETE FROM category_station_map WHERE station_id = ?`, [id]);
+    this.run(`DELETE FROM printer_stations WHERE id = ?`, [id]);
+    return { success: true };
+  }
+
+  // --- Category → Station Mapping ---
+  getCategoryStationMap() {
+    return this.execute(`
+      SELECT csm.category_id, csm.station_id, c.name as category_name, ps.station_name
+      FROM category_station_map csm
+      JOIN categories c ON csm.category_id = c.id
+      JOIN printer_stations ps ON csm.station_id = ps.id
+      WHERE ps.is_active = 1
+    `);
+  }
+
+  saveCategoryStationMap(categoryId, stationIds) {
+    // Clear existing mappings for this category
+    this.run(`DELETE FROM category_station_map WHERE category_id = ?`, [categoryId]);
+    
+    // Insert new mappings
+    for (const stationId of stationIds) {
+      this.run(`INSERT INTO category_station_map (category_id, station_id) VALUES (?, ?)`,
+        [categoryId, stationId]);
+    }
+    return { success: true };
+  }
+
+  // Given category IDs, return grouped station info with items
+  getStationsForCategories(categoryIds) {
+    if (!categoryIds || categoryIds.length === 0) return [];
+    
+    const placeholders = categoryIds.map(() => '?').join(',');
+    return this.execute(`
+      SELECT DISTINCT ps.id as station_id, ps.station_name, ps.printer_name,
+             csm.category_id
+      FROM category_station_map csm
+      JOIN printer_stations ps ON csm.station_id = ps.id
+      WHERE csm.category_id IN (${placeholders})
+        AND ps.is_active = 1
+    `, categoryIds);
+  }
+
+  // Ensure new tables exist (called during init for migration of existing databases)
+  ensurePrintingTables() {
+    this.run(`CREATE TABLE IF NOT EXISTS printer_stations (
+      id TEXT PRIMARY KEY,
+      station_name TEXT NOT NULL,
+      printer_name TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    this.run(`CREATE TABLE IF NOT EXISTS category_station_map (
+      category_id TEXT REFERENCES categories(id),
+      station_id TEXT REFERENCES printer_stations(id),
+      PRIMARY KEY (category_id, station_id)
+    )`);
+
+    this.run(`CREATE TABLE IF NOT EXISTS kot_logs (
+      id TEXT PRIMARY KEY,
+      kot_number INTEGER NOT NULL,
+      order_id TEXT REFERENCES orders(id),
+      station_id TEXT,
+      type TEXT CHECK(type IN ('new', 'reprint', 'void', 'update')) DEFAULT 'new',
+      items TEXT NOT NULL,
+      printed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      printed_by TEXT REFERENCES users(id),
+      notes TEXT
+    )`);
+
+    // Ensure KOT sequence exists
+    this.run(`INSERT OR IGNORE INTO sequences (sequence_name, current_value, date) VALUES ('kot_number', 0, date('now'))`);
+
+    // Ensure new default settings
+    const defaultSettings = [
+      ['bill_show_logo', 'false'],
+      ['bill_logo_path', ''],
+      ['bill_show_qr', 'false'],
+      ['bill_qr_upi_id', ''],
+      ['bill_show_itemwise_tax', 'false'],
+      ['bill_show_customer_details', 'true'],
+      ['bill_paper_width', '80'],
+      ['bill_fssai_number', ''],
+      ['auto_print_kot', 'true'],
+      ['auto_print_bill', 'false'],
+      ['printer_bill', ''],
+      ['printer_kot', '']
+    ];
+    
+    for (const [key, value] of defaultSettings) {
+      this.run(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, [key, value]);
+    }
   }
 }
 

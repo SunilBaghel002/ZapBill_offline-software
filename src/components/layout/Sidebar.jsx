@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -9,9 +9,9 @@ import {
   BarChart3,
   Users,
   Settings,
+  Printer,
   LogOut,
   ChefHat,
-  // ChefHat,
   RefreshCw,
   Wallet
 } from 'lucide-react';
@@ -19,14 +19,11 @@ import { useAuthStore } from '../../stores/authStore';
 import { useShift } from '../../context/ShiftContext';
 import ShiftModal from '../common/ShiftModal';
 
-// ... imports
-
-// ... imports
-
 const Sidebar = () => {
   const { user, logout } = useAuthStore();
   const { endShift } = useShift();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showEndShiftModal, setShowEndShiftModal] = React.useState(false);
   // Changed from hover to toggle
   const [expandedMenu, setExpandedMenu] = React.useState(null);
@@ -59,6 +56,7 @@ const Sidebar = () => {
     },
     { path: '/expenses', icon: Wallet, label: 'Expenses', adminOnly: false },
     { path: '/users', icon: Users, label: 'Users', adminOnly: true },
+    { path: '/printers', icon: Printer, label: 'Printers', adminOnly: true },
     { path: '/settings', icon: Settings, label: 'Settings', adminOnly: true },
   ];
 
@@ -76,10 +74,7 @@ const Sidebar = () => {
     navigate('/login');
   };
 
-  const toggleMenu = (path, e) => {
-    e.preventDefault();
-    setExpandedMenu(expandedMenu === path ? null : path);
-  };
+
 
   return (
     <aside className="sidebar">
@@ -100,21 +95,22 @@ const Sidebar = () => {
            if (item.children) {
              const isExpanded = expandedMenu === item.path;
              const isActive = location.pathname.startsWith(item.path);
-             
-             return (
-               <div key={item.path}>
-                 <div 
-                   className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
-                   onClick={(e) => toggleMenu(item.path, e)}
-                   style={{ cursor: 'pointer', justifyContent: 'space-between' }}
-                 >
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                     <item.icon size={22} className="sidebar-nav-icon" />
-                     <span className="sidebar-nav-label">{item.label}</span>
-                   </div>
-                   <span style={{ fontSize: '10px', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
-                 </div>
-                 
+
+              return (
+                <div key={item.path}>
+                  <NavLink
+                    to={item.path}
+                    className={({ isActive }) => `sidebar-nav-item ${isActive ? 'active' : ''}`}
+                    onClick={() => setExpandedMenu(expandedMenu === item.path ? null : item.path)}
+                    style={{ cursor: 'pointer', justifyContent: 'space-between', textDecoration: 'none' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <item.icon size={22} className="sidebar-nav-icon" />
+                      <span className="sidebar-nav-label">{item.label}</span>
+                    </div>
+                    <span style={{ fontSize: '10px', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+                  </NavLink>
+
                  {isExpanded && (
                    <div style={{ background: 'rgba(0,0,0,0.03)', paddingBottom: '4px' }}>
                      {item.children.map((child) => (

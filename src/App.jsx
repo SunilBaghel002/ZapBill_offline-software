@@ -14,6 +14,7 @@ import ReportsPage from './pages/ReportsPage';
 // import UsersPage from './pages/UsersPage';
 import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
+import PrintersPage from './pages/PrintersPage';
 import ExpensesPage from './pages/ExpensesPage';
 
 // Components
@@ -97,6 +98,11 @@ function App() {
               <Route path="users" element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <UsersPage />
+                </ProtectedRoute>
+              } />
+              <Route path="printers" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <PrintersPage />
                 </ProtectedRoute>
               } />
               <Route path="settings" element={

@@ -86,6 +86,18 @@ const validInvokeChannels = [
   'print:kot',
   'print:testPrint',
   'print:getPrinters',
+  'print:kotStation',
+  'print:voidKOT',
+  'print:reprint',
+  'print:selectLogo',
+  // Printer Stations & KOT
+  'printer:getStations',
+  'printer:saveStation',
+  'printer:deleteStation',
+  'printer:getCategoryMap',
+  'printer:saveCategoryMap',
+  'kot:log',
+  'kot:getLogs',
   // Settings
   'settings:getAll',
   'settings:get',

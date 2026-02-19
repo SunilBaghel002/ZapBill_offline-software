@@ -11,7 +11,7 @@ import {
 
 const SettingsPage = () => {
   const [settings, setSettings] = useState({});
-  const [printers, setPrinters] = useState([]);
+  const [printers, setPrinters] = useState([]); // Keep printers for now if needed, or remove?
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -69,18 +69,7 @@ const SettingsPage = () => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleTestPrint = async (printerName) => {
-    try {
-      const result = await window.electronAPI.invoke('print:testPrint', { printerName });
-      if (result.success) {
-        alert('Test print sent successfully!');
-      } else {
-        alert('Print failed: ' + (result.error || 'Unknown error'));
-      }
-    } catch (error) {
-      alert('Print failed: ' + error.message);
-    }
-  };
+
 
   const handleImport = async (e, type) => {
     const file = e.target.files[0];
@@ -263,95 +252,6 @@ const SettingsPage = () => {
           </div>
         </div>
 
-        {/* Printer Settings */}
-        <div className="card">
-          <div className="card-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
-              <Printer size={20} />
-              <h3>Printer Configuration</h3>
-            </div>
-          </div>
-          <div className="card-body">
-            <div className="alert alert-info" style={{ marginBottom: 'var(--spacing-4)' }}>
-              <p>Select different printers for Customer Bills and Kitchen Orders (KOT). If using the same printer, select it in both fields.</p>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--spacing-6)' }}>
-              {/* Bill Printer */}
-              <div style={{ padding: 'var(--spacing-4)', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
-                <h4 style={{ marginBottom: 'var(--spacing-3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Printer size={16} /> Customer Bill Printer
-                </h4>
-                <div className="input-group">
-                  <label className="input-label">Select Printer</label>
-                  <select
-                    className="input select"
-                    value={settings.printer_bill || ''}
-                    onChange={(e) => updateSetting('printer_bill', e.target.value)}
-                  >
-                    <option value="">-- Select Printer --</option>
-                    {printers.map(p => (
-                      <option key={p.name} value={p.name}>
-                        {p.name} {p.isDefault ? '(Default)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ marginTop: 'var(--spacing-2)' }}>
-                  <button 
-                    className="btn btn-sm btn-secondary"
-                    onClick={() => handleTestPrint(settings.printer_bill)}
-                    disabled={!settings.printer_bill}
-                  >
-                    Test Bill Print
-                  </button>
-                </div>
-              </div>
-
-              {/* KOT Printer */}
-              <div style={{ padding: 'var(--spacing-4)', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
-                <h4 style={{ marginBottom: 'var(--spacing-3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Store size={16} /> Kitchen (KOT) Printer
-                </h4>
-                <div className="input-group">
-                  <label className="input-label">Select Printer</label>
-                  <select
-                    className="input select"
-                    value={settings.printer_kot || ''}
-                    onChange={(e) => updateSetting('printer_kot', e.target.value)}
-                  >
-                    <option value="">-- Select Printer --</option>
-                    {printers.map(p => (
-                      <option key={p.name} value={p.name}>
-                        {p.name} {p.isDefault ? '(Default)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ marginTop: 'var(--spacing-2)' }}>
-                  <button 
-                    className="btn btn-sm btn-secondary"
-                    onClick={() => handleTestPrint(settings.printer_kot)}
-                    disabled={!settings.printer_kot}
-                  >
-                    Test KOT Print
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="input-group" style={{ marginTop: 'var(--spacing-4)' }}>
-              <label className="input-label">Receipt Footer Message</label>
-              <input
-                type="text"
-                className="input"
-                value={settings.receipt_footer || ''}
-                onChange={(e) => updateSetting('receipt_footer', e.target.value)}
-                placeholder="Thank you for dining with us!"
-              />
-            </div>
-          </div>
-        </div>
 
         {/* Data Management */}
         <div className="card">
