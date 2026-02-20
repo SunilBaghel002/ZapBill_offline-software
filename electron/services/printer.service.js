@@ -464,16 +464,83 @@ class PrinterService {
     `;
   }
 
+  // ─── Mini-Bill HTML (condensed bill summary for KOT attachment) ──
+  generateMiniBillHtml(order, allItems) {
+    const currencySymbol = order.currencySymbol || '₹';
+    
+    const itemsHtml = (allItems || []).map(item => {
+      const price = parseFloat(item.price || 0) * parseInt(item.quantity || 1);
+      return `
+        <div style="display:flex; justify-content:space-between; font-size:11px; padding:1px 0;">
+          <span>${item.quantity} × ${item.item_name}</span>
+          <span>${currencySymbol}${price.toFixed(2)}</span>
+        </div>`;
+    }).join('');
+
+    return `
+      <div style="border-top:2px dashed #000; margin-top:8px; padding-top:6px;">
+        <div style="text-align:center; font-size:10px; font-weight:bold; letter-spacing:1px; margin-bottom:4px;">
+          ✂ - - - - - - TEAR HERE - - - - - - ✂
+        </div>
+        <div style="text-align:center; font-size:13px; font-weight:bold; margin-bottom:4px;">
+          ${order.restaurantName || 'BILL SUMMARY'}
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:2px;">
+          <span>Order #: <strong>${order.order_number || 'N/A'}</strong></span>
+          <span>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+        </div>
+        ${order.table_number ? `<div style="font-size:11px; margin-bottom:2px;">Table: <strong>${order.table_number}</strong></div>` : ''}
+        ${order.customer_name ? `<div style="font-size:11px; margin-bottom:2px;">Customer: ${order.customer_name}</div>` : ''}
+        
+        <div style="border-top:1px solid #000; margin:4px 0;"></div>
+        ${itemsHtml}
+        <div style="border-top:1px solid #000; margin:4px 0;"></div>
+        
+        ${order.subtotal ? `
+        <div style="display:flex; justify-content:space-between; font-size:11px;">
+          <span>Subtotal</span><span>${currencySymbol}${parseFloat(order.subtotal).toFixed(2)}</span>
+        </div>` : ''}
+        ${order.tax_amount ? `
+        <div style="display:flex; justify-content:space-between; font-size:11px;">
+          <span>Tax</span><span>${currencySymbol}${parseFloat(order.tax_amount).toFixed(2)}</span>
+        </div>` : ''}
+        ${order.discount_amount ? `
+        <div style="display:flex; justify-content:space-between; font-size:11px;">
+          <span>Discount</span><span>-${currencySymbol}${parseFloat(order.discount_amount).toFixed(2)}</span>
+        </div>` : ''}
+        <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold; border-top:1px solid #000; padding-top:3px; margin-top:3px;">
+          <span>TOTAL</span><span>${currencySymbol}${parseFloat(order.total || order.grand_total || 0).toFixed(2)}</span>
+        </div>
+        
+        <div style="text-align:center; font-size:9px; margin-top:6px; color:#555;">--- Bill Copy (Kitchen Ref) ---</div>
+      </div>
+    `;
+  }
+
+  // ─── Print KOT with attached mini-bill ────────────────────
+  async printKOTWithBill(order, kotItems, allItems, printerName, stationName = null) {
+    try {
+      const kotHtml = this.generateKOTHtml(order, kotItems, null, stationName);
+      const miniBillHtml = this.generateMiniBillHtml(order, allItems);
+      const combinedHtml = kotHtml + miniBillHtml;
+      return await this.printHtml(combinedHtml, printerName, '80');
+    } catch (error) {
+      log.error('Print KOT with bill error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // ─── Station-Wise KOT Routing ─────────────────────────────
   /**
    * Routes items to correct station printers based on category-station mapping.
-   * @param {Object} order - The order object
+   * @param {Object} order - The order object (enriched with restaurant info for mini-bill)
    * @param {Array} items - Array of order items with category_id
    * @param {Array} stationMap - Array of {category_id, station_id, station_name, printer_name}
    * @param {string} defaultPrinterName - Fallback KOT printer for unmapped categories
+   * @param {boolean} attachBill - Whether to attach a mini-bill to each KOT
    * @returns {Promise} - Results of all station prints
    */
-  async printStationKOTs(order, items, stationMap, defaultPrinterName) {
+  async printStationKOTs(order, items, stationMap, defaultPrinterName, attachBill = false) {
     // Group items by station
     const stationGroups = {};
     const unmappedItems = [];
@@ -500,18 +567,32 @@ class PrinterService {
     const printJobs = [];
 
     for (const [, group] of Object.entries(stationGroups)) {
-      printJobs.push(
-        this.printKOT(order, group.items, group.printerName, null, group.stationName)
-          .catch(err => ({ success: false, error: err.message, station: group.stationName }))
-      );
+      if (attachBill) {
+        printJobs.push(
+          this.printKOTWithBill(order, group.items, items, group.printerName, group.stationName)
+            .catch(err => ({ success: false, error: err.message, station: group.stationName }))
+        );
+      } else {
+        printJobs.push(
+          this.printKOT(order, group.items, group.printerName, null, group.stationName)
+            .catch(err => ({ success: false, error: err.message, station: group.stationName }))
+        );
+      }
     }
 
     // Print unmapped items to default KOT printer
     if (unmappedItems.length > 0) {
-      printJobs.push(
-        this.printKOT(order, unmappedItems, defaultPrinterName)
-          .catch(err => ({ success: false, error: err.message, station: 'Default' }))
-      );
+      if (attachBill) {
+        printJobs.push(
+          this.printKOTWithBill(order, unmappedItems, items, defaultPrinterName)
+            .catch(err => ({ success: false, error: err.message, station: 'Default' }))
+        );
+      } else {
+        printJobs.push(
+          this.printKOT(order, unmappedItems, defaultPrinterName)
+            .catch(err => ({ success: false, error: err.message, station: 'Default' }))
+        );
+      }
     }
 
     const results = await Promise.allSettled(printJobs);

@@ -71,6 +71,7 @@ export const useCartStore = create(
               id: Date.now().toString(),
               menuItemId: menuItem.id,
               name: menuItem.name,
+              categoryId: menuItem.category_id,
               unitPrice: finalPrice,
               quantity,
               taxRate: menuItem.tax_rate || 0,

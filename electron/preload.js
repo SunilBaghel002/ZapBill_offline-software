@@ -87,6 +87,7 @@ const validInvokeChannels = [
   'print:testPrint',
   'print:getPrinters',
   'print:kotStation',
+  'print:kotRouted',
   'print:voidKOT',
   'print:reprint',
   'print:selectLogo',

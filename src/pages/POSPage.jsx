@@ -403,7 +403,7 @@ const POSPage = () => {
         // 3. Clear Cart (done in createOrder)
         // 4. Alert/Notify
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
-        await window.electronAPI.invoke('print:kot', { order: order, items: order.items });
+        await window.electronAPI.invoke('print:kotRouted', { order: order, items: order.items });
         showAlert(`Order #${result.orderNumber} Placed Successfully!`, "success");
         loadData();
       } else {
@@ -498,13 +498,15 @@ const POSPage = () => {
           item_name: item.name,
           quantity: item.quantity,
           unit_price: item.unitPrice,
+          price: item.unitPrice,
+          category_id: item.categoryId,
           special_instructions: item.specialInstructions,
           variant: item.variant,
           addons: item.addons
         }))
       };
 
-      await window.electronAPI.invoke('print:kot', {
+      await window.electronAPI.invoke('print:kotRouted', {
         order: kotOrder,
         items: kotOrder.items
       });
@@ -539,8 +541,8 @@ const POSPage = () => {
       if (result.success) {
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
 
-        // Print KOT
-        await window.electronAPI.invoke('print:kot', {
+        // Print KOT routed to kitchen stations
+        await window.electronAPI.invoke('print:kotRouted', {
           order: order,
           items: order.items
         });
@@ -577,16 +579,12 @@ const POSPage = () => {
       if (result.success) {
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
 
-        // Print KOT & Payment Receipt concurrently (Side by Side)
-        await Promise.all([
-            window.electronAPI.invoke('print:kot', {
-              order: order,
-              items: order.items
-            }).catch(err => console.error("KOT Print Failed", err)),
-            
-            window.electronAPI.invoke('print:receipt', { order: order })
-              .catch(err => console.error("Receipt Print Failed", err))
-        ]);
+        // Print KOT & Bill simultaneously via routed handler
+        await window.electronAPI.invoke('print:kotRouted', {
+          order: order,
+          items: order.items,
+          printBill: true
+        }).catch(err => console.error("KOT+Bill Print Failed", err));
 
         showAlert(`Order #${result.orderNumber} placed! KOT & Receipt printed.`, "success");
       } else {
@@ -1971,9 +1969,9 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
         // Get the full order details
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
 
-        // 1. Print KOT to Kitchen immediately when order is placed
-        console.log('Printing KOT to kitchen...');
-        await window.electronAPI.invoke('print:kot', {
+        // 1. Print KOT to Kitchen stations immediately when order is placed
+        console.log('Printing KOT to kitchen stations...');
+        await window.electronAPI.invoke('print:kotRouted', {
           order: order,
           items: order.items
         });

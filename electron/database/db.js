@@ -1004,15 +1004,18 @@ class Database {
     `, [`%${phone}%`]);
   }
 
+  // Get order by ID with items
   getOrderById(id) {
     const orders = this.execute(`SELECT * FROM orders WHERE id = ?`, [id]);
     if (orders.length === 0) return null;
 
     const order = orders[0];
-    order.items = this.execute(
-      `SELECT * FROM order_items WHERE order_id = ?`,
-      [id]
-    );
+    order.items = this.execute(`
+      SELECT oi.*, mi.category_id, oi.unit_price as price 
+      FROM order_items oi
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      WHERE oi.order_id = ?
+    `, [id]);
     return order;
   }
 
@@ -2503,7 +2506,7 @@ class Database {
   // --- Category → Station Mapping ---
   getCategoryStationMap() {
     return this.execute(`
-      SELECT csm.category_id, csm.station_id, c.name as category_name, ps.station_name
+      SELECT csm.category_id, csm.station_id, c.name as category_name, ps.station_name, ps.printer_name
       FROM category_station_map csm
       JOIN categories c ON csm.category_id = c.id
       JOIN printer_stations ps ON csm.station_id = ps.id

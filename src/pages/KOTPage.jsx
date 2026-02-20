@@ -303,7 +303,7 @@ const KOTPage = () => {
 
   const handlePrintKOT = async (order) => {
     try {
-      await window.electronAPI.invoke('print:kot', { 
+      await window.electronAPI.invoke('print:kotRouted', { 
         order, 
         items: order.items 
       });

@@ -198,7 +198,7 @@ const PrintersPage = () => {
           <div className="card-body" style={{ padding: '24px' }}>
             {/* TAB: Bill Printer */}
             {printerTab === 'bill' && (
-              <div style={{ display: 'grid', gap: 'var(--spacing-6)', maxWidth: '800px' }}>
+              <div style={{ display: 'grid', gap: 'var(--spacing-6)' }}>
                 <div className="alert alert-info" style={{ display: 'flex', gap: '12px' }}>
                   <Printer size={20} className="flex-shrink-0" />
                   <div>
@@ -207,7 +207,7 @@ const PrintersPage = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gap: 'var(--spacing-4)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-5)' }}>
                   <div className="input-group">
                     <label className="input-label">Select Printer</label>
                     <select
@@ -225,48 +225,49 @@ const PrintersPage = () => {
                     </select>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 'var(--spacing-4)', alignItems: 'end' }}>
-                    <div className="input-group">
-                      <label className="input-label">Paper Width</label>
-                      <select
-                        className="input select"
-                        value={settings.bill_paper_width || '80'}
-                        onChange={(e) => updateSetting('bill_paper_width', e.target.value)}
-                        style={{ padding: '12px' }}
-                      >
-                        <option value="80">80mm (Standard)</option>
-                        <option value="58">58mm (Compact)</option>
-                      </select>
-                    </div>
-                    <button 
-                      className="btn btn-secondary"
-                      onClick={() => handleTestPrint(settings.printer_bill)}
-                      disabled={!settings.printer_bill}
-                      style={{ height: '45px', padding: '0 24px' }}
-                    >
-                      🖨️ Test Print
-                    </button>
-                  </div>
-
                   <div className="input-group">
-                    <label className="input-label">Receipt Footer Message</label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={settings.receipt_footer || ''}
-                      onChange={(e) => updateSetting('receipt_footer', e.target.value)}
-                      placeholder="Thank you for dining with us!"
+                    <label className="input-label">Paper Width</label>
+                    <select
+                      className="input select"
+                      value={settings.bill_paper_width || '80'}
+                      onChange={(e) => updateSetting('bill_paper_width', e.target.value)}
                       style={{ padding: '12px' }}
-                    />
+                    >
+                      <option value="80">80mm (Standard)</option>
+                      <option value="58">58mm (Compact)</option>
+                    </select>
                   </div>
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Receipt Footer Message</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={settings.receipt_footer || ''}
+                    onChange={(e) => updateSetting('receipt_footer', e.target.value)}
+                    placeholder="Thank you for dining with us!"
+                    style={{ padding: '12px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => handleTestPrint(settings.printer_bill)}
+                    disabled={!settings.printer_bill}
+                    style={{ height: '45px', padding: '0 24px' }}
+                  >
+                    🖨️ Test Print
+                  </button>
                 </div>
               </div>
             )}
 
             {/* TAB: KOT Printer */}
             {printerTab === 'kot' && (
-              <div style={{ display: 'grid', gap: 'var(--spacing-6)', maxWidth: '800px' }}>
-                 <div className="alert alert-warning" style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'grid', gap: 'var(--spacing-6)' }}>
+                <div className="alert alert-warning" style={{ display: 'flex', gap: '12px' }}>
                   <AlertCircle size={20} className="flex-shrink-0" />
                   <div>
                     <strong>Default / Fallback Printer</strong>
@@ -274,49 +275,67 @@ const PrintersPage = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gap: 'var(--spacing-4)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--spacing-5)' }}>
                   <div className="input-group">
                     <label className="input-label">Select KOT Printer</label>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <select
-                        className="input select"
-                        value={settings.printer_kot || ''}
-                        onChange={(e) => updateSetting('printer_kot', e.target.value)}
-                        style={{ padding: '12px', flex: 1 }}
-                      >
-                       <option value="">-- Select Printer --</option>
-                        {printers.map(p => (
-                          <option key={p.name} value={p.name}>
-                            {p.name} {p.isDefault ? '(Default)' : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <button 
-                        className="btn btn-secondary"
-                        onClick={() => handleTestPrint(settings.printer_kot)}
-                        disabled={!settings.printer_kot}
-                        style={{ width: '120px' }}
-                      >
-                        Test
-                      </button>
-                    </div>
+                    <select
+                      className="input select"
+                      value={settings.printer_kot || ''}
+                      onChange={(e) => updateSetting('printer_kot', e.target.value)}
+                      style={{ padding: '12px' }}
+                    >
+                      <option value="">-- Select Printer --</option>
+                      {printers.map(p => (
+                        <option key={p.name} value={p.name}>
+                          {p.name} {p.isDefault ? '(Default)' : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--gray-200)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong style={{ fontSize: '15px' }}>Auto-Print KOT</strong>
-                        <p style={{ color: 'var(--gray-500)', fontSize: '13px', marginTop: '4px' }}>Automatically send KOT to kitchen when saving a new order</p>
-                      </div>
-                      <label className="switch">
-                        <input
-                          type="checkbox"
-                          checked={settings.auto_print_kot === 'true'}
-                          onChange={(e) => updateSetting('auto_print_kot', e.target.checked ? 'true' : 'false')}
-                          style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary-600)' }}
-                        />
-                      </label>
+                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => handleTestPrint(settings.printer_kot)}
+                      disabled={!settings.printer_kot}
+                      style={{ height: '45px', padding: '0 24px' }}
+                    >
+                      🖨️ Test Print
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--gray-200)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ fontSize: '15px' }}>Auto-Print KOT</strong>
+                      <p style={{ color: 'var(--gray-500)', fontSize: '13px', marginTop: '4px' }}>Automatically send KOT to kitchen when saving a new order</p>
                     </div>
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.auto_print_kot === 'true'}
+                        onChange={(e) => updateSetting('auto_print_kot', e.target.checked ? 'true' : 'false')}
+                        style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary-600)' }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--gray-200)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ fontSize: '15px' }}>Attach Mini-Bill with KOT</strong>
+                      <p style={{ color: 'var(--gray-500)', fontSize: '13px', marginTop: '4px' }}>Print a condensed bill summary below each KOT (tear-off copy for kitchen reference)</p>
+                    </div>
+                    <label className="switch">
+                      <input
+                        type="checkbox"
+                        checked={settings.kot_attach_bill !== 'false'}
+                        onChange={(e) => updateSetting('kot_attach_bill', e.target.checked ? 'true' : 'false')}
+                        style={{ width: '20px', height: '20px', cursor: 'pointer', accentColor: 'var(--primary-600)' }}
+                      />
+                    </label>
                   </div>
                 </div>
               </div>
@@ -465,7 +484,7 @@ const PrintersPage = () => {
 
             {/* TAB: Bill Format */}
             {printerTab === 'format' && (
-              <div style={{ display: 'grid', gap: 'var(--spacing-6)', maxWidth: '800px' }}>
+              <div style={{ display: 'grid', gap: 'var(--spacing-6)' }}>
                 {/* Logo Section */}
                 <div style={{ padding: '24px', background: 'var(--gray-50)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--gray-200)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

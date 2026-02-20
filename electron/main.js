@@ -979,6 +979,69 @@ function setupIpcHandlers() {
     }
   });
 
+  // ============ ROUTED KOT + BILL SIMULTANEOUS PRINTING ============
+  // Sends bill to bill printer AND routes KOTs to kitchen station printers concurrently
+  ipcMain.handle('print:kotRouted', async (event, { order, items, printBill = false }) => {
+    try {
+      const settingsRows = db.execute('SELECT * FROM settings');
+      const settings = {};
+      settingsRows.forEach(row => { settings[row.key] = row.value; });
+
+      // Enrich order with restaurant info (needed for receipt + mini-bill)
+      const enrichedOrder = {
+        ...order,
+        restaurantName: settings.restaurant_name,
+        restaurantAddress: settings.restaurant_address,
+        restaurantPhone: settings.restaurant_phone,
+        gstNumber: settings.gst_number,
+        receiptFooter: settings.receipt_footer,
+        fssaiNumber: settings.bill_fssai_number,
+        showLogo: settings.bill_show_logo === 'true',
+        logoPath: settings.bill_logo_path,
+        showQR: settings.bill_show_qr === 'true',
+        qrUpiId: settings.bill_qr_upi_id,
+        showItemwiseTax: settings.bill_show_itemwise_tax === 'true',
+        showCustomerDetails: settings.bill_show_customer_details !== 'false',
+        paperWidth: settings.bill_paper_width || '80',
+        currencySymbol: settings.currency_symbol || '₹'
+      };
+
+      // Get station mapping
+      const categoryMap = db.getCategoryStationMap();
+      const defaultKotPrinter = settings.printer_kot;
+      const attachBill = settings.kot_attach_bill !== 'false';
+
+      const printJobs = [];
+
+      // 1. Route KOTs to kitchen station printers
+      printJobs.push(
+        printerService.printStationKOTs(enrichedOrder, items, categoryMap, defaultKotPrinter, attachBill)
+          .catch(err => ({ success: false, error: err.message, type: 'kot' }))
+      );
+
+      // 2. Simultaneously print customer receipt if requested
+      if (printBill && settings.printer_bill) {
+        printJobs.push(
+          printerService.printReceipt(enrichedOrder, settings.printer_bill)
+            .catch(err => ({ success: false, error: err.message, type: 'receipt' }))
+        );
+      }
+
+      const results = await Promise.allSettled(printJobs);
+      const failures = results.filter(r => r.status === 'rejected' || (r.value && !r.value.success));
+
+      return {
+        success: true,
+        kotResult: results[0]?.value,
+        receiptResult: printBill ? results[1]?.value : null,
+        failures: failures.length
+      };
+    } catch (e) {
+      log.error('Print KOT routed error:', e);
+      return { success: false, error: e.message };
+    }
+  });
+
   // Void KOT
   ipcMain.handle('print:voidKOT', async (event, { order, items, reason, kotNumber }) => {
     try {
