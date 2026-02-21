@@ -403,11 +403,18 @@ const ReportsPage = () => {
 
             {reportType !== 'shift' && viewMode === 'dashboard' && (
                 <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginBottom: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '24px' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', padding: '24px', borderRadius: '20px', color: 'white', boxShadow: '0 10px 20px -5px rgba(245, 158, 11, 0.4)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 600, opacity: 0.9 }}>Opening Balance</span>
+                      <DollarSign size={20} />
+                    </div>
+                    <div style={{ fontSize: '28px', fontWeight: 800 }}>₹{(sales.opening_balance || 0).toLocaleString()}</div>
+                  </div>
                   <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', padding: '24px', borderRadius: '20px', color: 'white', boxShadow: '0 10px 20px -5px rgba(99, 102, 241, 0.4)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                       <span style={{ fontSize: '14px', fontWeight: 600, opacity: 0.9 }}>Total Sales</span>
-                      <DollarSign size={20} />
+                      <ShoppingCart size={20} />
                     </div>
                     <div style={{ fontSize: '28px', fontWeight: 800 }}>₹{(sales.total_revenue || 0).toLocaleString()}</div>
                   </div>
@@ -425,7 +432,14 @@ const ReportsPage = () => {
                     </div>
                     <div style={{ fontSize: '28px', fontWeight: 800 }}>₹{(sales.net_revenue || 0).toLocaleString()}</div>
                   </div>
-                  <div style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', padding: '24px', borderRadius: '20px', color: 'white', boxShadow: '0 10px 20px -5px rgba(245, 158, 11, 0.4)' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)', padding: '24px', borderRadius: '20px', color: 'white', boxShadow: '0 10px 20px -5px rgba(14, 165, 233, 0.4)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 600, opacity: 0.9 }}>Estimated Cash</span>
+                      <div style={{ display: 'flex', gap: '4px' }}><DollarSign size={20} /><DollarSign size={20} style={{ opacity: 0.6 }} /></div>
+                    </div>
+                    <div style={{ fontSize: '28px', fontWeight: 800 }}>₹{((sales.opening_balance || 0) + (sales.cash_amount || 0) - (sales.total_expenses || 0)).toLocaleString()}</div>
+                  </div>
+                  <div style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', padding: '24px', borderRadius: '20px', color: 'white', boxShadow: '0 10px 20px -5px rgba(139, 92, 246, 0.4)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                       <span style={{ fontSize: '14px', fontWeight: 600, opacity: 0.9 }}>Total Orders</span>
                       <ShoppingCart size={20} />

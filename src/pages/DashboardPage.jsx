@@ -11,7 +11,8 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
-  Minus
+  Minus,
+  Wallet
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
@@ -225,9 +226,11 @@ const OrderCard = ({ order, onClick }) => {
 const DashboardPage = () => {
   const [stats, setStats] = useState({
     todayRevenue: 0,
+    todayExpenses: 0,
+    openingBalance: 0,
+    netProfit: 0,
     totalOrders: 0,
     avgOrderValue: 0,
-    activeOrders: 0,
     revenueTrend: { direction: 'neutral', value: 0 },
     ordersTrend: { direction: 'neutral', value: 0 },
     avgOrderTrend: { direction: 'neutral', value: 0 },
@@ -321,12 +324,12 @@ const DashboardPage = () => {
       setStats({
         todayRevenue: todaySales.total_revenue || 0,
         todayExpenses: todaySales.total_expenses || 0,
-        netProfit: todaySales.net_revenue || 0, // Note: Biller report might not have expenses yet
+        openingBalance: todaySales.opening_balance || 0,
+        netProfit: todaySales.net_revenue || 0,
         totalOrders: todaySales.total_orders || 0,
         activeOrders: activeCount,
         revenueTrend,
         ordersTrend,
-        // avgOrderTrend, 
         activeOrdersTrend: { direction: 'neutral', value: 0 } 
       });
 
@@ -385,7 +388,15 @@ const DashboardPage = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="stats-grid">
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+        <StatCard
+          title="Opening Balance"
+          value={`₹${(stats.openingBalance || 0).toLocaleString()}`}
+          trend="neutral"
+          trendValue={0}
+          icon={Wallet}
+          color="warning"
+        />
         <StatCard
           title="Today's Sales"
           value={`₹${stats.todayRevenue.toLocaleString()}`}
@@ -403,20 +414,20 @@ const DashboardPage = () => {
           color="danger"
         />
         <StatCard
-          title="Net Profit"
-          value={`₹${stats.netProfit.toLocaleString()}`}
-          trend={stats.revenueTrend.direction} // Assuming profit follows revenue trend for now
-          trendValue={stats.revenueTrend.value}
-          icon={DollarSign}
-          color="success"
-        />
-        <StatCard
           title="Total Orders"
           value={stats.totalOrders}
           trend={stats.ordersTrend.direction}
           trendValue={stats.ordersTrend.value}
           icon={Users}
           color="info"
+        />
+        <StatCard
+          title="Net Profit"
+          value={`₹${stats.netProfit.toLocaleString()}`}
+          trend={stats.revenueTrend.direction} 
+          trendValue={stats.revenueTrend.value}
+          icon={DollarSign}
+          color="success"
         />
       </div>
 

@@ -109,6 +109,9 @@ const validInvokeChannels = [
   'shifts:getStatus',
   'shifts:getReport',
   'shifts:getByDate',
+  // Day Management
+  'day:getStatus',
+  'day:open',
   // App
   'app:getVersion',
   'app:checkForUpdates',

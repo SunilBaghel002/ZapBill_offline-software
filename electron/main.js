@@ -647,12 +647,34 @@ function setupIpcHandlers() {
     }
   });
 
+  // ============ DAY MANAGEMENT OPERATIONS ============
+  ipcMain.handle('day:getStatus', async (event, { date }) => {
+    try {
+      const status = db.getDayStatus(date);
+      return { success: true, status };
+    } catch (error) {
+      log.error('Get day status error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('day:open', async (event, { userId, openingBalance }) => {
+    try {
+      const status = db.openDay(userId, openingBalance);
+      return { success: true, status };
+    } catch (error) {
+      log.error('Open day error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Auto-close shifts on startup (optional, but good practice)
-  // try {
-  //   db.autoCloseShifts();
-  // } catch (e) {
-  //   log.error('Auto close shifts error:', e);
-  // }
+  try {
+    db.autoCloseShifts();
+    db.autoCloseDays();
+  } catch (e) {
+    log.error('Auto close shifts/days error:', e);
+  }
 
   // ============ EXPENSES OPERATIONS ============
   ipcMain.handle('expenses:create', async (event, { expenses }) => {

@@ -43,14 +43,19 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
 import { ShiftProvider, useShift } from './context/ShiftContext';
 import ShiftModal from './components/common/ShiftModal';
+import DayOpeningModal from './components/common/DayOpeningModal';
 
 // Component to handle shift logic and modal
 const ShiftManager = ({ children }) => {
-  const { showStartModal, setShowStartModal } = useShift();
+  const { showStartModal, setShowStartModal, showDayModal, setShowDayModal } = useShift();
   
   return (
     <>
       {children}
+      <DayOpeningModal 
+        isOpen={showDayModal} 
+        onClose={() => setShowDayModal(false)}
+      />
       <ShiftModal 
         isOpen={showStartModal} 
         type="start" 

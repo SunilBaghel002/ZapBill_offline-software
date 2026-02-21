@@ -99,6 +99,20 @@ class Database {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Create day_logs table
+    this.db.run(`CREATE TABLE IF NOT EXISTS day_logs (
+      id TEXT PRIMARY KEY,
+      business_date TEXT UNIQUE NOT NULL,
+      opening_time TEXT NOT NULL,
+      closing_time TEXT,
+      opening_balance REAL DEFAULT 0,
+      closing_balance REAL,
+      status TEXT CHECK(status IN ('open', 'closed')) DEFAULT 'open',
+      opened_by TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     // Create indexes
     try {
       this.db.run("CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)");
@@ -1444,6 +1458,10 @@ class Database {
         FROM expenses 
         WHERE date = ?
     `, [date]);
+
+    // Day Opening Balance
+    const dayLog = this.execute(`SELECT opening_balance FROM day_logs WHERE business_date = ?`, [date])[0];
+    const openingBalance = dayLog?.opening_balance || 0;
     
     const totalExpenses = expenses[0]?.total_expenses || 0;
     const totalRevenue = sales[0]?.total_revenue || 0;
@@ -1452,6 +1470,7 @@ class Database {
       sales: {
         ...sales[0],
         total_expenses: totalExpenses,
+        opening_balance: openingBalance,
         net_revenue: totalRevenue - totalExpenses
       },
       orders,
@@ -1606,27 +1625,37 @@ class Database {
     `, [startDate, endDate]);
 
     const totalExpenses = expenses[0]?.total_expenses || 0;
-    
-    // Ensure sales data exists
-    const salesData = sales[0] || {
-      total_orders: 0,
-      total_revenue: 0,
-      total_tax: 0,
-      total_discount: 0,
-      cash_amount: 0,
-      card_amount: 0,
-      upi_amount: 0
-    };
 
-    const totalRevenue = salesData.total_revenue || 0;
+  // Custom Range Opening Balance
+  const customOpening = this.execute(`
+    SELECT COALESCE(SUM(opening_balance), 0) as total_opening 
+    FROM day_logs 
+    WHERE business_date BETWEEN ? AND ?
+  `, [startDate, endDate]);
 
-    return {
-      sales: { 
-        ...salesData, 
-        total_addon_revenue: totalAddonRevenue,
-        total_expenses: totalExpenses,
-        net_revenue: totalRevenue - totalExpenses
-      },
+  const openingBalance = customOpening[0]?.total_opening || 0;
+  
+  // Ensure sales data exists
+  const salesData = sales[0] || {
+    total_orders: 0,
+    total_revenue: 0,
+    total_tax: 0,
+    total_discount: 0,
+    cash_amount: 0,
+    card_amount: 0,
+    upi_amount: 0
+  };
+
+  const totalRevenue = salesData.total_revenue || 0;
+
+  return {
+    sales: { 
+      ...salesData, 
+      total_addon_revenue: totalAddonRevenue,
+      total_expenses: totalExpenses,
+      opening_balance: openingBalance,
+      net_revenue: totalRevenue - totalExpenses
+    },
       topItems,
       categorySales,
       topAddons
@@ -1756,6 +1785,53 @@ class Database {
     });
   }
 
+  // ===== Day Management =====
+  getDayStatus(dateStr) {
+    const date = dateStr || new Date().toISOString().split('T')[0];
+    // First, auto-close previous days and shifts if needed
+    this.autoCloseDays();
+    this.autoCloseShifts();
+    
+    const logs = this.execute(`SELECT * FROM day_logs WHERE business_date = ?`, [date]);
+    return logs[0] || null;
+  }
+
+  openDay(userId, openingBalance) {
+    const today = new Date().toISOString().split('T')[0];
+    const existing = this.getDayStatus(today);
+    if (existing) return existing;
+    
+    const id = uuidv4();
+    this.insert('day_logs', {
+      id,
+      business_date: today,
+      opening_time: new Date().toISOString(),
+      opening_balance: openingBalance,
+      status: 'open',
+      opened_by: userId
+    });
+    
+    // Automatically start the first shift for the user opening the day
+    // This avoids showing the redundant Start Shift modal
+    try {
+      this.startShift(userId, openingBalance);
+    } catch (e) {
+      // Ignore if user already has an active shift or other error
+      console.log('Auto-shift note:', e.message);
+    }
+    
+    return this.getDayStatus(today);
+  }
+
+  autoCloseDays() {
+    const today = new Date().toISOString().split('T')[0];
+    this.db.run(`
+      UPDATE day_logs 
+      SET status = 'closed', closing_time = business_date || ' 23:59:59', updated_at = CURRENT_TIMESTAMP
+      WHERE status = 'open' AND business_date < ?
+    `, [today]);
+  }
+
   // Get detailed daily export (User-wise product sales with all details)
   getDetailedDailyExport(date) {
     return this.execute(`
@@ -1844,7 +1920,10 @@ class Database {
         COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as total_orders,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
-        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount,
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as cash_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as card_amount,
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as upi_amount
       FROM orders 
       WHERE DATE(created_at, 'localtime') >= ? 
         AND DATE(created_at, 'localtime') < date(?, '+7 days')
@@ -1852,21 +1931,30 @@ class Database {
     `, [startDate, startDate])[0];
 
     // Weekly Expenses
-    const weeklyExpenses = this.execute(`
-      SELECT COALESCE(SUM(amount), 0) as total_expenses 
-      FROM expenses 
-      WHERE date >= ? AND date < date(?, '+7 days')
-    `, [startDate, startDate]);
+  const weeklyExpenses = this.execute(`
+    SELECT COALESCE(SUM(amount), 0) as total_expenses 
+    FROM expenses 
+    WHERE date >= ? AND date < date(?, '+7 days')
+  `, [startDate, startDate]);
 
-    const totalExpenses = weeklyExpenses[0]?.total_expenses || 0;
-    const totalRevenue = (sales && sales.total_revenue) || 0;
+  // Weekly Opening Balance
+  const weeklyOpening = this.execute(`
+    SELECT COALESCE(SUM(opening_balance), 0) as total_opening 
+    FROM day_logs 
+    WHERE business_date >= ? AND business_date < date(?, '+7 days')
+  `, [startDate, startDate]);
 
-    return {
-      sales: {
-        ...(sales || { total_orders: 0, total_revenue: 0 }),
-        total_expenses: totalExpenses,
-        net_revenue: totalRevenue - totalExpenses
-      },
+  const totalExpenses = weeklyExpenses[0]?.total_expenses || 0;
+  const openingBalance = weeklyOpening[0]?.total_opening || 0;
+  const totalRevenue = (sales && sales.total_revenue) || 0;
+
+  return {
+    sales: {
+      ...(sales || { total_orders: 0, total_revenue: 0, total_tax: 0, total_discount: 0, cash_amount: 0, card_amount: 0, upi_amount: 0 }),
+      total_expenses: totalExpenses,
+      opening_balance: openingBalance,
+      net_revenue: totalRevenue - totalExpenses
+    },
       dailyTrend,
       topItems,
       categorySales
@@ -1936,21 +2024,30 @@ class Database {
     `, [monthStr])[0];
 
     // Monthly Expenses
-    const monthlyExpenses = this.execute(`
-      SELECT COALESCE(SUM(amount), 0) as total_expenses 
-      FROM expenses 
-      WHERE strftime('%Y-%m', date) = ?
-    `, [monthStr]);
+  const monthlyExpenses = this.execute(`
+    SELECT COALESCE(SUM(amount), 0) as total_expenses 
+    FROM expenses 
+    WHERE strftime('%Y-%m', date) = ?
+  `, [monthStr]);
 
-    const totalExpenses = monthlyExpenses[0]?.total_expenses || 0;
-    const totalRevenue = (sales && sales.total_revenue) || 0;
+  // Monthly Opening Balance
+  const monthlyOpening = this.execute(`
+    SELECT COALESCE(SUM(opening_balance), 0) as total_opening 
+    FROM day_logs 
+    WHERE strftime('%Y-%m', business_date) = ?
+  `, [monthStr]);
 
-    return {
-      sales: {
-        ...(sales || { total_orders: 0, total_revenue: 0 }),
-        total_expenses: totalExpenses,
-        net_revenue: totalRevenue - totalExpenses
-      },
+  const totalExpenses = monthlyExpenses[0]?.total_expenses || 0;
+  const openingBalance = monthlyOpening[0]?.total_opening || 0;
+  const totalRevenue = (sales && sales.total_revenue) || 0;
+
+  return {
+    sales: {
+      ...(sales || { total_orders: 0, total_revenue: 0 }),
+      total_expenses: totalExpenses,
+      opening_balance: openingBalance,
+      net_revenue: totalRevenue - totalExpenses
+    },
       dailyTrend,
       topItems,
       categorySales
