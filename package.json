@@ -65,14 +65,11 @@
     "win": {
       "target": [
         "nsis"
-      ],
-      "icon": "public/icon.ico"
+      ]
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "public/icon.ico",
-      "uninstallerIcon": "public/icon.ico"
+      "allowToChangeInstallationDirectory": true
     }
   },
   "author": "Restaurant POS Team",
