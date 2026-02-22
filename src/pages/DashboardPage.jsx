@@ -335,6 +335,8 @@ const DashboardPage = () => {
       const today = format(new Date(), 'yyyy-MM-dd');
       const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
       
+      let todayReport = null;
+      let yesterdayReport = null;
       let todaySales = {};
       let yesterdaySales = {};
       let revenueTrend = { direction: 'neutral', value: 0 };
@@ -364,21 +366,25 @@ const DashboardPage = () => {
         if (shiftStatus.success && shiftStatus.shift) {
           const reportResult = await window.electronAPI.invoke('shifts:getReport', { shiftId: shiftStatus.shift.id });
           if (reportResult.success && reportResult.report) {
-            todaySales = reportResult.report.sales;
+            todayReport = reportResult.report;
+            todaySales = todayReport.sales || {};
           }
         } else {
              // Try to get daily report for this biller specifically
-             const billerReport = await window.electronAPI.invoke('reports:billerDaily', { date: today, userId: user.id });
-             todaySales = billerReport || {};
+             todayReport = await window.electronAPI.invoke('reports:billerDaily', { date: today, userId: user.id });
+             todaySales = todayReport?.sales || todayReport || {};
         }
 
       } else {
         // --- ADMIN VIEW ---
         // Fetch global today's and yesterday's reports for comparison
-        const [todayReport, yesterdayReport] = await Promise.all([
+        const [todayRes, yesterdayRes] = await Promise.all([
           window.electronAPI.invoke('reports:daily', { date: today }),
           window.electronAPI.invoke('reports:daily', { date: yesterday })
         ]);
+
+        todayReport = todayRes;
+        yesterdayReport = yesterdayRes;
 
         todaySales = todayReport?.sales || {};
         yesterdaySales = yesterdayReport?.sales || {};

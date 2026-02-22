@@ -302,6 +302,61 @@ function setupIpcHandlers() {
     }
   });
 
+  // ============ MULTI-MENU OPERATIONS ============
+  ipcMain.handle('menu:getMenus', async () => {
+    try {
+      return db.getMenus();
+    } catch (error) {
+      log.error('Get menus error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:getActiveMenu', async () => {
+    try {
+      return db.getActiveMenu();
+    } catch (error) {
+      log.error('Get active menu error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:setActiveMenu', async (event, { id }) => {
+    try {
+      return db.setActiveMenu(id);
+    } catch (error) {
+      log.error('Set active menu error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:saveMenu', async (event, { menu }) => {
+    try {
+      return db.saveMenu(menu);
+    } catch (error) {
+      log.error('Save menu error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:deleteMenu', async (event, { id }) => {
+    try {
+      return db.deleteMenu(id);
+    } catch (error) {
+      log.error('Delete menu error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:duplicateMenu', async (event, { id, name }) => {
+    try {
+      return db.duplicateMenu(id, name);
+    } catch (error) {
+      log.error('Duplicate menu error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('menu:deleteCategory', async (event, { id }) => {
     try {
       // Check if any items use this category
@@ -727,10 +782,10 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('data:importMenu', async (event, { filePath }) => {
+  ipcMain.handle('data:importMenu', async (event, { filePath, menuName }) => {
     try {
       const items = dataImporter.parseMenu(filePath);
-      return db.importMenu(items);
+      return db.importMenu(items, menuName);
     } catch (error) {
       log.error('Import menu error:', error);
       return { success: false, error: error.message };

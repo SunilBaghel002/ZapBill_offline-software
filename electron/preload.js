@@ -11,6 +11,7 @@ const validInvokeChannels = [
   'db:query',
   'db:getPath',
   'db:movePath',
+  'dialog:selectFile',
   // Menu
   'menu:getCategories',
   'menu:getItems',
@@ -21,6 +22,13 @@ const validInvokeChannels = [
   'menu:saveAddon',
   'menu:deleteAddon',
   'menu:toggleFavorite',
+  'menu:getMenus',
+  'menu:getActiveMenu',
+  'menu:setActiveMenu',
+  'menu:saveMenu',
+  'menu:deleteMenu',
+  'menu:duplicateMenu',
+  'menu:deleteCategory',
   // Orders
   'order:create',
   'order:update',

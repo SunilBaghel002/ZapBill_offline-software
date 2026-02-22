@@ -27,6 +27,9 @@ const MenuPage = () => {
   const [showAddonModal, setShowAddonModal] = useState(false);
   const [editingAddon, setEditingAddon] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [menus, setMenus] = useState([]);
+  const [activeMenu, setActiveMenu] = useState(null);
+  const [showMenuManager, setShowMenuManager] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -34,14 +37,18 @@ const MenuPage = () => {
 
   const loadData = async () => {
     try {
-      const [cats, items, addonsList] = await Promise.all([
+      const [cats, items, addonsList, menusList, active] = await Promise.all([
         window.electronAPI.invoke('menu:getCategories'),
         window.electronAPI.invoke('menu:getItems', {}),
-        window.electronAPI.invoke('menu:getAddons')
+        window.electronAPI.invoke('menu:getAddons'),
+        window.electronAPI.invoke('menu:getMenus'),
+        window.electronAPI.invoke('menu:getActiveMenu')
       ]);
       setCategories(cats);
       setMenuItems(items);
       setAddons(addonsList || []);
+      setMenus(menusList || []);
+      setActiveMenu(active);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -126,9 +133,33 @@ const MenuPage = () => {
         borderBottom: '1px solid var(--gray-200)',
         boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
       }}>
-        <div>
-          <h1 style={{ fontSize: '1.5rem', margin: 0 }}>Menu Management</h1>
-          <p className="text-muted" style={{ fontSize: '0.875rem', margin: '4px 0 0 0' }}>Manage items, categories & add-ons</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div>
+            <h1 style={{ fontSize: '1.5rem', margin: 0 }}>Menu Management</h1>
+            <p className="text-muted" style={{ fontSize: '0.875rem', margin: '4px 0 0 0' }}>Manage items, categories & add-ons</p>
+          </div>
+          
+          {/* Menu Profile Selector */}
+          <div 
+            onClick={() => setShowMenuManager(true)}
+            style={{ 
+              background: 'var(--primary-50)', 
+              padding: '6px 14px', 
+              borderRadius: '20px', 
+              border: '1px solid var(--primary-200)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              marginLeft: '12px'
+            }}
+          >
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-500)' }} />
+            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--primary-700)' }}>
+              Menu: {activeMenu?.name || 'Loading...'}
+            </span>
+            <RefreshCw size={14} style={{ color: 'var(--primary-400)' }} />
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button
@@ -365,6 +396,16 @@ const MenuPage = () => {
           }}
         />
       )}
+
+      {/* Menu Manager Modal */}
+      {showMenuManager && (
+        <MenuManagerModal 
+          menus={menus}
+          activeMenu={activeMenu}
+          onClose={() => setShowMenuManager(false)}
+          onRefresh={loadData}
+        />
+      )}
     </div>
   );
 };
@@ -468,9 +509,9 @@ const CategoryModal = ({ category, onClose, onSave }) => {
     setIsSaving(true);
     try {
       if (category?.id) {
-        await window.electronAPI.invoke('menu:updateCategory', { id: category.id, name });
+        await window.electronAPI.invoke('menu:saveCategory', { category: { id: category.id, name } });
       } else {
-        await window.electronAPI.invoke('menu:createCategory', { name });
+        await window.electronAPI.invoke('menu:saveCategory', { category: { name } });
       }
       onSave();
     } catch (error) {
@@ -1056,6 +1097,159 @@ const MenuItemModal = ({ item, categories, onClose, onSave, globalAddons = [], o
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+
+// Menu Manager Modal
+const MenuManagerModal = ({ menus, activeMenu, onClose, onRefresh }) => {
+  const [newMenuName, setNewMenuName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleCreateMenu = async (e) => {
+    e.preventDefault();
+    if (!newMenuName.trim()) return;
+    setIsCreating(true);
+    try {
+      await window.electronAPI.invoke('menu:saveMenu', { menu: { name: newMenuName } });
+      setNewMenuName('');
+      onRefresh();
+    } catch (error) {
+      alert('Failed to create menu profile');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleSwitchMenu = async (id) => {
+    try {
+      await window.electronAPI.invoke('menu:setActiveMenu', { id });
+      onRefresh();
+    } catch (error) {
+      alert('Failed to switch menu profile');
+    }
+  };
+
+  const handleDuplicate = async (id, name) => {
+    const newName = window.prompt('Enter name for the duplicate menu profile:', `${name} (Copy)`);
+    if (!newName) return;
+    try {
+      await window.electronAPI.invoke('menu:duplicateMenu', { id, name: newName });
+      onRefresh();
+    } catch (error) {
+      alert('Failed to duplicate menu profile');
+    }
+  };
+
+  const handleDelete = async (id, name, isActive) => {
+    if (isActive) {
+      alert('Cannot delete the active menu profile.');
+      return;
+    }
+    if (window.confirm(`Are you sure you want to delete the menu profile "${name}"? This will delete all its categories and items.`)) {
+      try {
+        await window.electronAPI.invoke('menu:deleteMenu', { id });
+        onRefresh();
+      } catch (error) {
+        alert('Failed to delete menu profile');
+      }
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h3 className="modal-title">Menu Management Profiles</h3>
+            <p className="text-muted text-sm">Switch between different menu setups (e.g., Breakfast, Lunch, Special)</p>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="modal-body" style={{ overflowY: 'auto' }}>
+          {/* Create New Profile */}
+          <form onSubmit={handleCreateMenu} style={{ display: 'flex', gap: '8px', marginBottom: '24px', padding: '16px', background: 'var(--gray-50)', borderRadius: '12px' }}>
+            <input 
+              type="text" 
+              className="input" 
+              placeholder="Enter new menu profile name..." 
+              value={newMenuName}
+              onChange={(e) => setNewMenuName(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <button type="submit" className="btn btn-primary" disabled={isCreating || !newMenuName.trim()}>
+              <Plus size={18} /> Create Profile
+            </button>
+          </form>
+
+          {/* List Profile */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {menus.map(menu => {
+              const isActive = activeMenu?.id === menu.id;
+              return (
+                <div key={menu.id} style={{ 
+                  padding: '16px', 
+                  border: `1px solid ${isActive ? 'var(--primary-300)' : 'var(--gray-200)'}`, 
+                  borderRadius: '12px',
+                  background: isActive ? 'var(--primary-50)' : 'white',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  transition: 'all 0.2s'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ 
+                      width: '40px', 
+                      height: '40px', 
+                      borderRadius: '10px', 
+                      background: isActive ? 'var(--primary-500)' : 'var(--gray-100)',
+                      color: isActive ? 'white' : 'var(--gray-500)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <List size={20} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, color: isActive ? 'var(--primary-700)' : 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {menu.name}
+                        {isActive && <span className="badge badge-success" style={{ fontSize: '10px', padding: '2px 8px' }}>Active</span>}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>
+                        Created: {new Date(menu.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {!isActive && (
+                      <button className="btn btn-primary btn-sm" onClick={() => handleSwitchMenu(menu.id)}>
+                        Switch To
+                      </button>
+                    )}
+                    <button className="btn btn-secondary btn-icon btn-sm" title="Duplicate Profile" onClick={() => handleDuplicate(menu.id, menu.name)}>
+                      <RefreshCw size={14} />
+                    </button>
+                    {!isActive && (
+                      <button className="btn btn-secondary btn-icon btn-sm" style={{ color: 'var(--danger-500)' }} title="Delete Profile" onClick={() => handleDelete(menu.id, menu.name, isActive)}>
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn btn-secondary" style={{ width: '100%' }} onClick={onClose}>Close</button>
+        </div>
       </div>
     </div>
   );

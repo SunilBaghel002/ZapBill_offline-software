@@ -58,6 +58,9 @@ class Database {
     // Initialize schema
     await this.initSchema();
     
+    // Ensure at least one menu exists and link existing data
+    this.ensureDefaultMenu();
+    
     console.log('Database initialized at:', this.dbPath);
     return this;
   }
@@ -68,6 +71,15 @@ class Database {
     
     // Execute schema SQL
     this.db.run(schema);
+
+    // Create menus table
+    this.db.run(`CREATE TABLE IF NOT EXISTS menus (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      is_active INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      is_deleted INTEGER DEFAULT 0
+    )`);
 
     // Run migrations for existing databases
     this.migrateSchema();
@@ -122,6 +134,35 @@ class Database {
     this.save();
   }
 
+  ensureDefaultMenu() {
+    try {
+      // Check if any menu exists
+      const menus = this.execute("SELECT * FROM menus WHERE is_deleted = 0");
+      let activeMenuId;
+
+      if (menus.length === 0) {
+        // Create default menu
+        activeMenuId = 'menu_default';
+        this.run("INSERT INTO menus (id, name, is_active, created_at) VALUES (?, ?, ?, ?)",
+          [activeMenuId, 'Default Menu', 1, new Date().toISOString()]);
+      } else {
+        const active = menus.find(m => m.is_active === 1);
+        if (active) {
+          activeMenuId = active.id;
+        } else {
+          activeMenuId = menus[0].id;
+          this.run("UPDATE menus SET is_active = 1 WHERE id = ?", [activeMenuId]);
+        }
+      }
+
+      // Link categories and menu items without menu_id to the active menu
+      this.run("UPDATE categories SET menu_id = ? WHERE menu_id IS NULL OR menu_id = ''", [activeMenuId]);
+      this.run("UPDATE menu_items SET menu_id = ? WHERE menu_id IS NULL OR menu_id = ''", [activeMenuId]);
+    } catch (error) {
+      console.error('Error ensuring default menu:', error);
+    }
+  }
+
   migrateSchema() {
     try {
       // Add is_deleted to order_items if missing
@@ -174,6 +215,12 @@ class Database {
         // Add tax_rate to order_items
         try { this.db.run("ALTER TABLE order_items ADD COLUMN tax_rate REAL DEFAULT 0"); } catch (e) {}
      } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    try {
+      // Add menu_id to categories and menu_items
+      try { this.db.run("ALTER TABLE categories ADD COLUMN menu_id TEXT"); } catch (e) {}
+      try { this.db.run("ALTER TABLE menu_items ADD COLUMN menu_id TEXT"); } catch (e) {}
+    } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
 
     try {
       // Create addons table if not exists (for existing databases)
@@ -607,13 +654,116 @@ class Database {
   }
 
   // ===== Menu Operations =====
+  getMenus() {
+    return this.execute(`SELECT * FROM menus WHERE is_deleted = 0 ORDER BY created_at DESC`);
+  }
+
+  getActiveMenu() {
+    const result = this.execute(`SELECT * FROM menus WHERE is_active = 1 AND is_deleted = 0 LIMIT 1`);
+    return result[0] || null;
+  }
+
+  setActiveMenu(menuId) {
+    this.db.run('BEGIN');
+    try {
+      this.run('UPDATE menus SET is_active = 0');
+      this.run('UPDATE menus SET is_active = 1 WHERE id = ?', [menuId]);
+      this.db.run('COMMIT');
+      return { success: true };
+    } catch (e) {
+      this.db.run('ROLLBACK');
+      return { success: false, error: e.message };
+    }
+  }
+
+  saveMenu(menu) {
+    if (menu.id) {
+      this.update('menus', { name: menu.name }, { id: menu.id });
+      return menu.id;
+    } else {
+      const id = uuidv4();
+      this.insert('menus', {
+        id,
+        name: menu.name,
+        is_active: 0,
+        created_at: new Date().toISOString(),
+        is_deleted: 0
+      });
+      return id;
+    }
+  }
+
+  deleteMenu(id) {
+    // Cannot delete active menu
+    const menu = this.execute('SELECT is_active FROM menus WHERE id = ?', [id])[0];
+    if (menu && menu.is_active) {
+      return { success: false, error: 'Cannot delete the active menu.' };
+    }
+    this.run('UPDATE menus SET is_deleted = 1 WHERE id = ?', [id]);
+    return { success: true };
+  }
+
+  duplicateMenu(menuId, newName) {
+    const original = this.execute('SELECT * FROM menus WHERE id = ?', [menuId])[0];
+    if (!original) return { success: false, error: 'Original menu not found' };
+
+    const newMenuId = uuidv4();
+    this.db.run('BEGIN');
+    try {
+      this.insert('menus', {
+        id: newMenuId,
+        name: newName || `${original.name} (Copy)`,
+        is_active: 0,
+        created_at: new Date().toISOString(),
+        is_deleted: 0
+      });
+
+      // Copy categories
+      const categories = this.execute('SELECT * FROM categories WHERE menu_id = ? AND is_deleted = 0', [menuId]);
+      for (const cat of categories) {
+        const newCatId = uuidv4();
+        this.run('INSERT INTO categories (id, name, description, display_order, menu_id, is_active, is_deleted) VALUES (?, ?, ?, ?, ?, ?, 0)',
+          [newCatId, cat.name, cat.description, cat.display_order, newMenuId, cat.is_active]);
+
+        // Copy items for this category
+        const items = this.execute('SELECT * FROM menu_items WHERE category_id = ? AND is_deleted = 0', [cat.id]);
+        for (const item of items) {
+          const newItemId = uuidv4();
+          this.run(`
+            INSERT INTO menu_items (
+              id, category_id, name, description, price, cost_price, tax_rate, 
+              is_vegetarian, is_available, preparation_time, variants, addons, menu_id, is_deleted
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+          `, [
+            newItemId, newCatId, item.name, item.description, item.price, item.cost_price, 
+            item.tax_rate, item.is_vegetarian, item.is_available, item.preparation_time, 
+            item.variants, item.addons, newMenuId
+          ]);
+        }
+      }
+
+      this.db.run('COMMIT');
+      return { success: true, id: newMenuId };
+    } catch (e) {
+      this.db.run('ROLLBACK');
+      return { success: false, error: e.message };
+    }
+  }
+
   getCategories() {
+    const activeMenu = this.getActiveMenu();
+    if (!activeMenu) return [];
+    
     return this.execute(
-      `SELECT * FROM categories WHERE is_deleted = 0 ORDER BY display_order, name`
+      `SELECT * FROM categories WHERE menu_id = ? AND is_deleted = 0 ORDER BY display_order, name`,
+      [activeMenu.id]
     );
   }
 
   saveCategory(category) {
+    const activeMenu = this.getActiveMenu();
+    if (!activeMenu) return null;
+
     if (category.id) {
       this.update('categories', {
         name: category.name,
@@ -629,9 +779,11 @@ class Database {
         name: category.name,
         description: category.description,
         display_order: category.display_order || 0,
+        menu_id: activeMenu.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_deleted: 0,
+        is_active: 1
       });
       this.addToSyncQueue('category', id, 'create', category);
       return id;
@@ -639,13 +791,16 @@ class Database {
   }
 
   getMenuItems(categoryId = null) {
+    const activeMenu = this.getActiveMenu();
+    if (!activeMenu) return [];
+
     let query = `
       SELECT m.*, c.name as category_name 
       FROM menu_items m 
       LEFT JOIN categories c ON m.category_id = c.id 
-      WHERE m.is_deleted = 0
+      WHERE m.is_deleted = 0 AND m.menu_id = ?
     `;
-    const params = [];
+    const params = [activeMenu.id];
 
     if (categoryId) {
       query += ` AND m.category_id = ?`;
@@ -657,6 +812,9 @@ class Database {
   }
 
   saveMenuItem(item) {
+    const activeMenu = this.getActiveMenu();
+    if (!activeMenu) return null;
+
     // Helper to safely stringify JSON or return null
     const safeStringify = (data) => {
       try {
@@ -701,6 +859,7 @@ class Database {
         preparation_time: item.preparation_time,
         variants: safeStringify(item.variants),
         addons: safeStringify(item.addons),
+        menu_id: activeMenu.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_deleted: 0,
@@ -722,56 +881,96 @@ class Database {
     return { success: true };
   }
 
-  importMenu(items) {
+  // Internal helper for queries inside transactions (no automatic save)
+  _rawQuery(sql, params = []) {
+    const stmt = this.db.prepare(sql);
+    stmt.bind(params);
+    const results = [];
+    while (stmt.step()) {
+      results.push(stmt.getAsObject());
+    }
+    stmt.free();
+    return results;
+  }
+
+  importMenu(items, menuName = null) {
     let successCount = 0;
     let errorCount = 0;
     const errors = [];
 
-    this.db.run('BEGIN TRANSACTION');
+    this.db.run('BEGIN');
     try {
+      let targetMenuId;
+      if (menuName) {
+        // Create or find named menu
+        const existingMenu = this._rawQuery('SELECT id FROM menus WHERE name = ? AND is_deleted = 0 COLLATE NOCASE', [menuName]);
+        if (existingMenu && existingMenu.length > 0) {
+          targetMenuId = existingMenu[0].id;
+        } else {
+          targetMenuId = uuidv4();
+          this.run('INSERT INTO menus (id, name, is_active, created_at, is_deleted) VALUES (?, ?, 0, ?, 0)',
+            [targetMenuId, menuName, new Date().toISOString()]);
+        }
+      } else {
+        const activeMenu = this.getActiveMenu();
+        if (!activeMenu) {
+          throw new Error('No active menu found to import into.');
+        }
+        targetMenuId = activeMenu.id;
+      }
+
       for (const item of items) {
         try {
-          // 1. Find or Create Category
+          // 1. Find or Create Category within THIS menu
           let categoryId;
-          const catResult = this.execute('SELECT id FROM categories WHERE name = ? COLLATE NOCASE', [item.category]);
-          if (catResult.length > 0) {
+          const catResult = this._rawQuery('SELECT id FROM categories WHERE name = ? AND menu_id = ? AND is_deleted = 0 COLLATE NOCASE', [item.category, targetMenuId]);
+          
+          if (catResult && catResult.length > 0) {
             categoryId = catResult[0].id;
           } else {
             categoryId = uuidv4();
-            this.run('INSERT INTO categories (id, name, display_order, is_active) VALUES (?, ?, ?, ?, ?)',
-              [categoryId, item.category, 99, 1]);
+            const stmtCat = this.db.prepare('INSERT INTO categories (id, name, display_order, is_active, menu_id, is_deleted) VALUES (?, ?, ?, ?, ?, 0)');
+            stmtCat.run([categoryId, item.category, 99, 1, targetMenuId]);
+            stmtCat.free();
           }
 
-          // 2. Insert or Update Menu Item
-          const existing = this.execute('SELECT id FROM menu_items WHERE name = ? COLLATE NOCASE', [item.name]);
-          if (existing.length > 0) {
+          // 2. Insert or Update Menu Item within THIS menu and THIS category
+          const existing = this._rawQuery('SELECT id FROM menu_items WHERE name = ? AND menu_id = ? AND is_deleted = 0 COLLATE NOCASE', [item.name, targetMenuId]);
+          
+          if (existing && existing.length > 0) {
             // Update
-            this.run(`
+            const stmtItem = this.db.prepare(`
               UPDATE menu_items SET 
                 category_id = ?, price = ?, tax_rate = ?, is_vegetarian = ?, description = ?, updated_at = ?
               WHERE id = ?
-            `, [categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), existing[0].id]);
+            `);
+            stmtItem.run([categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), existing[0].id]);
+            stmtItem.free();
           } else {
             // Insert
             const id = uuidv4();
-            this.run(`
-              INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, is_available, created_at, updated_at, is_deleted)
-              VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0)
-            `, [id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), new Date().toISOString()]);
+            const stmtItem = this.db.prepare(`
+              INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, is_available, created_at, updated_at, is_deleted, menu_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0, ?)
+            `);
+            stmtItem.run([id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), new Date().toISOString(), targetMenuId]);
+            stmtItem.free();
           }
           successCount++;
         } catch (err) {
-          console.error(`Error importing item ${item.name}:`, err);
+          console.error(`Row import error (${item.name}):`, err);
           errorCount++;
-          errors.push(`Failed to import ${item.name}: ${err.message}`);
+          errors.push(`${item.name}: ${err.message}`);
         }
       }
       this.db.run('COMMIT');
     } catch (e) {
-      this.db.run('ROLLBACK');
-      throw e;
+      console.error('Menu import transaction failed:', e);
+      try { this.db.run('ROLLBACK'); } catch (r) {}
+      return { success: false, error: 'Transaction failed: ' + e.message };
     }
 
+    this.save();
     return { success: true, successCount, errorCount, errors };
   }
 
@@ -780,38 +979,43 @@ class Database {
     let errorCount = 0;
     const errors = [];
 
-    this.db.run('BEGIN TRANSACTION');
+    this.db.run('BEGIN');
     try {
       for (const item of items) {
         try {
-          const existing = this.execute('SELECT id FROM inventory WHERE name = ? COLLATE NOCASE', [item.name]);
-          if (existing.length > 0) {
-            // Update
-            this.run(`
+          const existing = this._rawQuery('SELECT id FROM inventory WHERE name = ? COLLATE NOCASE', [item.name]);
+          if (existing && existing.length > 0) {
+            const stmt = this.db.prepare(`
               UPDATE inventory SET 
                 unit = ?, current_stock = ?, minimum_stock = ?, cost_per_unit = ?, supplier = ?, updated_at = ?
               WHERE id = ?
-            `, [item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), existing[0].id]);
+            `);
+            stmt.run([item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), existing[0].id]);
+            stmt.free();
           } else {
-            // Insert
             const id = uuidv4();
-            this.run(`
+            const stmt = this.db.prepare(`
               INSERT INTO inventory (id, name, unit, current_stock, minimum_stock, cost_per_unit, supplier, created_at, updated_at, is_deleted)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-            `, [id, item.name, item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), new Date().toISOString()]);
+            `);
+            stmt.run([id, item.name, item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), new Date().toISOString()]);
+            stmt.free();
           }
           successCount++;
         } catch (err) {
-          console.error(`Error importing inventory item ${item.name}:`, err);
+          console.error(`Inventory row import error (${item.name}):`, err);
           errorCount++;
-          errors.push(`Failed to import ${item.name}: ${err.message}`);
+          errors.push(`${item.name}: ${err.message}`);
         }
       }
       this.db.run('COMMIT');
     } catch (e) {
-      this.db.run('ROLLBACK');
-      throw e;
+      console.error('Inventory import transaction failed:', e);
+      try { this.db.run('ROLLBACK'); } catch (r) {}
+      return { success: false, error: 'Transaction failed: ' + e.message };
     }
+    
+    this.save();
     return { success: true, successCount, errorCount, errors };
   }
 

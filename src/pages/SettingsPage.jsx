@@ -24,6 +24,7 @@ const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState('restaurant');
   const [dbPath, setDbPath] = useState('');
   const [isMovingDb, setIsMovingDb] = useState(false);
+  const [importMenuName, setImportMenuName] = useState('');
 
   useEffect(() => {
     loadData();
@@ -88,7 +89,10 @@ const SettingsPage = () => {
       }
 
       const channel = type === 'menu' ? 'data:importMenu' : 'data:importInventory';
-      const result = await window.electronAPI.invoke(channel, { filePath: fileResult.filePath });
+      const result = await window.electronAPI.invoke(channel, { 
+        filePath: fileResult.filePath,
+        menuName: type === 'menu' ? importMenuName : null
+      });
       
       if (result.success) {
         setImportStats({
@@ -400,6 +404,22 @@ const SettingsPage = () => {
                     <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginBottom: '16px', padding: '12px', background: 'var(--gray-50)', borderRadius: '8px' }}>
                       <strong style={{ color: 'var(--gray-600)' }}>Expected columns:</strong> Name, Category, Price, Tax Rate, Description
                     </div>
+                    
+                    <div style={{ marginBottom: '16px' }}>
+                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '6px' }}>Menu Profile Name (Optional)</label>
+                      <input 
+                        type="text" 
+                        className="input" 
+                        placeholder="e.g. Summer Menu, Breakfast"
+                        value={importMenuName}
+                        onChange={(e) => setImportMenuName(e.target.value)}
+                        style={{ fontSize: '12px', padding: '8px 12px' }}
+                      />
+                      <p style={{ fontSize: '10px', color: 'var(--gray-400)', marginTop: '4px' }}>
+                        If blank, items will be imported into the currently active menu.
+                      </p>
+                    </div>
+
                     <button className="btn btn-primary" onClick={() => handleImport('menu')} disabled={importing !== null}
                       style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center' }}>
                       <Upload size={16} />
