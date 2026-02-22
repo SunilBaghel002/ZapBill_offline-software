@@ -1384,19 +1384,19 @@ const POSPage = () => {
                 Save
               </button>
               <button className="pos-action-btn btn-print" onClick={handleSaveAndPrint}>
-                <Printer size={18} style={{ marginBottom: '4px' }} />
+                <Printer size={22} style={{ marginBottom: '4px' }} />
                 Print
               </button>
               <button className="pos-action-btn btn-kot" onClick={handleKOTOnly}>
-                <ChefHat size={18} style={{ marginBottom: '4px' }} />
+                <ChefHat size={22} style={{ marginBottom: '4px' }} />
                 KOT
               </button>
               <button className="pos-action-btn btn-kot-print" onClick={handleKOTAndPrint}>
-                <Printer size={18} style={{ marginBottom: '4px' }} />
+                <Printer size={22} style={{ marginBottom: '4px' }} />
                 KOT+Print
               </button>
               <button className="pos-action-btn btn-hold" onClick={handleHoldOrder} style={{ position: 'relative' }}>
-                <PauseCircle size={18} style={{ marginBottom: '4px' }} />
+                <PauseCircle size={22} style={{ marginBottom: '4px' }} />
                 Hold
                 {cart.heldOrders.length > 0 && (
                   <span style={{
@@ -2649,68 +2649,130 @@ const DiscountModal = ({ onClose, onApply, onClear, currentType, currentValue, s
 
 export default POSPage;
 
-// Held Orders Modal
 const HeldOrdersModal = ({ orders, onClose, onResume, onDelete }) => {
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: '700px', maxHeight: '80vh' }}>
-        <div className="modal-header" style={{ background: '#37474F', color: 'white' }}>
-          <h3 className="modal-title" style={{ color: 'white' }}>Held Orders ({orders.length})</h3>
-          <button className="modal-close-btn" onClick={onClose} style={{ color: 'white' }}><X size={20} /></button>
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 2000 }}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: '750px', height: 'auto', maxHeight: '85vh', borderRadius: '16px' }}>
+        <div className="modal-header" style={{ background: '#2c3e50', color: 'white', padding: '20px 24px' }}>
+          <h3 className="modal-title" style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>Held Orders ({orders.length})</h3>
+          <button 
+            className="modal-close-btn" 
+            onClick={onClose} 
+            style={{ 
+              background: 'rgba(255,255,255,0.15)', 
+              color: 'white', 
+              border: 'none',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background 0.2s'
+            }}
+            onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            <X size={22} />
+          </button>
         </div>
         <div className="modal-body" style={{ padding: '0' }}>
           {orders.length === 0 ? (
-            <div className="empty-state" style={{ padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <PauseCircle size={48} color="#CFD8DC" />
-              <p style={{ marginTop: '16px', color: '#90A4AE' }}>No held orders found</p>
+            <div className="empty-state" style={{ padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+              <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '50%', marginBottom: '16px' }}>
+                <PauseCircle size={64} color="#94a3b8" />
+              </div>
+              <h4 style={{ margin: 0, color: '#475569', fontSize: '18px' }}>No orders currently on hold</h4>
+              <p style={{ marginTop: '8px', color: '#94a3b8', maxWidth: '300px' }}>Orders you place on hold will appear here for later retrieval.</p>
             </div>
           ) : (
             <div className="held-orders-list">
               {orders.map(order => (
-                <div key={order.id} style={{ padding: '16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div 
+                  key={order.id} 
+                  onClick={() => onResume(order)}
+                  style={{ 
+                    padding: '20px 24px', 
+                    borderBottom: '1px solid #f1f5f9', 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }} 
+                  onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseOut={e => e.currentTarget.style.background = 'white'}
+                >
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Order #{order.orderNumber}</div>
-                      <span style={{ fontSize: '11px', background: '#ECEFF1', padding: '2px 6px', borderRadius: '4px', color: '#546E7A' }}>
-                        {new Date(order.timestamp).toLocaleTimeString()}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ fontWeight: '800', fontSize: '18px', color: '#1e293b' }}>Order #{order.orderNumber}</div>
+                      <span style={{ fontSize: '12px', background: '#f1f5f9', padding: '4px 10px', borderRadius: '20px', color: '#64748b', fontWeight: '600' }}>
+                        {new Date(order.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                      {order.items.length} Items • {order.orderType?.toUpperCase()}
+                    <div style={{ fontSize: '13px', color: '#64748b', marginTop: '6px', fontWeight: '500' }}>
+                      {order.items.reduce((acc, i) => acc + i.quantity, 0)} Items • {order.orderType?.replace('_', ' ').toUpperCase()}
                     </div>
                     {(order.customerName || order.customerPhone) && (
-                      <div style={{ fontSize: '12px', color: '#1976D2', marginTop: '2px' }}>
-                        <User size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
-                        {order.customerName} {order.customerPhone ? `(${order.customerPhone})` : ''}
+                      <div style={{ fontSize: '13px', color: '#3b82f6', marginTop: '4px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <User size={14} />
+                        {order.customerName || 'Walk-in'} {order.customerPhone ? `(${order.customerPhone})` : ''}
                       </div>
                     )}
-                    {order.items.slice(0, 3).map((item, idx) => (
-                      <div key={idx} style={{ fontSize: '11px', color: '#90A4AE' }}>
-                        - {item.quantity} x {item.name}
-                      </div>
-                    ))}
-                    {order.items.length > 3 && <div style={{ fontSize: '11px', color: '#90A4AE' }}>... +{order.items.length - 3} more</div>}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                      {order.items.slice(0, 3).map((item, idx) => (
+                        <span key={idx} style={{ fontSize: '11px', color: '#94a3b8', background: '#f8fafc', padding: '2px 8px', borderRadius: '4px', border: '1px solid #f1f5f9' }}>
+                          {item.quantity}× {item.name}
+                        </span>
+                      ))}
+                      {order.items.length > 3 && <span style={{ fontSize: '11px', color: '#94a3b8', padding: '2px 4px' }}>+{order.items.length - 3} more</span>}
+                    </div>
                   </div>
 
-                  <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '18px', color: '#D32F2F' }}>
+                  <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px', marginLeft: '20px' }}>
+                    <div style={{ fontWeight: '900', fontSize: '22px', color: '#ef4444' }}>
                       ₹{order.totalAmount.toFixed(2)}
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '10px' }}>
                       <button
-                        onClick={() => onDelete(order.id)}
+                        onClick={(e) => { e.stopPropagation(); onDelete(order.id); }}
                         className="btn"
-                        style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid #FFCDD2', background: '#FFEBEE', color: '#D32F2F' }}
+                        style={{ 
+                          padding: '10px 20px', 
+                          fontSize: '14px', 
+                          fontWeight: '700',
+                          border: '1.5px solid #fee2e2', 
+                          background: '#fef2f2', 
+                          color: '#ef4444',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={e => { e.currentTarget.style.background = '#fee2e2'; }}
+                        onMouseOut={e => { e.currentTarget.style.background = '#fef2f2'; }}
                       >
-                        <Trash2 size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                        <Trash2 size={16} />
                         Delete
                       </button>
                       <button
-                        onClick={() => onResume(order)}
+                        onClick={(e) => { e.stopPropagation(); onResume(order); }}
                         className="btn btn-primary"
-                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                        style={{ 
+                          padding: '10px 24px', 
+                          fontSize: '14px', 
+                          fontWeight: '700',
+                          background: '#3b82f6',
+                          borderColor: '#3b82f6',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)'
+                        }}
                       >
-                        <PlayCircle size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                        <PlayCircle size={16} />
                         Resume
                       </button>
                     </div>

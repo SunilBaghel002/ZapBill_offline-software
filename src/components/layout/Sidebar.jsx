@@ -77,20 +77,32 @@ const Sidebar = () => {
 
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" style={{
+      width: '280px',
+      height: '100vh',
+      background: '#1A2327',
+      color: 'white',
+      display: 'flex',
+      flexDirection: 'column',
+      boxShadow: '2px 0 10px rgba(0,0,0,0.3)',
+      position: 'fixed',
+      left: 0,
+      top: 0,
+      zIndex: 100
+    }}>
       {/* Logo Section */}
-      <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">
-          <UtensilsCrossed size={28} />
+      <div style={{ padding: '20px', borderBottom: '1px solid #37474F', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ background: '#0096FF', padding: '8px', borderRadius: '8px' }}>
+          <UtensilsCrossed size={24} color="white" />
         </div>
-        <div className="sidebar-logo-text">
-          <span className="sidebar-brand">ZapBill</span>
-          <span className="sidebar-tagline">POS System</span>
+        <div>
+          <div style={{ fontWeight: 'bold', fontSize: '18px' }}>ZapBill</div>
+          <div style={{ fontSize: '12px', color: '#90A4AE' }}>POS System</div>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
         {navItems.map((item) => {
            if (item.children) {
              const isExpanded = expandedMenu === item.path;
@@ -100,33 +112,46 @@ const Sidebar = () => {
                 <div key={item.path}>
                   <NavLink
                     to={item.path}
-                    className={({ isActive }) => `sidebar-nav-item ${isActive ? 'active' : ''}`}
                     onClick={() => setExpandedMenu(expandedMenu === item.path ? null : item.path)}
-                    style={{ cursor: 'pointer', justifyContent: 'space-between', textDecoration: 'none' }}
+                    style={({ isActive }) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '14px 24px',
+                      color: isActive ? 'white' : '#B0BEC5',
+                      background: isActive ? 'rgba(0, 150, 255, 0.1)' : 'transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      borderLeft: isActive ? '4px solid #0096FF' : '4px solid transparent',
+                      textDecoration: 'none'
+                    })}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <item.icon size={22} className="sidebar-nav-icon" />
-                      <span className="sidebar-nav-label">{item.label}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <item.icon size={24} />
+                      <span style={{ fontSize: '15px', fontWeight: 600 }}>{item.label}</span>
                     </div>
-                    <span style={{ fontSize: '10px', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+                    <span style={{ fontSize: '10px', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', opacity: 0.5 }}>▼</span>
                   </NavLink>
 
                  {isExpanded && (
-                   <div style={{ background: 'rgba(0,0,0,0.03)', paddingBottom: '4px' }}>
+                   <div style={{ background: 'rgba(0,0,0,0.2)', paddingBottom: '4px' }}>
                      {item.children.map((child) => (
                        <NavLink
                          key={child.path}
                          to={child.path}
-                         className={({ isActive }) => 
-                           `sidebar-nav-item ${isActive ? 'active' : ''}`
-                         }
-                         style={{ 
-                           paddingLeft: '48px', 
-                           fontSize: '13px',
-                           height: '40px'
-                         }}
+                         className={({ isActive }) =>isActive ? 'active-nav-link' : ''}
+                         style={({ isActive }) => ({
+                           display: 'flex',
+                           alignItems: 'center',
+                           padding: '12px 24px 12px 64px',
+                           color: isActive ? 'white' : '#B0BEC5',
+                           textDecoration: 'none',
+                           fontSize: '14px',
+                           background: isActive ? 'rgba(0, 150, 255, 0.15)' : 'transparent',
+                           transition: 'all 0.2s'
+                         })}
                        >
-                         <span className="sidebar-nav-label">{child.label}</span>
+                         <span>{child.label}</span>
                        </NavLink>
                      ))}
                    </div>
@@ -139,14 +164,25 @@ const Sidebar = () => {
             <NavLink
               key={item.path}
               to={item.path}
-              className={({ isActive }) => 
-                `sidebar-nav-item ${isActive ? 'active' : ''}`
-              }
+              className={({ isActive }) => isActive ? 'active-nav-link' : ''}
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '14px 24px',
+                color: isActive ? 'white' : '#B0BEC5',
+                textDecoration: 'none',
+                background: isActive ? 'rgba(0, 150, 255, 0.15)' : 'transparent',
+                borderLeft: isActive ? '4px solid #0096FF' : '4px solid transparent',
+                transition: 'all 0.2s'
+              })}
             >
-              <item.icon size={22} className="sidebar-nav-icon" />
-              <span className="sidebar-nav-label">{item.label}</span>
+              <item.icon size={24} />
+              <span style={{ fontSize: '15px', fontWeight: 600 }}>{item.label}</span>
               {item.badge && (
-                <span className="sidebar-badge">{item.badge}</span>
+                <span style={{ marginLeft: 'auto', background: '#0096FF', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 'bold' }}>
+                  {item.badge}
+                </span>
               )}
             </NavLink>
           );
@@ -155,18 +191,24 @@ const Sidebar = () => {
         {/* End Shift Button for Billers */}
         <button
           onClick={() => setShowEndShiftModal(true)}
-          className="sidebar-nav-item"
           style={{ 
             width: '100%', 
             border: 'none', 
             background: 'none', 
             cursor: 'pointer',
             marginTop: 'auto',
-            color: 'var(--gray-400)'
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            padding: '14px 24px',
+            color: '#B0BEC5',
+            transition: 'all 0.2s'
           }}
+          onMouseOver={e => e.currentTarget.style.color = 'white'}
+          onMouseOut={e => e.currentTarget.style.color = '#B0BEC5'}
         >
-          <LogOut size={22} className="sidebar-nav-icon" />
-          <span className="sidebar-nav-label">End Day</span>
+          <LogOut size={24} />
+          <span style={{ fontSize: '15px', fontWeight: 600 }}>End Day</span>
         </button>
       </nav>
 
@@ -176,26 +218,76 @@ const Sidebar = () => {
         onClose={() => setShowEndShiftModal(false)} 
       />
 
-      {/* User Section */}
-      <div className="sidebar-user">
-        <div className="sidebar-user-avatar">
-          {user?.fullName?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U'}
+      {/* User Section - Unified with MainSidebar */}
+      <div style={{ padding: '16px', borderTop: '1px solid #37474F', background: '#263238' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+          <div style={{ 
+            width: '40px', 
+            height: '40px', 
+            borderRadius: '50%', 
+            background: '#455A64', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            fontWeight: 'bold',
+            color: 'white',
+            fontSize: '16px'
+          }}>
+            {user?.fullName?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U'}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: '600', color: 'white', fontSize: '14px' }}>{user?.fullName || user?.username || 'User'}</div>
+            <div style={{ fontSize: '12px', color: '#B0BEC5', textTransform: 'capitalize' }}>{user?.role || 'Staff'}</div>
+          </div>
         </div>
-        <div className="sidebar-user-info">
-          <span className="sidebar-user-name">{user?.fullName || user?.username || 'User'}</span>
-          <span className="sidebar-user-role">{user?.role || 'Staff'} ({user?.role})</span>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            onClick={handleSwitchUser}
+            style={{ 
+              flex: 1, 
+              padding: '10px', 
+              background: '#37474F', 
+              border: 'none', 
+              borderRadius: '6px', 
+              color: '#CFD8DC', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '6px', 
+              fontSize: '13px', 
+              transition: 'background 0.2s',
+              fontWeight: '500'
+            }}
+            onMouseOver={e => e.currentTarget.style.background = '#455A64'}
+            onMouseOut={e => e.currentTarget.style.background = '#37474F'}
+            title="Switch User"
+          >
+            <RefreshCw size={14} /> Switch User
+          </button>
+          <button 
+            onClick={handleLogout}
+            style={{ 
+              padding: '10px 14px', 
+              background: '#0096FF', 
+              border: 'none', 
+              borderRadius: '6px', 
+              color: 'white', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '6px', 
+              fontSize: '13px', 
+              transition: 'background 0.2s' 
+            }}
+            onMouseOver={e => e.currentTarget.style.background = '#0284c7'}
+            onMouseOut={e => e.currentTarget.style.background = '#0096FF'}
+            title="Logout"
+          >
+            <LogOut size={14} />
+          </button>
         </div>
-        <button 
-          className="sidebar-logout" 
-          onClick={handleSwitchUser} 
-          title="Switch User"
-          style={{ marginRight: '2px' }}
-        >
-          <RefreshCw size={16} />
-        </button>
-        <button className="sidebar-logout" onClick={handleLogout} title="Logout">
-          <LogOut size={18} />
-        </button>
       </div>
     </aside>
   );

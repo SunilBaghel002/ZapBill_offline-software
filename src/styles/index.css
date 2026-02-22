@@ -136,7 +136,7 @@
   /* Layout */
   --sidebar-width-collapsed: 72px;
   /* Kept for legacy, but we won't collapse */
-  --sidebar-width-expanded: 240px;
+  --sidebar-width-expanded: 280px;
   /* Fixed larger width */
   --header-height: 64px;
   /* Slightly taller header */
@@ -160,7 +160,7 @@
   /* Backgrounds */
 
   /* Global Layout Variables */
-  --sidebar-width: 240px;
+  --sidebar-width: 280px;
 }
 
 
