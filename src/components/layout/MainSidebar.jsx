@@ -135,7 +135,7 @@ const MainSidebar = ({ isOpen, onClose }) => {
                     padding: '12px 24px',
                     color: isActive ? 'white' : '#B0BEC5',
                     textDecoration: 'none',
-                    background: isActive ? '#0284c7' : 'transparent',
+                    background: isActive ? 'rgba(0, 150, 255, 0.15)' : 'transparent',
                     borderLeft: isActive ? '4px solid #0096FF' : '4px solid transparent',
                     transition: 'all 0.2s'
                 })}

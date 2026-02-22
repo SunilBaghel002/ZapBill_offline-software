@@ -12,36 +12,111 @@ import {
   AlertCircle,
   XCircle,
   Minus,
-  Wallet
+  Wallet,
+  BarChart3,
+  ShoppingBag,
+  ArrowUpRight,
+  Plus
 } from 'lucide-react';
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer 
+} from 'recharts';
 import { format, subDays } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
 
+// StatCard Component
 // StatCard Component
 const StatCard = ({ title, value, trend, trendValue, icon: Icon, color }) => {
   const isPositive = trend === 'up';
   const isNegative = trend === 'down';
   const isNeutral = trend === 'neutral';
   
+  const colors = {
+    primary: { bg: '#e0f2fe', icon: '#0096FF', text: '#0369a1', glow: 'rgba(0, 150, 255, 0.15)' },
+    success: { bg: '#dcfce7', icon: '#10b981', text: '#15803d', glow: 'rgba(16, 185, 129, 0.15)' },
+    warning: { bg: '#fef3c7', icon: '#f59e0b', text: '#92400e', glow: 'rgba(245, 158, 11, 0.15)' },
+    danger: { bg: '#fee2e2', icon: '#ef4444', text: '#991b1b', glow: 'rgba(239, 68, 68, 0.15)' },
+    info: { bg: '#e0e7ff', icon: '#6366f1', text: '#3730a3', glow: 'rgba(99, 102, 241, 0.15)' }
+  };
+
+  const theme = colors[color] || colors.primary;
+
   return (
-    <div className="stat-card">
-      <div className="stat-card-header">
-        <div className={`stat-card-icon ${color}`}>
-          <Icon size={20} />
+    <div className="card hover-shadow" style={{ 
+      padding: '20px', 
+      borderRadius: '24px', 
+      background: 'white',
+      border: '1px solid #f1f5f9',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '20px',
+      position: 'relative',
+      overflow: 'hidden',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      cursor: 'default',
+      minHeight: '120px'
+    }}>
+      {/* Icon Box */}
+      <div style={{ 
+        width: '64px', 
+        height: '64px', 
+        borderRadius: '20px', 
+        background: theme.bg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: theme.icon,
+        boxShadow: `0 12px 24px -6px ${theme.glow}`,
+        flexShrink: 0,
+        zIndex: 2
+      }}>
+        <Icon size={32} strokeWidth={2} />
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, zIndex: 2 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <span style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            {title}
+          </span>
+          <div style={{ 
+            padding: '4px 10px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: '800',
+            background: isPositive ? '#dcfce7' : isNegative ? '#fee2e2' : '#f1f5f9',
+            color: isPositive ? '#15803d' : isNegative ? '#b91c1c' : '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            border: isPositive ? '1px solid #bbf7d0' : isNegative ? '1px solid #fecaca' : '1px solid #e2e8f0'
+          }}>
+            {isPositive ? <TrendingUp size={14} /> : isNegative ? <TrendingDown size={14} /> : <Minus size={14} />}
+            {trendValue}%
+          </div>
         </div>
-        <button className="stat-card-menu">
-          <MoreHorizontal size={16} />
-        </button>
+        <div style={{ fontSize: '28px', fontWeight: '900', color: '#1e293b', lineHeight: '1' }}>
+          {value}
+        </div>
       </div>
-      <div className="stat-card-content">
-        <span className="stat-card-title">{title}</span>
-        <span className="stat-card-value">{value}</span>
-      </div>
-      <div className={`stat-card-trend ${isPositive ? 'positive' : isNegative ? 'negative' : 'neutral'}`} style={{ color: isNeutral ? 'var(--gray-500)' : undefined }}>
-        {isPositive && <TrendingUp size={14} />}
-        {isNegative && <TrendingDown size={14} />}
-        {isNeutral && <Minus size={14} />}
-        <span>{trendValue}% from yesterday</span>
+
+      {/* Background Decorator */}
+      <div style={{ 
+        position: 'absolute', 
+        right: '-10px', 
+        bottom: '-10px', 
+        opacity: 0.05, 
+        transform: 'rotate(-15deg)',
+        color: theme.icon,
+        zIndex: 1
+      }}>
+        <Icon size={110} />
       </div>
     </div>
   );
@@ -134,90 +209,92 @@ const OrderDetailsModal = ({ order, onClose }) => {
 // Order Card Component
 const OrderCard = ({ order, onClick }) => {
   const statusColors = {
-    active: 'info',
-    pending: 'warning',
-    preparing: 'info',
-    ready: 'success',
-    completed: 'success',
-    cancelled: 'danger',
-    held: 'warning'
+    active: { bg: '#e0f2fe', text: '#0369a1', icon: Clock },
+    pending: { bg: '#fef3c7', text: '#d97706', icon: AlertCircle },
+    preparing: { bg: '#e0f2fe', text: '#0369a1', icon: Clock },
+    ready: { bg: '#dcfce7', text: '#15803d', icon: CheckCircle },
+    completed: { bg: '#dcfce7', text: '#15803d', icon: CheckCircle },
+    cancelled: { bg: '#fee2e2', text: '#b91c1c', icon: XCircle },
+    held: { bg: '#fef3c7', text: '#d97706', icon: AlertCircle }
   };
 
-  const statusIcons = {
-    active: Clock,
-    pending: AlertCircle,
-    preparing: Clock,
-    ready: CheckCircle,
-    completed: CheckCircle,
-    cancelled: XCircle,
-    held: AlertCircle
-  };
-
-  const StatusIcon = statusIcons[order.status] || AlertCircle;
+  const status = statusColors[order.status] || statusColors.active;
+  const StatusIcon = status.icon;
   
-  // Parse date
   const orderDate = new Date(order.created_at);
   const today = new Date();
   const isToday = orderDate.toDateString() === today.toDateString();
   const dateDisplay = isToday ? 'Today' : orderDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 
   return (
-    <div className="order-card" onClick={() => onClick(order)} 
-        style={{ 
-            cursor: 'pointer', 
-            transition: 'all 0.2s ease', 
-            border: '1px solid #eef2f6',
-            background: 'white',
-            borderRadius: '12px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'; }}
+    <div 
+      className="card hover-shadow" 
+      onClick={() => onClick(order)}
+      style={{
+        padding: '0',
+        borderRadius: '16px',
+        border: '1px solid #f1f5f9',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}
     >
-      <div className="order-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px dashed #f0f0f0' }}>
-        <div className="order-card-info" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="order-card-number" style={{ fontWeight: '700', color: '#1a1a1a', fontSize: '15px' }}>#{order.order_number}</span>
-          <span style={{ fontSize: '11px', color: '#888', background: '#f5f5f5', padding: '2px 6px', borderRadius: '4px' }}>{dateDisplay}</span>
+      <div style={{ padding: '16px', borderBottom: '1px solid #f1f5f9' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#1e293b' }}>#{order.order_number}</h4>
+            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {order.order_type?.replace('_', ' ')} • {dateDisplay}
+            </span>
+          </div>
+          <span style={{ 
+            padding: '4px 10px', 
+            borderRadius: '20px', 
+            background: status.bg, 
+            color: status.text, 
+            fontSize: '11px', 
+            fontWeight: '700',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            textTransform: 'uppercase'
+          }}>
+            <StatusIcon size={12} />
+            {order.status}
+          </span>
         </div>
-        <span className={`order-card-status ${statusColors[order.status]}`} 
-            style={{ 
-                fontSize: '11px', 
-                padding: '4px 8px', 
-                borderRadius: '20px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px',
-                fontWeight: '600',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-            }}>
-          <StatusIcon size={12} />
-          {order.status}
-        </span>
+        
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>{order.customer_name || 'Walk-in Customer'}</div>
+          <div style={{ color: '#64748b', fontSize: '13px' }}>
+            {order.items?.slice(0, 2).map((item, idx) => (
+              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>{item.quantity}x {item.item_name || item.name}</span>
+              </div>
+            ))}
+            {order.items?.length > 2 && (
+              <div style={{ color: '#0096FF', fontWeight: '600', marginTop: '4px', fontSize: '12px' }}>
+                +{order.items.length - 2} more items
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-      <div className="order-card-body" style={{ padding: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#555', marginBottom: '12px' }}>
-            <div style={{ fontWeight: '600', color: '#333' }}>{order.customer_name || 'Walk-in'}</div>
-            <div style={{ color: '#888' }}>{order.order_type.replace('_', ' ')}</div>
-        </div>
-        <div className="order-card-items" style={{ minHeight: '40px' }}>
-          {order.items?.slice(0, 2).map((item, idx) => (
-            <div key={idx} className="order-card-item" style={{ fontSize: '13px', color: '#666', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              <span style={{ fontWeight: '600', color: '#333', marginRight: '6px' }}>{item.quantity}x</span> 
-              {item.item_name || item.name}
-            </div>
-          ))}
-          {order.items?.length > 2 && (
-            <div className="order-card-more" style={{ fontSize: '12px', color: '#3498db', marginTop: '4px' }}>+{order.items.length - 2} more items</div>
-          )}
-        </div>
-      </div>
-      <div className="order-card-footer" style={{ padding: '12px 16px', background: '#fafafa', borderTop: '1px solid #f0f0f0', borderRadius: '0 0 12px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span className="order-card-time" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#888' }}>
+      
+      <div style={{ 
+        padding: '12px 16px', 
+        background: '#f8fafc', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center' 
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#64748b' }}>
           <Clock size={14} />
           {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-        </span>
-        <span className="order-card-total" style={{ fontWeight: '700', fontSize: '16px', color: '#27ae60' }}>₹{order.total_amount?.toFixed(0) || 0}</span>
+        </div>
+        <div style={{ fontSize: '18px', fontWeight: '900', color: '#0096FF' }}>
+          ₹{order.total_amount?.toFixed(0)}
+        </div>
       </div>
     </div>
   );
@@ -239,6 +316,8 @@ const DashboardPage = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [chartData, setChartData] = useState([]);
+  const [topItems, setTopItems] = useState([]);
 
   const { user } = useAuthStore();
 
@@ -333,6 +412,17 @@ const DashboardPage = () => {
         activeOrdersTrend: { direction: 'neutral', value: 0 } 
       });
 
+      // Fetch weekly trend for chart
+      const weekStart = format(subDays(new Date(), 6), 'yyyy-MM-dd');
+      const weeklyReport = await window.electronAPI.invoke('reports:weekly', { startDate: weekStart });
+      if (weeklyReport && weeklyReport.dailyTrend) {
+        setChartData(weeklyReport.dailyTrend);
+      }
+      
+      if (todayReport && todayReport.topItems) {
+        setTopItems(todayReport.topItems.slice(0, 5));
+      }
+
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -378,17 +468,30 @@ const DashboardPage = () => {
   }
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ background: '#f8fafc' }}>
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">Welcome back! Here's what's happening today.</p>
+          <h1 className="page-title" style={{ fontSize: '28px', fontWeight: '900', color: '#1e293b' }}>Dashboard</h1>
+          <p className="page-subtitle" style={{ color: '#64748b', fontSize: '15px' }}>Welcome back, <span style={{ color: '#0096FF', fontWeight: '700' }}>{user?.full_name || user?.username}</span>! Here's your restaurant's overview.</p>
+        </div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn btn-secondary" onClick={loadDashboardData} style={{ borderRadius: '12px', padding: '10px 16px' }}>
+            <Clock size={18} /> Refresh
+          </button>
+          <a href="/pos" className="btn btn-primary" style={{ borderRadius: '12px', padding: '10px 20px', fontWeight: '700' }}>
+            <Plus size={18} /> New Order
+          </a>
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+      <div className="stats-grid" style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', 
+        gap: '24px',
+        marginBottom: '32px'
+      }}>
         <StatCard
           title="Opening Balance"
           value={`₹${(stats.openingBalance || 0).toLocaleString()}`}
@@ -402,24 +505,8 @@ const DashboardPage = () => {
           value={`₹${stats.todayRevenue.toLocaleString()}`}
           trend={stats.revenueTrend.direction}
           trendValue={stats.revenueTrend.value}
-          icon={ShoppingCart}
+          icon={ShoppingBag}
           color="primary"
-        />
-        <StatCard
-          title="Today's Expenses"
-          value={`₹${stats.todayExpenses.toLocaleString()}`}
-          trend="neutral"
-          trendValue={0}
-          icon={TrendingDown}
-          color="danger"
-        />
-        <StatCard
-          title="Total Orders"
-          value={stats.totalOrders}
-          trend={stats.ordersTrend.direction}
-          trendValue={stats.ordersTrend.value}
-          icon={Users}
-          color="info"
         />
         <StatCard
           title="Net Profit"
@@ -429,25 +516,164 @@ const DashboardPage = () => {
           icon={DollarSign}
           color="success"
         />
+        <StatCard
+          title="Total Orders"
+          value={stats.totalOrders}
+          trend={stats.ordersTrend.direction}
+          trendValue={stats.ordersTrend.value}
+          icon={BarChart3}
+          color="info"
+        />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '32px', marginBottom: '32px' }}>
+        {/* Sales Trend Chart */}
+        <div className="card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>Sales Trend (Last 7 Days)</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: '700', fontSize: '14px' }}>
+              <TrendingUp size={16} /> 12% increase
+            </div>
+          </div>
+          <div style={{ height: '300px', width: '100%' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData.length > 0 ? chartData : [
+                {date: 'Mon', total_revenue: 0}, {date: 'Tue', total_revenue: 0}, 
+                {date: 'Wed', total_revenue: 0}, {date: 'Thu', total_revenue: 0}, 
+                {date: 'Fri', total_revenue: 0}, {date: 'Sat', total_revenue: 0}, 
+                {date: 'Sun', total_revenue: 0}
+              ]}>
+                <defs>
+                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0096FF" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#0096FF" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(str) => {
+                    try { return format(new Date(str), 'MMM d'); } 
+                    catch(e) { return str; }
+                  }} 
+                  tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: '500' }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                />
+                <YAxis 
+                  tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: '500' }} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tickFormatter={(v) => `₹${v}`} 
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    borderRadius: '16px', 
+                    border: 'none', 
+                    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)',
+                    padding: '12px' 
+                  }} 
+                  itemStyle={{ fontWeight: '800', color: '#0096FF' }}
+                  labelStyle={{ fontWeight: '700', marginBottom: '4px' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="total_revenue" 
+                  stroke="#0096FF" 
+                  fillOpacity={1} 
+                  fill="url(#colorRev)" 
+                  strokeWidth={4}
+                  dot={{ r: 4, fill: '#0096FF', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6, strokeWidth: 0 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Top Items Section */}
+        <div className="card" style={{ padding: '24px', borderRadius: '24px', border: '1px solid #f1f5f9' }}>
+          <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '800', color: '#1e293b' }}>Top Selling Items</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {topItems.length > 0 ? topItems.map((item, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ 
+                  width: '40px', 
+                  height: '40px', 
+                  borderRadius: '10px', 
+                  background: '#f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  fontWeight: '800',
+                  color: '#64748b'
+                }}>
+                  #{idx + 1}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b' }}>{item.item_name}</div>
+                  <div style={{ fontSize: '12px', color: '#94a3b8' }}>{item.total_quantity} units sold</div>
+                </div>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: '#10b981' }}>
+                  ₹{item.total_revenue?.toFixed(0)}
+                </div>
+              </div>
+            )) : (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8' }}>
+                <BarChart3 size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
+                <p>No data yet</p>
+              </div>
+            )}
+          </div>
+          <a href="/reports?category=sales" style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: '8px',
+            marginTop: '24px',
+            padding: '12px',
+            borderRadius: '12px',
+            background: '#0096FF10',
+            color: '#0096FF',
+            fontSize: '13px',
+            fontWeight: '700',
+            textDecoration: 'none'
+          }}>
+            Detailed Sales Report <ArrowUpRight size={16} />
+          </a>
+        </div>
       </div>
 
       {/* Recent Orders Section */}
       <div className="dashboard-section">
-        <div className="section-header">
-          <h2 className="section-title">Recent Orders</h2>
-          <a href="/orders" className="section-link">
-            View all <ArrowRight size={16} />
+        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 className="section-title" style={{ fontSize: '20px', fontWeight: '900', color: '#1e293b', margin: 0 }}>Recent Orders</h2>
+          <a href="/orders" className="section-link" style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '6px', 
+            color: '#0096FF', 
+            fontWeight: '700', 
+            fontSize: '14px',
+            textDecoration: 'none'
+          }}>
+            View All Orders <ArrowRight size={16} />
           </a>
         </div>
-        <div className="orders-grid">
+        <div className="orders-grid" style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+          gap: '24px' 
+        }}>
           {recentOrders.length > 0 ? (
             recentOrders.map(order => (
               <OrderCard key={order.id} order={order} onClick={setSelectedOrder} />
             ))
           ) : (
-            <div className="empty-state">
-              <ShoppingCart size={48} />
-              <p>No orders today</p>
+            <div className="empty-state" style={{ gridColumn: '1 / -1', padding: '60px' }}>
+              <ShoppingCart size={48} color="#cbd5e1" />
+              <p style={{ marginTop: '16px', color: '#94a3b8', fontWeight: '600' }}>No orders placed today yet.</p>
             </div>
           )}
         </div>

@@ -374,6 +374,13 @@ h4 {
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--gray-200);
   overflow: hidden;
+  transition: all var(--transition-base);
+}
+
+.hover-shadow:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-200);
 }
 
 .card-header {
@@ -1637,15 +1644,15 @@ h4 {
 }
 
 .pos-new-order-btn {
-  background: #E49B0F;
+  background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
   color: white;
   border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
-  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 700;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(228, 155, 15, 0.3);
+  box-shadow: 0 4px 12px rgba(245, 124, 0, 0.2);
   transition: all 0.2s;
 }
 
@@ -1712,14 +1719,14 @@ h4 {
 
 /* Category Sidebar - Light Theme Redesign */
 .pos-category-sidebar {
-  width: 120px; /* Increased from 100px */
-  background: #FFFFFF; /* White Background */
+  width: 140px; 
+  background: #f1f5f9;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  padding: 12px 8px; /* Breathing room */
-  gap: 12px;
-  border-right: 1px solid #F1F5F9; /* Subtle separator */
+  padding: 12px 8px;
+  gap: 10px;
+  border-right: 1px solid #e2e8f0;
 }
 
 /* Scrollbar styling */
@@ -1728,35 +1735,41 @@ h4 {
 }
 
 .pos-category-item {
-  height: 85px; /* Taller for elegance */
-  min-height: 85px;
+  height: 95px;
+  min-height: 95px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #64748B; /* Slate 500 - Muted Dark Gray */
-  font-weight: 600;
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  border-radius: 16px; /* Soft rounding */
-  transition: all 0.2s ease;
+  color: #475569;
+  font-weight: 800;
+  font-size: 11px;
+  border-radius: 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: center;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: white;
+  border: 1px solid transparent;
 }
 
 .pos-category-item:hover {
-  background: #F8FAFC; /* Very light gray hover */
-  color: #334155; /* Darker text */
+  background: #e2e8f0;
+  transform: translateY(-2px);
 }
 
 .pos-category-item.active {
-  /* Deep Blue/Purple Gradient Pill */
-  background: linear-gradient(180deg, #1A237E 0%, #3949AB 100%); 
+  background: #0096FF;
   color: white;
-  box-shadow: 0 8px 20px rgba(26, 35, 126, 0.25); /* Deep shadow */
-  transform: scale(1.02);
-  border-radius: 24px; /* Pill shape */
+  box-shadow: 0 12px 20px -5px rgba(0, 150, 255, 0.3);
+  transform: scale(1.05);
+  border-color: #0096FF;
+}
+
+.pos-category-item.active .pos-category-icon-wrapper {
+  color: white;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
 }
 
 .pos-category-item.active .pos-category-icon-wrapper svg {
@@ -1806,9 +1819,9 @@ h4 {
 }
 
 .pos-order-type-tab.active {
-  background: #D32F2F;
-  /* Red Active */
+  background: #0096FF;
   color: white;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
 }
 
 /* Cart Table Header */
@@ -2289,10 +2302,10 @@ h4 {
 
 .pos-action-btn {
   border: none;
-  font-weight: 600;
-  font-size: 15px;
+  font-weight: 800;
+  font-size: 13px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   color: white;
   display: flex;
   flex-direction: column;
@@ -2300,16 +2313,19 @@ h4 {
   justify-content: center;
   text-align: center;
   line-height: 1.2;
-  padding: 0 4px;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.pos-action-btn:last-child {
-  border-right: none;
+  padding: 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .pos-action-btn:hover {
-  filter: brightness(1.1);
+  filter: contrast(1.1) brightness(1.1);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.2);
+}
+
+.pos-action-btn:active {
+  transform: translateY(-1px);
 }
 
 .pos-billing-ctrl-row {
@@ -2364,27 +2380,14 @@ h4 {
   padding: 1px 0 0 0;
 }
 
-.pos-action-btn {
-  border: none;
-  height: 48px;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  color: white;
-  transition: opacity 0.2s;
-}
-
-.pos-action-btn:hover {
-  opacity: 0.9;
-}
-
+/* Action Button Colors */
 .pos-action-btn.btn-save {
   background: #10B981; /* Vibrant Green */
 }
 
 /* Red */
 .pos-action-btn.btn-print {
-  background: #1565C0;
+  background: #6366f1;
 }
 
 /* Dark Red */
@@ -2399,7 +2402,7 @@ h4 {
 
 /* Dark Blue Grey */
 .pos-action-btn.btn-hold {
-  background: #FF8F00;
+  background: #f59e0b;
   color: white;
 }
 

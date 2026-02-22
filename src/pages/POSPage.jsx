@@ -12,6 +12,7 @@ import {
   X,
   Printer,
   Check,
+  CheckCircle,
   Search,
 
   Leaf,
@@ -734,7 +735,7 @@ const POSPage = () => {
               onClick={() => setSelectedCategory('favorites')}
             >
               <div className="pos-category-icon-wrapper" style={{ marginBottom: '4px' }}>
-                <Star size={32} fill={selectedCategory === 'favorites' ? "white" : "#FFC107"} color={selectedCategory === 'favorites' ? "white" : "#FFC107"} />
+                <Star size={32} fill={selectedCategory === 'favorites' ? "white" : "#FFC107"} color={selectedCategory === 'favorites' ? "white" : "#FFB300"} />
               </div>
               <span>Favorites</span>
             </div>
@@ -896,25 +897,42 @@ const POSPage = () => {
             <div style={{ background: 'white', padding: '12px', borderBottom: '1px solid #E0E0E0', animation: 'slideDown 0.2s ease-out' }}>
               {cart.orderType === 'dine_in' ? (
                 <>
-                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#37474F', marginBottom: '8px' }}>🪑 Select Table</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px' }}>
-                    {Array.from({ length: 20 }, (_, i) => {
-                      const tNum = `T${i + 1}`;
-                      return (
-                        <button
-                          key={tNum}
-                          onClick={() => { cart.setTableNumber(tNum); setActiveCartTab(null); }}
-                          style={{ padding: '8px 4px', border: cart.tableNumber === tNum ? '2px solid #D32F2F' : '1px solid #eee', borderRadius: '4px', background: cart.tableNumber === tNum ? '#FFF3F3' : '#FAFAFA', cursor: 'pointer', fontWeight: cart.tableNumber === tNum ? 700 : 400, fontSize: '13px', color: cart.tableNumber === tNum ? '#D32F2F' : '#37474F' }}
-                        >
-                          {tNum}
-                        </button>
-                      );
-                    })}
+                  <div style={{ fontWeight: 700, fontSize: '13px', color: '#37474F', marginBottom: '8px' }}>🪑 Enter Table Number</div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder="e.g. 5, 12, P1"
+                      value={cart.tableNumber || ''}
+                      onChange={(e) => cart.setTableNumber(e.target.value.toUpperCase())}
+                      style={{
+                        flex: 1,
+                        padding: '10px 12px',
+                        border: '1.5px solid #CFD8DC',
+                        borderRadius: '8px',
+                        fontSize: '16px',
+                        fontWeight: '700',
+                        textAlign: 'center',
+                        color: '#E65100',
+                        background: '#FFF8E1',
+                        outline: 'none',
+                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+                      }}
+                      autoFocus
+                    />
                     <button
-                      onClick={() => { cart.setTableNumber(''); }}
-                      style={{ gridColumn: 'span 5', padding: '6px', border: '1px solid #eee', borderRadius: '4px', background: '#FFF3E0', cursor: 'pointer', fontSize: '12px', color: '#E65100', fontWeight: 500, marginTop: '4px' }}
+                      onClick={() => cart.setTableNumber('')}
+                      style={{
+                        padding: '10px 16px',
+                        background: '#ECEFF1',
+                        border: '1px solid #CFD8DC',
+                        borderRadius: '8px',
+                        color: '#546E7A',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        fontSize: '13px'
+                      }}
                     >
-                      Clear Table
+                      Clear
                     </button>
                   </div>
                 </>
@@ -1221,14 +1239,14 @@ const POSPage = () => {
 
           {/* 4. Bill Details Sheet - POSITIONED ABSOLUTE TO PANEL */}
           <div className={`pos-bottom-sheet ${showBillSheet ? 'active' : ''}`} style={{ paddingBottom: '120px' }}>
-            <div className="sheet-header" style={{ padding: '12px 16px', background: '#37474F', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0' }}>
+            <div className="sheet-header" style={{ padding: '12px 16px', background: '#0096FF', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0' }}>
               <h3 style={{ margin: 0, fontSize: '16px' }}>Bill Details</h3>
               <button onClick={() => setShowBillSheet(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><ChevronDown size={24} /></button>
             </div>
             <div className="sheet-body" style={{ padding: '20px', background: 'white', flex: 1, overflowY: 'auto' }}>
               <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
                 <span>Subtotal</span>
-                <span style={{ fontWeight: 600 }}>₹{cart.getSubtotal().toFixed(2)}</span>
+                <span style={{ fontWeight: 700, color: '#1e293b' }}>₹{cart.getSubtotal().toFixed(2)}</span>
               </div>
 
               {/* Editable Discount */}
@@ -1286,27 +1304,49 @@ const POSPage = () => {
               <div style={{ height: '1px', background: '#eee', marginBottom: '16px' }}></div>
 
               {/* Grand Total */}
-              <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 'bold', color: '#D32F2F' }}>
+              <div className="bill-row" style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                fontSize: '20px', 
+                fontWeight: '900', 
+                color: '#0096FF',
+                marginTop: '16px'
+              }}>
                 <span>Grand Total</span>
                 <span>₹{cart.getGrandTotal().toFixed(2)}</span>
               </div>
 
               {/* Return Calculation */}
-              <div style={{ marginTop: '20px', padding: '16px', background: '#E0F2F1', borderRadius: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{ fontWeight: '600', color: '#00695C' }}>Customer Paid</span>
+              <div style={{ 
+                marginTop: '20px', 
+                padding: '16px', 
+                background: '#f8fafc', 
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontWeight: '700', color: '#64748b', fontSize: '13px', textTransform: 'uppercase' }}>Customer Paid</span>
                   <input
                     type="number"
                     value={cart.customerPaid || ''}
                     onChange={(e) => cart.setCustomerPaid(parseFloat(e.target.value) || 0)}
-                    placeholder="Amount"
-                    style={{ width: '100px', textAlign: 'right', border: '1px solid #80CBC4', padding: '6px', borderRadius: '4px', fontWeight: 'bold' }}
+                    placeholder="₹ 0.00"
+                    style={{ 
+                      width: '120px', 
+                      textAlign: 'right', 
+                      border: '1px solid #cbd5e1', 
+                      padding: '8px 12px', 
+                      borderRadius: '8px', 
+                      fontWeight: '800',
+                      fontSize: '16px',
+                      color: '#1e293b'
+                    }}
                   />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#004D40', fontWeight: 'bold' }}>
-                  <span>Return to Customer</span>
-                  <span style={{ fontSize: '18px' }}>
-                    ₹{Math.max(0, (cart.customerPaid || 0) - cart.getGrandTotal()).toFixed(2)}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: '700', color: '#64748b', fontSize: '13px', textTransform: 'uppercase' }}>Return Amount</span>
+                  <span style={{ fontSize: '22px', fontWeight: '900', color: '#10b981' }}>
+                    ₹{Math.max(0, (cart.customerPaid || 0) - cart.getGrandTotal()).toFixed(0)}
                   </span>
                 </div>
               </div>
@@ -1340,7 +1380,7 @@ const POSPage = () => {
             {/* Action Bar */}
             <div className="pos-action-bar">
               <button className="pos-action-btn btn-save" onClick={handleCheckout}>
-                <Save size={20} style={{ marginBottom: '4px' }} />
+                <CheckCircle size={24} style={{ marginBottom: '4px', strokeWidth: 2.5 }} />
                 Save
               </button>
               <button className="pos-action-btn btn-print" onClick={handleSaveAndPrint}>
