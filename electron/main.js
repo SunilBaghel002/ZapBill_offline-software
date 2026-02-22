@@ -704,7 +704,29 @@ function setupIpcHandlers() {
     }
   });
 
-  // ============ DATA IMPORT ============
+  // ============ FILE PICKER (for imports) ============
+  ipcMain.handle('dialog:selectFile', async (event, { title, filters } = {}) => {
+    try {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openFile'],
+        title: title || 'Select File',
+        filters: filters || [
+          { name: 'Spreadsheets', extensions: ['xlsx', 'xls', 'csv'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, cancelled: true };
+      }
+
+      return { success: true, filePath: result.filePaths[0] };
+    } catch (error) {
+      log.error('File picker error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('data:importMenu', async (event, { filePath }) => {
     try {
       const items = dataImporter.parseMenu(filePath);

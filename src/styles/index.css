@@ -42,25 +42,31 @@
   /* Semantic Colors */
   --success-50: #e8f5e9;
   --success-100: #c8e6c9;
+  --success-200: #a5d6a7;
   --success-500: #4CAF50;
   --success-600: #43a047;
   --success-700: #388e3c;
 
   --warning-50: #fffbeb;
   --warning-100: #fef3c7;
+  --warning-200: #fde68a;
   --warning-500: #FFC107;
   --warning-600: #d97706;
+  --warning-700: #b45309;
 
   --danger-50: #fef2f2;
   --danger-100: #fee2e2;
+  --danger-200: #fecaca;
   --danger-500: #DC3545;
   --danger-600: #dc2626;
   --danger-700: #b91c1c;
 
   --info-50: #f0f9ff;
   --info-100: #e0f2fe;
+  --info-200: #bae6fd;
   --info-500: #17A2B8;
   --info-600: #0284c7;
+  --info-700: #0369a1;
 
   /* Legacy error aliases */
   --error-50: var(--danger-50);
