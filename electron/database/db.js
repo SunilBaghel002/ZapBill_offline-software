@@ -531,18 +531,16 @@ class Database {
     return results;
   }
 
-  // Execute raw SQL
+  // Execute raw SQL for reading (safe for transactions)
   execute(sql, params = []) {
     const stmt = this.db.prepare(sql);
-    stmt.bind(params);
+    if (params.length > 0) stmt.bind(params);
     
     const results = [];
     while (stmt.step()) {
       results.push(stmt.getAsObject());
     }
     stmt.free();
-    
-    this.save();
     return results;
   }
 
@@ -659,8 +657,18 @@ class Database {
   }
 
   getActiveMenu() {
+    // Try to find marked active menu
     const result = this.execute(`SELECT * FROM menus WHERE is_active = 1 AND is_deleted = 0 LIMIT 1`);
-    return result[0] || null;
+    if (result && result.length > 0) return result[0];
+
+    // Fallback: If no menu is marked active, pick the first one and mark it as active
+    const fallback = this.execute(`SELECT * FROM menus WHERE is_deleted = 0 ORDER BY created_at ASC LIMIT 1`);
+    if (fallback && fallback.length > 0) {
+      this.run('UPDATE menus SET is_active = 1 WHERE id = ?', [fallback[0].id]);
+      return { ...fallback[0], is_active: 1 };
+    }
+
+    return null;
   }
 
   setActiveMenu(menuId) {
@@ -898,7 +906,7 @@ class Database {
     let errorCount = 0;
     const errors = [];
 
-    this.db.run('BEGIN');
+    this.db.run('BEGIN TRANSACTION');
     try {
       let targetMenuId;
       if (menuName) {
@@ -908,15 +916,29 @@ class Database {
           targetMenuId = existingMenu[0].id;
         } else {
           targetMenuId = uuidv4();
-          this.run('INSERT INTO menus (id, name, is_active, created_at, is_deleted) VALUES (?, ?, 0, ?, 0)',
+          // Use this.db.run directly for simple one-off insert
+          this.db.run('INSERT INTO menus (id, name, is_active, created_at, is_deleted) VALUES (?, ?, 0, ?, 0)', 
             [targetMenuId, menuName, new Date().toISOString()]);
+          console.log(`Created new menu profile: ${menuName} (${targetMenuId})`);
         }
+        
+        // Auto-activate this menu if we are importing specifically into it
+        this.db.run('UPDATE menus SET is_active = 0');
+        this.db.run('UPDATE menus SET is_active = 1 WHERE id = ?', [targetMenuId]);
       } else {
-        const activeMenu = this.getActiveMenu();
-        if (!activeMenu) {
-          throw new Error('No active menu found to import into.');
+        const activeMenuResult = this._rawQuery('SELECT * FROM menus WHERE is_active = 1 AND is_deleted = 0 LIMIT 1');
+        if (!activeMenuResult || activeMenuResult.length === 0) {
+          // Fallback to default if no active
+          const allMenus = this._rawQuery('SELECT id FROM menus WHERE is_deleted = 0 LIMIT 1');
+          if (allMenus && allMenus.length > 0) {
+            targetMenuId = allMenus[0].id;
+            this.db.run('UPDATE menus SET is_active = 1 WHERE id = ?', [targetMenuId]);
+          } else {
+            throw new Error('No menu profile found to import into.');
+          }
+        } else {
+          targetMenuId = activeMenuResult[0].id;
         }
-        targetMenuId = activeMenu.id;
       }
 
       for (const item of items) {
@@ -929,9 +951,8 @@ class Database {
             categoryId = catResult[0].id;
           } else {
             categoryId = uuidv4();
-            const stmtCat = this.db.prepare('INSERT INTO categories (id, name, display_order, is_active, menu_id, is_deleted) VALUES (?, ?, ?, ?, ?, 0)');
-            stmtCat.run([categoryId, item.category, 99, 1, targetMenuId]);
-            stmtCat.free();
+            this.db.run('INSERT INTO categories (id, name, display_order, is_active, menu_id, is_deleted) VALUES (?, ?, ?, ?, ?, 0)',
+              [categoryId, item.category, 99, 1, targetMenuId]);
           }
 
           // 2. Insert or Update Menu Item within THIS menu and THIS category
@@ -939,22 +960,18 @@ class Database {
           
           if (existing && existing.length > 0) {
             // Update
-            const stmtItem = this.db.prepare(`
+            this.db.run(`
               UPDATE menu_items SET 
                 category_id = ?, price = ?, tax_rate = ?, is_vegetarian = ?, description = ?, updated_at = ?
               WHERE id = ?
-            `);
-            stmtItem.run([categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), existing[0].id]);
-            stmtItem.free();
+            `, [categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), existing[0].id]);
           } else {
             // Insert
             const id = uuidv4();
-            const stmtItem = this.db.prepare(`
+            this.db.run(`
               INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, is_available, created_at, updated_at, is_deleted, menu_id)
               VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0, ?)
-            `);
-            stmtItem.run([id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), new Date().toISOString(), targetMenuId]);
-            stmtItem.free();
+            `, [id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), new Date().toISOString(), targetMenuId]);
           }
           successCount++;
         } catch (err) {
@@ -966,7 +983,11 @@ class Database {
       this.db.run('COMMIT');
     } catch (e) {
       console.error('Menu import transaction failed:', e);
-      try { this.db.run('ROLLBACK'); } catch (r) {}
+      try {
+        this.db.run('ROLLBACK');
+      } catch (rollbackErr) {
+        // Transaction might already be closed by the error
+      }
       return { success: false, error: 'Transaction failed: ' + e.message };
     }
 
@@ -979,27 +1000,23 @@ class Database {
     let errorCount = 0;
     const errors = [];
 
-    this.db.run('BEGIN');
+    this.db.run('BEGIN TRANSACTION');
     try {
       for (const item of items) {
         try {
           const existing = this._rawQuery('SELECT id FROM inventory WHERE name = ? COLLATE NOCASE', [item.name]);
           if (existing && existing.length > 0) {
-            const stmt = this.db.prepare(`
+            this.db.run(`
               UPDATE inventory SET 
                 unit = ?, current_stock = ?, minimum_stock = ?, cost_per_unit = ?, supplier = ?, updated_at = ?
               WHERE id = ?
-            `);
-            stmt.run([item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), existing[0].id]);
-            stmt.free();
+            `, [item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), existing[0].id]);
           } else {
             const id = uuidv4();
-            const stmt = this.db.prepare(`
+            this.db.run(`
               INSERT INTO inventory (id, name, unit, current_stock, minimum_stock, cost_per_unit, supplier, created_at, updated_at, is_deleted)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-            `);
-            stmt.run([id, item.name, item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), new Date().toISOString()]);
-            stmt.free();
+            `, [id, item.name, item.unit, item.current_stock, item.minimum_stock, item.cost_per_unit, item.supplier, new Date().toISOString(), new Date().toISOString()]);
           }
           successCount++;
         } catch (err) {
@@ -1011,7 +1028,11 @@ class Database {
       this.db.run('COMMIT');
     } catch (e) {
       console.error('Inventory import transaction failed:', e);
-      try { this.db.run('ROLLBACK'); } catch (r) {}
+      try {
+        this.db.run('ROLLBACK');
+      } catch (rollbackErr) {
+        // Transaction might already be closed
+      }
       return { success: false, error: 'Transaction failed: ' + e.message };
     }
     

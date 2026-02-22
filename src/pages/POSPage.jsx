@@ -248,6 +248,7 @@ const POSPage = () => {
   const [showOrderInfo, setShowOrderInfo] = useState(false);
 
   const [activeCartTab, setActiveCartTab] = useState(null); // 'table', 'user', 'chef', 'summary'
+  const [activeMenu, setActiveMenu] = useState(null);
   
   // Custom Confirm Modal State
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -324,15 +325,20 @@ const POSPage = () => {
   }, []);
 
   const loadData = async () => {
+    setIsLoading(true);
     try {
-      const categoriesResult = await window.electronAPI.invoke('menu:getCategories');
-      setCategories(categoriesResult);
+      const cats = await window.electronAPI.invoke('menu:getCategories');
+      const items = await window.electronAPI.invoke('menu:getItems', {});
+      const active = await window.electronAPI.invoke('menu:getActiveMenu');
+      
+      console.log('POS Data Loaded:', { cats: cats.length, items: items.length, activeMenu: active?.name });
+      
+      setCategories(cats);
+      setMenuItems(items);
+      setActiveMenu(active);
 
-      // Default to Favorites
-      setSelectedCategory('favorites');
-
-      const itemsResult = await window.electronAPI.invoke('menu:getItems', {});
-      setMenuItems(itemsResult);
+      // Default to All Items
+      setSelectedCategory(null);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -680,6 +686,25 @@ const POSPage = () => {
             </div>
             <div className="pos-logo-text" style={{ color: '#0096FF', fontWeight: 'bold', fontSize: '20px', fontFamily: 'sans-serif' }}>ZapBill</div>
           </div>
+          {/* Active Menu Name Badge */}
+          {activeMenu && (
+            <div style={{ 
+              marginLeft: '12px', 
+              padding: '4px 12px', 
+              background: '#E3F2FD', 
+              borderRadius: '16px', 
+              fontSize: '12px', 
+              fontWeight: 600, 
+              color: '#1565C0',
+              border: '1px solid #BBDEFB',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <Menu size={14} />
+              {activeMenu.name}
+            </div>
+          )}
         </div>
 
         <div className="pos-search-wrapper">
@@ -705,7 +730,9 @@ const POSPage = () => {
           </div>
 
           <div className="pos-header-actions">
-            <button className="pos-header-icon-btn" title="Sync"><RefreshCw size={20} /></button>
+            <button className="pos-header-icon-btn" title="Refresh Menu" onClick={loadData}>
+              <RefreshCw size={20} />
+            </button>
             <button className="pos-header-icon-btn" title="Keyboard Shortcuts"><Keyboard size={20} /></button>
             <button className="pos-header-icon-btn" title="User Profile"><User size={20} /></button>
           </div>

@@ -99,8 +99,10 @@ const SettingsPage = () => {
           type,
           success: result.successCount,
           error: result.errorCount,
+          menuName: type === 'menu' ? (importMenuName || 'Default Menu') : null,
           details: result.errors || []
         });
+        if (type === 'menu') setImportMenuName(''); // Clear after success
       } else {
         alert('Import failed: ' + result.error);
       }
@@ -455,17 +457,19 @@ const SettingsPage = () => {
                     <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: 'var(--gray-800)' }}>
                       Last Import Results ({importStats.type === 'menu' ? 'Menu' : 'Inventory'})
                     </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: importStats.error > 0 ? '16px' : '0' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: importStats.error > 0 ? '16px' : '0' }}>
                       <div style={{ padding: '14px 16px', background: 'var(--success-50)', borderRadius: '10px', border: '1px solid var(--success-200)' }}>
                         <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--success-600)' }}>{importStats.success}</div>
                         <div style={{ fontSize: '12px', color: 'var(--success-600)', marginTop: '2px' }}>Successfully Imported</div>
                       </div>
-                      {importStats.error > 0 && (
-                        <div style={{ padding: '14px 16px', background: 'var(--danger-50)', borderRadius: '10px', border: '1px solid var(--danger-200)' }}>
-                          <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--danger-600)' }}>{importStats.error}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--danger-600)', marginTop: '2px' }}>Failed</div>
-                        </div>
-                      )}
+                      <div style={{ padding: '14px 16px', background: 'white', borderRadius: '10px', border: '1px solid var(--primary-200)' }}>
+                        <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--primary-600)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{importStats.menuName || 'N/A'}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--primary-600)', marginTop: '2px' }}>Menu Profile</div>
+                      </div>
+                      <div style={{ padding: '14px 16px', background: importStats.error > 0 ? 'var(--danger-50)' : 'var(--success-50)', borderRadius: '10px', border: `1px solid ${importStats.error > 0 ? 'var(--danger-200)' : 'var(--success-200)'}` }}>
+                        <div style={{ fontSize: '24px', fontWeight: '700', color: importStats.error > 0 ? 'var(--danger-600)' : 'var(--success-600)' }}>{importStats.error}</div>
+                        <div style={{ fontSize: '12px', color: importStats.error > 0 ? 'var(--danger-600)' : 'var(--success-600)', marginTop: '2px' }}>Failed</div>
+                      </div>
                     </div>
                     {importStats.error > 0 && importStats.details.length > 0 && (
                       <div style={{ padding: '12px 16px', background: 'white', borderRadius: '8px', border: '1px solid var(--danger-200)' }}>

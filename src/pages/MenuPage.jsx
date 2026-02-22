@@ -117,21 +117,18 @@ const MenuPage = () => {
   }
 
   return (
-    <div className="page-container" style={{ marginTop: '64px', height: 'calc(100vh - 64px)' }}>
+    <div className="page-container" style={{ height: 'calc(100vh - 65px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      {/* Sticky Header */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         background: 'white',
         padding: '16px 24px',
-        margin: '-24px -24px 24px -24px',
-        position: 'sticky',
-        top: 0,
+        margin: '0',
         zIndex: 20,
         borderBottom: '1px solid var(--gray-200)',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+        flexShrink: 0
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div>
@@ -193,7 +190,7 @@ const MenuPage = () => {
         </div>
       </div>
 
-      {/* Categories */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
       <div style={{ marginBottom: 'var(--spacing-4)' }}>
         <h4 style={{ marginBottom: 'var(--spacing-2)' }}>Categories</h4>
         <div style={{ display: 'flex', gap: 'var(--spacing-2)', flexWrap: 'wrap' }}>
@@ -406,6 +403,7 @@ const MenuPage = () => {
           onRefresh={loadData}
         />
       )}
+      </div>
     </div>
   );
 };
