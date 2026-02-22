@@ -224,6 +224,8 @@ const POSPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPayment, setShowPayment] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [masterAddons, setMasterAddons] = useState([]);
+  const [globalAddons, setGlobalAddons] = useState([]);
 
   // New States for Add-ons and Hold Order
   const [showAddonModal, setShowAddonModal] = useState(false);
@@ -327,15 +329,21 @@ const POSPage = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const cats = await window.electronAPI.invoke('menu:getCategories');
-      const items = await window.electronAPI.invoke('menu:getItems', {});
-      const active = await window.electronAPI.invoke('menu:getActiveMenu');
+      const [cats, items, active, ma, ga] = await Promise.all([
+        window.electronAPI.invoke('menu:getCategories'),
+        window.electronAPI.invoke('menu:getItems', {}),
+        window.electronAPI.invoke('menu:getActiveMenu'),
+        window.electronAPI.invoke('menu:getMasterAddons'),
+        window.electronAPI.invoke('menu:getAddons')
+      ]);
       
       console.log('POS Data Loaded:', { cats: cats.length, items: items.length, activeMenu: active?.name });
       
       setCategories(cats);
       setMenuItems(items);
       setActiveMenu(active);
+      setMasterAddons(ma || []);
+      setGlobalAddons(ga || []);
 
       // Default to All Items
       setSelectedCategory(null);
@@ -1462,6 +1470,8 @@ const POSPage = () => {
       {showAddonModal && selectedItemForAddon && (
         <AddonSelectionModal
           item={selectedItemForAddon}
+          masterAddons={masterAddons}
+          globalAddons={globalAddons}
           onClose={() => {
             setShowAddonModal(false);
             setSelectedItemForAddon(null);
@@ -1561,12 +1571,38 @@ const POSPage = () => {
 };
 
 // Addon Selection Modal Component - Redesigned to match reference
-const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
+const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], globalAddons = [] }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState(item.parsedVariants.length > 0 ? item.parsedVariants[0] : null);
   const [selectedAddons, setSelectedAddons] = useState([]);
   const [addonSearch, setAddonSearch] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
+
+  // Resolve addons from Master Addon group for the selected variant
+  const getVariantMasterAddons = () => {
+    if (!selectedVariant?.master_addon_id) return [];
+    const masterAddon = masterAddons.find(ma => ma.id === selectedVariant.master_addon_id);
+    if (!masterAddon) return [];
+    
+    let addonIds = [];
+    try {
+      addonIds = typeof masterAddon.addon_ids === 'string' ? JSON.parse(masterAddon.addon_ids) : (masterAddon.addon_ids || []);
+    } catch (e) {
+      console.error('Error parsing master addon ids', e);
+      return [];
+    }
+    
+    return globalAddons.filter(ga => addonIds.includes(ga.id));
+  };
+
+  const variantSpecificAddons = getVariantMasterAddons();
+  // Deduplicate by name if needed, assuming item-specific addons take precedence or we just merge
+  const allAvailableAddons = [...item.parsedAddons];
+  variantSpecificAddons.forEach(va => {
+    if (!allAvailableAddons.some(a => a.name === va.name)) {
+      allAvailableAddons.push(va);
+    }
+  });
 
   const calculateTotal = () => {
     let total = selectedVariant ? parseFloat(selectedVariant.price) : item.price;
@@ -1579,18 +1615,16 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
   const toggleAddon = (addon) => {
     const existing = selectedAddons.find(a => a.name === addon.name);
     if (existing) {
-      // If already selected, increase quantity
       setSelectedAddons(selectedAddons.map(a => 
         a.name === addon.name ? { ...a, quantity: (a.quantity || 1) + 1 } : a
       ));
     } else {
-      // Add new with quantity 1
       setSelectedAddons([...selectedAddons, { ...addon, quantity: 1 }]);
     }
   };
 
   const decreaseAddon = (e, addon) => {
-    e.stopPropagation(); // Prevent toggling
+    e.stopPropagation();
     const existing = selectedAddons.find(a => a.name === addon.name);
     if (existing) {
       if (existing.quantity > 1) {
@@ -1598,16 +1632,21 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
           a.name === addon.name ? { ...a, quantity: a.quantity - 1 } : a
         ));
       } else {
-        // Remove if quantity becomes 0
         setSelectedAddons(selectedAddons.filter(a => a.name !== addon.name));
       }
     }
   };
 
-  // Filter addons by search
-  const filteredAddons = item.parsedAddons.filter(addon =>
+  const filteredAddons = allAvailableAddons.filter(addon =>
     addon.name.toLowerCase().includes(addonSearch.toLowerCase())
   );
+
+  // Sync selected addons when variant changes - remove any that are no longer available
+  useEffect(() => {
+    setSelectedAddons(prev => prev.filter(selected => 
+      allAvailableAddons.some(available => available.name === selected.name)
+    ));
+  }, [selectedVariant]);
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1050 }}>
@@ -1640,7 +1679,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
         )}
 
         {/* Addon Search */}
-        {item.parsedAddons.length > 0 && (
+        {allAvailableAddons.length > 0 && (
           <div className="addon-search-box">
             <div style={{ position: 'relative' }}>
               <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#90A4AE' }} />
@@ -1657,7 +1696,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart }) => {
 
         {/* Addon Groups */}
         <div className="addon-groups">
-          {item.parsedAddons.length > 0 && (
+          {allAvailableAddons.length > 0 && (
             <div className="addon-group">
               <div className="addon-group-header">
                 <span className="addon-group-name">

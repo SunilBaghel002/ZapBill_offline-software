@@ -256,6 +256,20 @@ class Database {
       `);
     } catch (error) { console.log('Migration note:', error.message); }
 
+    try {
+      // Create master_addons table
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS master_addons (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            addon_ids TEXT, -- JSON array of global addon IDs
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            is_deleted INTEGER DEFAULT 0
+        )
+      `);
+    } catch (error) { console.log('Migration note:', error.message); }
+
     // Migrate orders table to support 'held' status in CHECK constraint
     this.migrateOrdersTableForHeldStatus();
 
@@ -672,14 +686,20 @@ class Database {
   }
 
   setActiveMenu(menuId) {
-    this.db.run('BEGIN');
+    if (!menuId) return { success: false, error: 'Menu ID is required' };
+    
+    console.log(`Switching active menu to: ${menuId}`);
+    this.db.run('BEGIN TRANSACTION');
     try {
-      this.run('UPDATE menus SET is_active = 0');
-      this.run('UPDATE menus SET is_active = 1 WHERE id = ?', [menuId]);
+      this.db.run('UPDATE menus SET is_active = 0');
+      this.db.run('UPDATE menus SET is_active = 1 WHERE id = ?', [menuId]);
       this.db.run('COMMIT');
+      this.save();
+      console.log(`Menu ${menuId} is now active.`);
       return { success: true };
     } catch (e) {
-      this.db.run('ROLLBACK');
+      try { this.db.run('ROLLBACK'); } catch (rollbackError) { /* Already handled */ }
+      console.error('Set active menu error:', e);
       return { success: false, error: e.message };
     }
   }
@@ -716,28 +736,27 @@ class Database {
     if (!original) return { success: false, error: 'Original menu not found' };
 
     const newMenuId = uuidv4();
-    this.db.run('BEGIN');
+    this.db.run('BEGIN TRANSACTION');
     try {
-      this.insert('menus', {
-        id: newMenuId,
-        name: newName || `${original.name} (Copy)`,
-        is_active: 0,
-        created_at: new Date().toISOString(),
-        is_deleted: 0
-      });
+      this.db.run(`
+        INSERT INTO menus (id, name, is_active, created_at, is_deleted) 
+        VALUES (?, ?, 0, ?, 0)
+      `, [newMenuId, newName || `${original.name} (Copy)`, new Date().toISOString()]);
 
       // Copy categories
       const categories = this.execute('SELECT * FROM categories WHERE menu_id = ? AND is_deleted = 0', [menuId]);
       for (const cat of categories) {
         const newCatId = uuidv4();
-        this.run('INSERT INTO categories (id, name, description, display_order, menu_id, is_active, is_deleted) VALUES (?, ?, ?, ?, ?, ?, 0)',
-          [newCatId, cat.name, cat.description, cat.display_order, newMenuId, cat.is_active]);
+        this.db.run(`
+          INSERT INTO categories (id, name, description, display_order, menu_id, is_active, is_deleted) 
+          VALUES (?, ?, ?, ?, ?, ?, 0)
+        `, [newCatId, cat.name, cat.description, cat.display_order, newMenuId, cat.is_active]);
 
         // Copy items for this category
         const items = this.execute('SELECT * FROM menu_items WHERE category_id = ? AND is_deleted = 0', [cat.id]);
         for (const item of items) {
           const newItemId = uuidv4();
-          this.run(`
+          this.db.run(`
             INSERT INTO menu_items (
               id, category_id, name, description, price, cost_price, tax_rate, 
               is_vegetarian, is_available, preparation_time, variants, addons, menu_id, is_deleted
@@ -751,9 +770,11 @@ class Database {
       }
 
       this.db.run('COMMIT');
+      this.save();
       return { success: true, id: newMenuId };
     } catch (e) {
-      this.db.run('ROLLBACK');
+      try { this.db.run('ROLLBACK'); } catch (rollbackErr) {}
+      console.error('Duplicate menu error:', e);
       return { success: false, error: e.message };
     }
   }
@@ -876,6 +897,37 @@ class Database {
       this.addToSyncQueue('menu_item', id, 'create', item);
       return id;
     }
+  }
+
+  // ============ MASTER ADDONS ============
+  getMasterAddons() {
+    return this.execute('SELECT * FROM master_addons WHERE is_deleted = 0 ORDER BY name');
+  }
+
+  saveMasterAddon(data) {
+    if (data.id) {
+      this.update('master_addons', {
+        name: data.name,
+        addon_ids: typeof data.addon_ids === 'string' ? data.addon_ids : JSON.stringify(data.addon_ids),
+        updated_at: new Date().toISOString()
+      }, { id: data.id });
+      return data.id;
+    } else {
+      const id = uuidv4();
+      this.insert('master_addons', {
+        id,
+        name: data.name,
+        addon_ids: typeof data.addon_ids === 'string' ? data.addon_ids : JSON.stringify(data.addon_ids),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_deleted: 0
+      });
+      return id;
+    }
+  }
+
+  deleteMasterAddon(id) {
+    return this.update('master_addons', { is_deleted: 1 }, { id });
   }
 
   deleteMenuItem(id) {
@@ -1721,14 +1773,25 @@ class Database {
         AND is_deleted = 0
     `, [date, userId]);
 
+    const expenses = this.execute(`
+      SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE date = ? AND employee_id = ?
+    `, [date, userId]);
+
     const orders = this.execute(`
       SELECT * FROM orders 
       WHERE DATE(created_at, 'localtime') = ? AND cashier_id = ? AND is_deleted = 0 
       ORDER BY created_at DESC
     `, [date, userId]);
 
+    const totalRevenue = sales[0]?.total_revenue || 0;
+    const totalExpenses = expenses[0]?.total_expenses || 0;
+
     return {
-      sales: sales[0] || { total_orders: 0, total_revenue: 0, cash_amount: 0, card_amount: 0, upi_amount: 0 },
+      sales: {
+        ...(sales[0] || { total_orders: 0, total_revenue: 0, cash_amount: 0, card_amount: 0, upi_amount: 0 }),
+        total_expenses: totalExpenses,
+        net_revenue: totalRevenue - totalExpenses
+      },
       orders,
     };
   }
@@ -1971,9 +2034,24 @@ class Database {
         AND is_deleted = 0
     `, [shift.user_id, shift.start_time, endTime])[0];
 
+    const expenses = this.execute(`
+      SELECT COALESCE(SUM(amount), 0) as total_expenses
+      FROM expenses
+      WHERE employee_id = ?
+        AND created_at >= ?
+        AND created_at <= ?
+    `, [shift.user_id, shift.start_time, endTime])[0];
+
+    const totalRevenue = sales?.total_revenue || 0;
+    const totalExpenses = expenses?.total_expenses || 0;
+
     return {
       shift,
-      sales: sales || { total_orders: 0, total_revenue: 0, cash_sales: 0, card_sales: 0, upi_sales: 0 }
+      sales: {
+        ...(sales || { total_orders: 0, total_revenue: 0, cash_sales: 0, card_sales: 0, upi_sales: 0 }),
+        total_expenses: totalExpenses,
+        net_revenue: totalRevenue - totalExpenses
+      }
     };
   }
 

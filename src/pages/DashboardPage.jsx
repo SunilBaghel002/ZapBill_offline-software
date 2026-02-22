@@ -515,6 +515,14 @@ const DashboardPage = () => {
           color="primary"
         />
         <StatCard
+          title="Total Expenses"
+          value={`₹${(stats.todayExpenses || 0).toLocaleString()}`}
+          trend="neutral"
+          trendValue={0}
+          icon={TrendingDown}
+          color="danger"
+        />
+        <StatCard
           title="Net Profit"
           value={`₹${stats.netProfit.toLocaleString()}`}
           trend={stats.revenueTrend.direction} 

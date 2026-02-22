@@ -302,6 +302,34 @@ function setupIpcHandlers() {
     }
   });
 
+  // ============ MASTER ADDONS ============
+  ipcMain.handle('menu:getMasterAddons', async () => {
+    try {
+      return db.getMasterAddons();
+    } catch (error) {
+      log.error('Get master addons error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:saveMasterAddon', async (event, { data }) => {
+    try {
+      return db.saveMasterAddon(data);
+    } catch (error) {
+      log.error('Save master addon error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:deleteMasterAddon', async (event, { id }) => {
+    try {
+      return db.deleteMasterAddon(id);
+    } catch (error) {
+      log.error('Delete master addon error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // ============ MULTI-MENU OPERATIONS ============
   ipcMain.handle('menu:getMenus', async () => {
     try {

@@ -9,7 +9,8 @@ import {
   FolderOpen,
   Leaf,
   RefreshCw,
-  List
+  List,
+  Layers // New icon
 } from 'lucide-react';
 import './MenuPage.css'; // Added import
 
@@ -24,8 +25,12 @@ const MenuPage = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [addons, setAddons] = useState([]);
+  const [masterAddons, setMasterAddons] = useState([]); // New state for Master Add-ons
   const [showAddonModal, setShowAddonModal] = useState(false);
+  const [showMasterAddonsModal, setShowMasterAddonsModal] = useState(false); // New modal state
   const [editingAddon, setEditingAddon] = useState(null);
+  const [editingMasterAddon, setEditingMasterAddon] = useState(null); // New editing state
+  const [editingMasterAddonModalOpen, setEditingMasterAddonModalOpen] = useState(false); // New modal opening state
   const [isLoading, setIsLoading] = useState(true);
   const [menus, setMenus] = useState([]);
   const [activeMenu, setActiveMenu] = useState(null);
@@ -37,16 +42,18 @@ const MenuPage = () => {
 
   const loadData = async () => {
     try {
-      const [cats, items, addonsList, menusList, active] = await Promise.all([
+      const [cats, items, addonsList, masterAddonsList, menusList, active] = await Promise.all([
         window.electronAPI.invoke('menu:getCategories'),
         window.electronAPI.invoke('menu:getItems', {}),
         window.electronAPI.invoke('menu:getAddons'),
+        window.electronAPI.invoke('menu:getMasterAddons'),
         window.electronAPI.invoke('menu:getMenus'),
         window.electronAPI.invoke('menu:getActiveMenu')
       ]);
       setCategories(cats);
       setMenuItems(items);
       setAddons(addonsList || []);
+      setMasterAddons(masterAddonsList || []);
       setMenus(menusList || []);
       setActiveMenu(active);
     } catch (error) {
@@ -80,8 +87,6 @@ const MenuPage = () => {
     setShowCategoryModal(true);
   };
 
-
-
   // Helper for Global Addons List Modal
   const handleEditAddon = (addon) => {
     setEditingAddon(addon);
@@ -91,6 +96,19 @@ const MenuPage = () => {
   const handleDeleteAddon = async (id) => {
     if (window.confirm('Are you sure you want to delete this add-on?')) {
       await window.electronAPI.invoke('menu:deleteAddon', { id });
+      loadData();
+    }
+  };
+
+  // Master Addon Handlers
+  const handleEditMasterAddon = (masterAddon) => {
+    setEditingMasterAddon(masterAddon);
+    // Logic for MasterAddonEditModal
+  };
+
+  const handleDeleteMasterAddon = async (id) => {
+    if (window.confirm('Are you sure you want to delete this Master Add-on group?')) {
+      await window.electronAPI.invoke('menu:deleteMasterAddon', { id });
       loadData();
     }
   };
@@ -165,6 +183,9 @@ const MenuPage = () => {
           >
             <List size={18} />
             Global Add-ons
+          </button>
+          <button className="btn btn-secondary" onClick={() => setShowMasterAddonsModal(true)}>
+            <Layers size={18} /> Master Add-ons
           </button>
           <button
             className="btn btn-secondary"
@@ -342,7 +363,7 @@ const MenuPage = () => {
 
       {/* Item Modal */}
       {showItemModal && (
-        <MenuItemModal
+        <ItemModal
           item={editingItem}
           categories={categories}
           onClose={() => {
@@ -356,6 +377,7 @@ const MenuPage = () => {
           }}
 
           globalAddons={addons}
+          masterAddons={masterAddons}
           onRefreshAddons={loadData}
         />
       )}
@@ -401,6 +423,44 @@ const MenuPage = () => {
           activeMenu={activeMenu}
           onClose={() => setShowMenuManager(false)}
           onRefresh={loadData}
+        />
+      )}
+
+      {/* Master Add-ons List Modal */}
+      {showMasterAddonsModal && (
+        <MasterAddonsModal
+          masterAddons={masterAddons}
+          onClose={() => setShowMasterAddonsModal(false)}
+          onAdd={() => {
+            setEditingMasterAddon(null);
+            setShowMasterAddonsModal(false);
+            setEditingMasterAddonModalOpen(true);
+          }}
+          onEdit={(ma) => {
+            setEditingMasterAddon(ma);
+            setShowMasterAddonsModal(false);
+            setEditingMasterAddonModalOpen(true);
+          }}
+          onDelete={handleDeleteMasterAddon}
+        />
+      )}
+
+      {/* Master Add-on Edit Modal */}
+      {editingMasterAddonModalOpen && (
+        <MasterAddonEditModal
+          masterAddon={editingMasterAddon}
+          globalAddons={addons}
+          onClose={() => {
+            setEditingMasterAddonModalOpen(false);
+            setEditingMasterAddon(null);
+            setShowMasterAddonsModal(true);
+          }}
+          onSave={() => {
+            setEditingMasterAddonModalOpen(false);
+            setEditingMasterAddon(null);
+            setShowMasterAddonsModal(true);
+            loadData();
+          }}
         />
       )}
       </div>
@@ -593,7 +653,7 @@ const CategoryModal = ({ category, onClose, onSave }) => {
 };
 
 // Menu Item Modal
-const MenuItemModal = ({ item, categories, onClose, onSave, globalAddons = [], onRefreshAddons }) => {
+const ItemModal = ({ item, categories, onClose, onSave, globalAddons, onRefreshAddons, masterAddons }) => {
   const [formData, setFormData] = useState({
     name: item?.name || '',
     description: item?.description || '',
@@ -981,7 +1041,7 @@ const MenuItemModal = ({ item, categories, onClose, onSave, globalAddons = [], o
                           style={{ padding: '8px', fontSize: '0.9rem' }}
                         />
                       </div>
-                      <div style={{ width: '150px' }}>
+                      <div style={{ width: '120px' }}>
                         <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Price (₹)</label>
                         <input
                           type="number"
@@ -991,6 +1051,20 @@ const MenuItemModal = ({ item, categories, onClose, onSave, globalAddons = [], o
                           placeholder="0.00"
                           style={{ padding: '8px', fontWeight: 600, fontSize: '0.9rem' }}
                         />
+                      </div>
+                      <div style={{ width: '150px' }}>
+                        <label style={{ fontSize: '0.75rem', color: '#6b7280', display: 'block', marginBottom: '4px' }}>Master Add-on</label>
+                        <select
+                          className="input select"
+                          value={variant.master_addon_id || ''}
+                          onChange={(e) => updateVariant(index, 'master_addon_id', e.target.value)}
+                          style={{ padding: '8px', fontSize: '0.85rem' }}
+                        >
+                          <option value="">None</option>
+                          {masterAddons?.map(ma => (
+                            <option key={ma.id} value={ma.id}>{ma.name}</option>
+                          ))}
+                        </select>
                       </div>
                       <button
                         type="button"
@@ -1423,6 +1497,229 @@ const AddonModal = ({ addon, onClose, onSave }) => {
               boxShadow: '0 2px 4px -1px rgba(211, 47, 47, 0.4)'
             }}>
               {isSaving ? 'Saving...' : 'Save Add-on'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Master Add-ons List Modal
+const MasterAddonsModal = ({ masterAddons, onClose, onAdd, onEdit, onDelete }) => {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: '700px', height: '80vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header" style={{ borderBottom: '1px solid var(--gray-200)' }}>
+          <div>
+            <h3 className="modal-title">Master Add-on Groups</h3>
+            <p className="text-muted text-sm">Create collections of add-ons to apply to variants</p>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+            <button className="btn btn-secondary" onClick={onAdd}>
+              <Plus size={16} /> New Group
+            </button>
+          </div>
+
+          {masterAddons.length === 0 ? (
+            <div className="empty-state" style={{ padding: '60px 0' }}>
+              <Layers size={48} className="text-muted" style={{ marginBottom: '12px', opacity: 0.5 }} />
+              <p className="text-muted">No master add-on groups found.</p>
+              <button className="btn btn-link" onClick={onAdd}>Create your first group</button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
+              {masterAddons.map(ma => {
+                let addonIds = [];
+                try {
+                  addonIds = typeof ma.addon_ids === 'string' ? JSON.parse(ma.addon_ids || '[]') : (ma.addon_ids || []);
+                } catch (e) { console.error('Error parsing addon_ids', e); }
+                
+                return (
+                  <div key={ma.id} style={{
+                    padding: '16px',
+                    background: 'white',
+                    border: '1px solid var(--gray-200)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>{ma.name}</h4>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button className="btn btn-ghost btn-icon btn-sm" onClick={() => onEdit(ma)}>
+                          <Edit2 size={14} />
+                        </button>
+                        <button className="btn btn-ghost btn-icon btn-sm text-danger" onClick={() => onDelete(ma.id)}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      <span className="badge badge-secondary" style={{ fontSize: '0.75rem' }}>
+                        {addonIds.length} Add-ons
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Master Add-on Edit Modal
+const MasterAddonEditModal = ({ masterAddon, globalAddons, onClose, onSave }) => {
+  const [name, setName] = useState(masterAddon?.name || '');
+  const [selectedAddonIds, setSelectedAddonIds] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (masterAddon?.addon_ids) {
+      try {
+        const ids = typeof masterAddon.addon_ids === 'string' ? JSON.parse(masterAddon.addon_ids) : masterAddon.addon_ids;
+        setSelectedAddonIds(ids || []);
+      } catch (e) {
+        console.error('Error parsing addon_ids', e);
+        setSelectedAddonIds([]);
+      }
+    }
+  }, [masterAddon]);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      alert('Please enter a group name');
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      await window.electronAPI.invoke('menu:saveMasterAddon', {
+        data: {
+          id: masterAddon?.id,
+          name,
+          addon_ids: selectedAddonIds
+        }
+      });
+      onSave();
+    } catch (error) {
+      alert('Failed to save Master Add-on: ' + error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const toggleAddon = (id) => {
+    if (selectedAddonIds.includes(id)) {
+      setSelectedAddonIds(selectedAddonIds.filter(i => i !== id));
+    } else {
+      setSelectedAddonIds([...selectedAddonIds, id]);
+    }
+  };
+
+  const filteredGlobalAddons = globalAddons.filter(a => 
+    a.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
+      <div className="modal" style={{ maxWidth: '500px' }} onClick={(e) => e.stopPropagation()}>
+        <form onSubmit={handleSave}>
+          <div className="modal-header">
+            <h3 className="modal-title">{masterAddon ? 'Edit Master Add-on' : 'New Master Add-on'}</h3>
+            <button type="button" className="btn btn-ghost btn-icon" onClick={onClose}><X size={20} /></button>
+          </div>
+          
+          <div className="modal-body" style={{ padding: '20px' }}>
+            <div className="input-group">
+              <label className="input-label">Group Name *</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g. Pizza Toppings, Burger Add-ons"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={{ marginTop: '20px' }}>
+              <label className="input-label">Select Add-ons</label>
+              <div style={{ position: 'relative', marginBottom: '12px' }}>
+                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Search global add-ons..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ paddingLeft: '32px', height: '36px', fontSize: '0.875rem' }}
+                />
+              </div>
+              
+              <div style={{ 
+                maxHeight: '250px', 
+                overflowY: 'auto', 
+                border: '1px solid var(--gray-200)', 
+                borderRadius: '8px',
+                padding: '4px'
+              }}>
+                {filteredGlobalAddons.length === 0 && (
+                  <p style={{ padding: '20px', textAlign: 'center', color: '#9ca3af', fontSize: '0.875rem' }}>No add-ons found</p>
+                )}
+                {filteredGlobalAddons.map(addon => (
+                  <div 
+                    key={addon.id}
+                    onClick={() => toggleAddon(addon.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 12px',
+                      cursor: 'pointer',
+                      borderRadius: '6px',
+                      background: selectedAddonIds.includes(addon.id) ? 'var(--primary-50)' : 'transparent',
+                      transition: 'all 0.1s'
+                    }}
+                  >
+                    <div style={{
+                      width: '18px',
+                      height: '18px',
+                      border: `2px solid ${selectedAddonIds.includes(addon.id) ? 'var(--primary-600)' : '#d1d5db'}`,
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: selectedAddonIds.includes(addon.id) ? 'var(--primary-600)' : 'white'
+                    }}>
+                      {selectedAddonIds.includes(addon.id) && <Plus size={14} color="white" />}
+                    </div>
+                    <span style={{ fontSize: '0.9rem', flex: 1 }}>{addon.name}</span>
+                    <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>₹{addon.price}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-muted text-xs mt-2">{selectedAddonIds.length} add-ons selected</p>
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save Group'}
             </button>
           </div>
         </form>

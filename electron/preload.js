@@ -29,6 +29,9 @@ const validInvokeChannels = [
   'menu:deleteMenu',
   'menu:duplicateMenu',
   'menu:deleteCategory',
+  'menu:getMasterAddons',
+  'menu:saveMasterAddon',
+  'menu:deleteMasterAddon',
   // Orders
   'order:create',
   'order:update',

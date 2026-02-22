@@ -6,7 +6,7 @@ const CustomAlert = ({ isOpen, message, type = 'info', onClose, onConfirm }) => 
     if (isOpen && type !== 'confirm') {
       const timer = setTimeout(() => {
         onClose();
-      }, 3000);
+      }, 2000);
       return () => clearTimeout(timer);
     }
   }, [isOpen, type, onClose]);
