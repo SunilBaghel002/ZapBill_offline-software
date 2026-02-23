@@ -689,10 +689,7 @@ const POSPage = () => {
             <Menu size={24} color="#546E7A" />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ background: '#0096FF', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <UtensilsCrossed size={20} color="white" />
-            </div>
-            <div className="pos-logo-text" style={{ color: '#0096FF', fontWeight: 'bold', fontSize: '20px', fontFamily: 'sans-serif' }}>ZapBill</div>
+            <img src="/logo.png" alt="ZapBill Logo" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
           </div>
           {/* Active Menu Name Badge */}
           {activeMenu && (

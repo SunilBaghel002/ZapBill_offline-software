@@ -91,14 +91,8 @@ const Sidebar = () => {
       zIndex: 100
     }}>
       {/* Logo Section */}
-      <div style={{ padding: '20px', borderBottom: '1px solid #37474F', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{ background: '#0096FF', padding: '8px', borderRadius: '8px' }}>
-          <UtensilsCrossed size={24} color="white" />
-        </div>
-        <div>
-          <div style={{ fontWeight: 'bold', fontSize: '18px' }}>ZapBill</div>
-          <div style={{ fontSize: '12px', color: '#90A4AE' }}>POS System</div>
-        </div>
+      <div style={{ padding: '20px', borderBottom: '1px solid #37474F', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <img src="/logo.png" alt="ZapBill Logo" style={{ maxWidth: '180px', height: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
       </div>
 
       {/* Navigation */}

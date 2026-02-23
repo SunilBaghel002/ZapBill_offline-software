@@ -65,16 +65,12 @@ const LoginPage = () => {
           color: 'white',
         }}>
           <div style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto var(--spacing-4)',
           }}>
-            <UtensilsCrossed size={40} />
+            <img src="/logo.png" alt="ZapBill Logo" style={{ width: '120px', height: '120px', objectFit: 'contain' }} />
           </div>
           <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--spacing-2)' }}>
             ZapBill POS

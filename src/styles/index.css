@@ -1142,6 +1142,22 @@ h4 {
   background: var(--gray-400);
 }
 
+/* Sidebar Specific Scrollbar */
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: #1A2327;
+  border-radius: 0;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #37474F;
+  border-radius: 10px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #546E7A;
+}
+
 /* ========================================
    MODERN SIDEBAR NAVIGATION
    ======================================== */

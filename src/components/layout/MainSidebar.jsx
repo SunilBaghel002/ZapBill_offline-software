@@ -122,23 +122,15 @@ const MainSidebar = ({ isOpen, onClose }) => {
         }}
       >
         {/* Header */}
-        <div style={{ padding: '20px', borderBottom: '1px solid #37474F', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ background: '#0096FF', padding: '8px', borderRadius: '8px' }}>
-                    <UtensilsCrossed size={24} color="white" />
-                </div>
-                <div>
-                    <div style={{ fontWeight: 'bold', fontSize: '18px' }}>ZapBill</div>
-                    <div style={{ fontSize: '12px', color: '#90A4AE' }}>POS System</div>
-                </div>
-            </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#90A4AE', cursor: 'pointer' }}>
-                <X size={24} />
+        <div style={{ padding: '20px', borderBottom: '1px solid #37474F', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/logo.png" alt="ZapBill Logo" style={{ maxWidth: '160px', height: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+            <button onClick={onClose} style={{ position: 'absolute', right: '12px', top: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', padding: '6px', border: 'none', color: '#90A4AE', cursor: 'pointer', display: 'flex', transition: 'background 0.2s' }} onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}>
+                <X size={20} />
             </button>
         </div>
 
         {/* Nav Items */}
-        <nav style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
+        <nav className="sidebar-nav" style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
             {navItems.map((item) => {
               if (item.children) {
                 const isExpanded = expandedMenu === item.path;
