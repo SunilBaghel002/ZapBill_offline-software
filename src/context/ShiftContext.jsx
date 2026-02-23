@@ -37,7 +37,7 @@ export const ShiftProvider = ({ children }) => {
     if (!isAuthenticated || !user) return;
 
     const interval = setInterval(() => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toLocaleDateString('en-CA');
       if (dayStatus && dayStatus.business_date !== today) {
         checkActiveShift();
       }

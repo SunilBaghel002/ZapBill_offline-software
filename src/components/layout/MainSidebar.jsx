@@ -52,12 +52,12 @@ const MainSidebar = ({ isOpen, onClose }) => {
 
   // All nav items with role restrictions
   const allNavItems = [
-    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: true },
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
     { path: '/pos', icon: ShoppingCart, label: 'POS / Billing', adminOnly: false },
     { path: '/orders', icon: ClipboardList, label: 'Orders', badge: activeOrdersCount > 0 ? activeOrdersCount : null, adminOnly: false },
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu', adminOnly: true },
     { path: '/kot', icon: ChefHat, label: 'Kitchen (KOT)', adminOnly: false },
-    { path: '/inventory', icon: Package, label: 'Inventory', adminOnly: true },
+    { path: '/inventory', icon: Package, label: 'Inventory', adminOnly: false },
     { 
       path: '/reports', 
       icon: BarChart3, 

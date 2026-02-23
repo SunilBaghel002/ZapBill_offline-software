@@ -44,7 +44,7 @@ const DayOpeningModal = ({ isOpen, onClose }) => {
   return (
     <div className="modal-overlay" style={{ 
       backdropFilter: 'blur(8px)',
-      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+      backgroundColor: 'rgba(255, 255, 255, 0.3)',
       transition: 'opacity 0.3s ease',
       opacity: animate ? 1 : 0
     }}>

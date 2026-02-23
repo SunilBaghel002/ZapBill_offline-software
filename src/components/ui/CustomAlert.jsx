@@ -136,3 +136,16 @@ const CustomAlert = ({ isOpen, message, type = 'info', onClose, onConfirm }) => 
 };
 
 export default CustomAlert;
+
+
+/* pping tray creation
+[1] [12364:0222/214753.850:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: Access is denied. (0x5)
+[1] [12364:0222/214753.851:ERROR:net\disk_cache\disk_cache.cc:236] Unable to create cache
+[1] [12364:0222/214753.851:ERROR:gpu\ipc\host\gpu_disk_cache.cc:724] Gpu Cache Creation failed: -2
+[1] [12364:0222/214753.850:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: Access is denied. (0x5)
+[1] [12364:0222/214753.851:ERROR:net\disk_cache\disk_cache.cc:236] Unable to create cache
+[1] [12364:0222/214753.851:ERROR:gpu\ipc\host\gpu_disk_cache.cc:724] Gpu Cache Creation failed: -2
+[1] [12364:0222/214753.850:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: Access is denied. (0x5)
+[1] [12364:0222/214753.851:ERROR:net\disk_cache\disk_cache.cc:236] Unable to create cache
+[1] [12364:0222/214753.851:ERROR:gpu\ipc\host\gpu_disk_cache.cc:724] Gpu Cache Creation failed: -2
+[1] 21:48:16.263 > Login attempt for user: admin */

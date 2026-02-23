@@ -1777,6 +1777,12 @@ class Database {
       SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE date = ? AND employee_id = ?
     `, [date, userId]);
 
+    const shifts = this.execute(`
+      SELECT COALESCE(SUM(start_cash), 0) as total_start_cash 
+      FROM shifts 
+      WHERE user_id = ? AND date(start_time, 'localtime') = ?
+    `, [userId, date]);
+
     const orders = this.execute(`
       SELECT * FROM orders 
       WHERE DATE(created_at, 'localtime') = ? AND cashier_id = ? AND is_deleted = 0 
@@ -1785,11 +1791,13 @@ class Database {
 
     const totalRevenue = sales[0]?.total_revenue || 0;
     const totalExpenses = expenses[0]?.total_expenses || 0;
+    const openingBalance = shifts[0]?.total_start_cash || 0;
 
     return {
       sales: {
         ...(sales[0] || { total_orders: 0, total_revenue: 0, cash_amount: 0, card_amount: 0, upi_amount: 0 }),
         total_expenses: totalExpenses,
+        opening_balance: openingBalance,
         net_revenue: totalRevenue - totalExpenses
       },
       orders,
@@ -2002,12 +2010,12 @@ class Database {
     // In a real scenario, we might want more complex logic (e.g. shifts spanning midnight)
     // For now, we'll just close shifts started before today 00:00
     
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
     
     this.db.run(`
       UPDATE shifts 
       SET status = 'closed', end_time = datetime('now'), end_cash = 0, updated_at = CURRENT_TIMESTAMP
-      WHERE status = 'active' AND date(start_time) < ?
+      WHERE status = 'active' AND date(start_time, 'localtime') < ?
     `, [today]);
   }
 
@@ -2050,6 +2058,7 @@ class Database {
       sales: {
         ...(sales || { total_orders: 0, total_revenue: 0, cash_sales: 0, card_sales: 0, upi_sales: 0 }),
         total_expenses: totalExpenses,
+        opening_balance: shift.start_cash || 0,
         net_revenue: totalRevenue - totalExpenses
       }
     };
@@ -2090,7 +2099,7 @@ class Database {
 
   // ===== Day Management =====
   getDayStatus(dateStr) {
-    const date = dateStr || new Date().toISOString().split('T')[0];
+    const date = dateStr || new Date().toLocaleDateString('en-CA');
     // First, auto-close previous days and shifts if needed
     this.autoCloseDays();
     this.autoCloseShifts();
@@ -2100,7 +2109,7 @@ class Database {
   }
 
   openDay(userId, openingBalance) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
     const existing = this.getDayStatus(today);
     if (existing) return existing;
     
@@ -2127,7 +2136,7 @@ class Database {
   }
 
   autoCloseDays() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
     this.db.run(`
       UPDATE day_logs 
       SET status = 'closed', closing_time = business_date || ' 23:59:59', updated_at = CURRENT_TIMESTAMP
@@ -2768,8 +2777,8 @@ class Database {
   getStaffPerformance(startDate, endDate) {
     return this.execute(`
       SELECT 
-        u.username as staff_name,
-        u.role,
+        COALESCE(u.full_name, u.username, o.cashier_id, 'Unknown') as staff_name,
+        COALESCE(u.role, 'Unknown') as role,
         COUNT(o.id) as orders_handled,
         SUM(o.total_amount) as total_sales,
         AVG(o.total_amount) as avg_order_value
@@ -2778,7 +2787,7 @@ class Database {
       WHERE o.is_deleted = 0 
         AND o.status != 'cancelled'
         AND date(o.created_at, 'localtime') BETWEEN date(?) AND date(?)
-      GROUP BY u.id
+      GROUP BY COALESCE(u.id, o.cashier_id)
     `, [startDate, endDate]);
   }
 
