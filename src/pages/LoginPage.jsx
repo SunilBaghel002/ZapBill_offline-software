@@ -70,7 +70,7 @@ const LoginPage = () => {
             justifyContent: 'center',
             margin: '0 auto var(--spacing-4)',
           }}>
-            <img src="/logo.png" alt="ZapBill Logo" style={{ width: '120px', height: '120px', objectFit: 'contain' }} />
+            <img src="./logo.png" alt="ZapBill Logo" style={{ width: '120px', height: '120px', objectFit: 'contain' }} />
           </div>
           <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--spacing-2)' }}>
             ZapBill POS
