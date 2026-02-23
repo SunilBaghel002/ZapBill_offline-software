@@ -478,10 +478,7 @@ class PrinterService {
     }).join('');
 
     return `
-      <div style="border-top:2px dashed #000; margin-top:8px; padding-top:6px;">
-        <div style="text-align:center; font-size:10px; font-weight:bold; letter-spacing:1px; margin-bottom:4px;">
-          ✂ - - - - - - TEAR HERE - - - - - - ✂
-        </div>
+      <div style="margin-bottom:8px; padding-bottom:6px;">
         <div style="text-align:center; font-size:13px; font-weight:bold; margin-bottom:4px;">
           ${order.restaurantName || 'BILL SUMMARY'}
         </div>
@@ -512,7 +509,12 @@ class PrinterService {
           <span>TOTAL</span><span>${currencySymbol}${parseFloat(order.total || order.grand_total || 0).toFixed(2)}</span>
         </div>
         
-        <div style="text-align:center; font-size:9px; margin-top:6px; color:#555;">--- Bill Copy (Kitchen Ref) ---</div>
+        <div style="text-align:center; font-size:9px; margin-top:6px; color:#555; margin-bottom:4px;">--- Bill Copy (Kitchen Ref) ---</div>
+        
+        <div style="text-align:center; font-size:10px; font-weight:bold; letter-spacing:1px; margin-bottom:4px;">
+          ✂ - - - - - - TEAR HERE - - - - - - ✂
+        </div>
+        <div style="border-bottom:2px dashed #000; margin-bottom:8px;"></div>
       </div>
     `;
   }
@@ -522,7 +524,7 @@ class PrinterService {
     try {
       const kotHtml = this.generateKOTHtml(order, kotItems, null, stationName);
       const miniBillHtml = this.generateMiniBillHtml(order, allItems);
-      const combinedHtml = kotHtml + miniBillHtml;
+      const combinedHtml = miniBillHtml + kotHtml;
       return await this.printHtml(combinedHtml, printerName, '80');
     } catch (error) {
       log.error('Print KOT with bill error:', error);
