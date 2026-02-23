@@ -18,6 +18,7 @@ import {
 import { useAuthStore } from '../../stores/authStore';
 import { useShift } from '../../context/ShiftContext';
 import ShiftModal from '../common/ShiftModal';
+import logoImg from '../../assets/logo.png';
 
 const Sidebar = () => {
   const { user, logout } = useAuthStore();
@@ -92,7 +93,7 @@ const Sidebar = () => {
     }}>
       {/* Logo Section */}
       <div style={{ padding: '20px', borderBottom: '1px solid #37474F', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <img src="./logo.png" alt="ZapBill Logo" style={{ maxWidth: '100px', height: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+        <img src={logoImg} alt="ZapBill Logo" style={{ maxWidth: '100px', height: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
       </div>
 
       {/* Navigation */}

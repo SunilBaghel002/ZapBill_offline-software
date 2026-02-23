@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { UtensilsCrossed, User, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 const LoginPage = () => {
   const [username, setUsername] = useState('');
@@ -70,7 +71,7 @@ const LoginPage = () => {
             justifyContent: 'center',
             margin: '0 auto var(--spacing-4)',
           }}>
-            <img src="./logo.png" alt="ZapBill Logo" style={{ width: '120px', height: '120px', objectFit: 'contain' }} />
+            <img src={logoImg} alt="ZapBill Logo" style={{ width: '120px', height: '120px', objectFit: 'contain' }} />
           </div>
           <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--spacing-2)' }}>
             ZapBill POS

@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import MainSidebar from '../components/layout/MainSidebar';
 import CustomAlert from '../components/ui/CustomAlert';
+import logoImg from '../assets/logo.png';
 import '../styles/pos-sheet.css';
 
 const CustomerHistoryModal = ({ isOpen, onClose, history, customerName, customerPhone }) => {
@@ -689,7 +690,7 @@ const POSPage = () => {
             <Menu size={24} color="#546E7A" />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="./logo.png" alt="ZapBill Logo" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
+            <img src={logoImg} alt="ZapBill Logo" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
           </div>
           {/* Active Menu Name Badge */}
           {activeMenu && (

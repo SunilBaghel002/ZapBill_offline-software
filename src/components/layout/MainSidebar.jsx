@@ -19,6 +19,7 @@ import {
 import { useAuthStore } from '../../stores/authStore';
 import { useShift } from '../../context/ShiftContext';
 import ShiftModal from '../common/ShiftModal';
+import logoImg from '../../assets/logo.png';
 
 const MainSidebar = ({ isOpen, onClose }) => {
   const { user, logout } = useAuthStore();
@@ -123,7 +124,7 @@ const MainSidebar = ({ isOpen, onClose }) => {
       >
         {/* Header */}
         <div style={{ padding: '20px', borderBottom: '1px solid #37474F', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src="./logo.png" alt="ZapBill Logo" style={{ maxWidth: '100px', height: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+            <img src={logoImg} alt="ZapBill Logo" style={{ maxWidth: '100px', height: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
             <button onClick={onClose} style={{ position: 'absolute', right: '12px', top: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '50%', padding: '6px', border: 'none', color: '#90A4AE', cursor: 'pointer', display: 'flex', transition: 'background 0.2s' }} onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'} onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}>
                 <X size={20} />
             </button>
