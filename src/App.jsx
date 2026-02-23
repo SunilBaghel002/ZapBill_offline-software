@@ -89,7 +89,7 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="inventory" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'biller', 'cashier']}>
                   <InventoryPage />
                 </ProtectedRoute>
               } />
@@ -106,7 +106,7 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="printers" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'biller', 'cashier']}>
                   <PrintersPage />
                 </ProtectedRoute>
               } />

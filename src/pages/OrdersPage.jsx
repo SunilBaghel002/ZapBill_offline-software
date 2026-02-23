@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   Search, 
   Eye, 
@@ -20,9 +21,10 @@ import {
 } from 'lucide-react';
 
 const OrdersPage = () => {
+  const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(location.state?.search || '');
   const [dateFilter, setDateFilter] = useState('today');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
@@ -30,6 +32,15 @@ const OrdersPage = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+
+  // When location state changes (global search), update query and show all dates
+  useEffect(() => {
+    if (location.state?.search) {
+      setSearchQuery(location.state.search);
+      setDateFilter('all');
+      setStatusFilter('all');
+    }
+  }, [location.state?.search]);
 
   useEffect(() => {
     loadOrders();

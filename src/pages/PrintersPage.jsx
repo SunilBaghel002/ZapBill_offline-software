@@ -376,10 +376,13 @@ const PrintersPage = () => {
                   <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: 'var(--gray-800)' }}>Printer Configuration</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                     <div className="input-group">
-                      <label className="input-label">Select Printer</label>
+                      <label className="input-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        Select Printer 
+                        <span style={{ fontSize: '11px', color: 'var(--success-600)', fontWeight: 'normal' }}>USB / Wi-Fi / Bluetooth supported</span>
+                      </label>
                       <select className="input select" value={settings.printer_bill || ''} onChange={(e) => updateSetting('printer_bill', e.target.value)}>
                         <option value="">-- Select Printer --</option>
-                        {printers.map(p => <option key={p.name} value={p.name}>{p.name} {p.isDefault ? '(Default)' : ''}</option>)}
+                        {printers.map(p => <option key={p.name} value={p.name}>{p.displayName || p.name} {p.isDefault ? '(Default)' : ''}</option>)}
                       </select>
                     </div>
                     <div className="input-group">
@@ -429,6 +432,55 @@ const PrintersPage = () => {
                     {testingPrinter === settings.printer_bill ? 'Printing...' : 'Test Print'}
                   </button>
                 </div>
+
+                {/* System Printers List */}
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: 'var(--gray-800)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Zap size={18} style={{ color: 'var(--primary-500)' }} /> Detected System Printers
+                  </h4>
+                  <div style={{ 
+                    background: 'white', borderRadius: '12px', border: '1px solid var(--gray-200)', overflow: 'hidden'
+                  }}>
+                    {printers.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', color: 'var(--gray-500)', fontSize: '13px' }}>
+                        No printers detected on this computer.
+                      </div>
+                    ) : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead style={{ background: 'var(--gray-50)' }}>
+                          <tr>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--gray-700)', borderBottom: '1px solid var(--gray-200)' }}>Printer Name</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--gray-700)', borderBottom: '1px solid var(--gray-200)' }}>Status</th>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '600', color: 'var(--gray-700)', borderBottom: '1px solid var(--gray-200)' }}>Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {printers.map((p, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                              <td style={{ padding: '12px 16px', fontWeight: '500', color: 'var(--gray-800)' }}>
+                                {p.displayName || p.name}
+                                {p.isDefault && <span style={{ marginLeft: '8px', fontSize: '10px', background: 'var(--primary-100)', color: 'var(--primary-700)', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold' }}>DEFAULT</span>}
+                              </td>
+                              <td style={{ padding: '12px 16px' }}>
+                                {p.status !== 0 ? (
+                                  <span style={{ color: 'var(--error-600)', fontSize: '12px', display:'flex', alignItems:'center', gap:'4px' }}><span style={{width:'8px', height:'8px', borderRadius:'50%', background:'var(--error-500)'}}></span> Offline / Error</span>
+                                ) : (
+                                  <span style={{ color: 'var(--success-600)', fontSize: '12px', display:'flex', alignItems:'center', gap:'4px' }}><span style={{width:'8px', height:'8px', borderRadius:'50%', background:'var(--success-500)'}}></span> Ready</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 16px', color: 'var(--gray-500)', fontSize: '12px' }}>
+                                {p.name.toLowerCase().includes('pdf') || p.name.toLowerCase().includes('xps') || p.name.toLowerCase().includes('onenote') ? 'Virtual/Software' : 'Hardware (USB/Network)'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                  <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '12px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <Info size={14} /> ZapBill automatically detects any USB, Wi-Fi, Ethernet, or Bluetooth printer connected to your operating system.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -459,7 +511,7 @@ const PrintersPage = () => {
                       <label className="input-label">Select KOT Printer</label>
                       <select className="input select" value={settings.printer_kot || ''} onChange={(e) => updateSetting('printer_kot', e.target.value)}>
                         <option value="">-- Select Printer --</option>
-                        {printers.map(p => <option key={p.name} value={p.name}>{p.name} {p.isDefault ? '(Default)' : ''}</option>)}
+                        {printers.map(p => <option key={p.name} value={p.name}>{p.displayName || p.name} {p.isDefault ? '(Default)' : ''}</option>)}
                       </select>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'flex-end' }}>

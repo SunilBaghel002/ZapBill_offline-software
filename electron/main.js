@@ -44,13 +44,14 @@ function createWindow() {
   // Load the app
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // DevTools disabled from auto-opening
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
     mainWindow.show();
     mainWindow.focus();
   });

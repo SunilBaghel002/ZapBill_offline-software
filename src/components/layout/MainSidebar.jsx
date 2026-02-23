@@ -73,7 +73,7 @@ const MainSidebar = ({ isOpen, onClose }) => {
     },
     { path: '/expenses', icon: Wallet, label: 'Expenses', adminOnly: false },
     { path: '/users', icon: Users, label: 'Users', adminOnly: true },
-    { path: '/printers', icon: Printer, label: 'Printers', adminOnly: true },
+    { path: '/printers', icon: Printer, label: 'Printers', adminOnly: false },
     { path: '/settings', icon: Settings, label: 'Settings', adminOnly: true },
   ];
 

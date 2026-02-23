@@ -734,15 +734,13 @@ const POSPage = () => {
 
           <div className="pos-support-box">
             <span>Support</span>
-            <strong>9099912483</strong>
+            <strong>9310065542</strong>
           </div>
 
           <div className="pos-header-actions">
-            <button className="pos-header-icon-btn" title="Refresh Menu" onClick={loadData}>
+            <button className="pos-header-icon-btn" title="Refresh App" onClick={() => window.location.reload()}>
               <RefreshCw size={20} />
             </button>
-            <button className="pos-header-icon-btn" title="Keyboard Shortcuts"><Keyboard size={20} /></button>
-            <button className="pos-header-icon-btn" title="User Profile"><User size={20} /></button>
           </div>
         </div>
       </div>

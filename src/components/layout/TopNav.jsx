@@ -1,21 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Search,
-  Bell,
   Plus,
-  ChevronDown,
   Clock,
-  MapPin,
   Wifi,
-  WifiOff
+  WifiOff,
+  Search
 } from 'lucide-react';
+import { useAuthStore } from '../../stores/authStore';
+import { useNavigate } from 'react-router-dom';
 
 const TopNav = ({ onNewOrder }) => {
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
   const [isOnline, setIsOnline] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      navigate('/orders', { state: { search: searchTerm } });
+      setSearchTerm(''); // clear after search
+    }
+  };
+
   // Update time every minute
-  React.useEffect(() => {
+  useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 60000);
@@ -42,23 +52,16 @@ const TopNav = ({ onNewOrder }) => {
   return (
     <header className="top-nav">
       {/* Search Section */}
-      <div className="top-nav-search">
+      <form className="top-nav-search" onSubmit={handleSearch}>
         <Search size={18} className="top-nav-search-icon" />
         <input
           type="text"
           placeholder="Search orders, items, customers..."
           className="top-nav-search-input"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
         />
-      </div>
-
-      {/* Center Section - Outlet Selector */}
-      <div className="top-nav-center">
-        <button className="top-nav-outlet">
-          <MapPin size={16} />
-          <span>Main Branch</span>
-          <ChevronDown size={16} />
-        </button>
-      </div>
+      </form>
 
       {/* Right Section */}
       <div className="top-nav-right">
@@ -81,15 +84,9 @@ const TopNav = ({ onNewOrder }) => {
           <span>{isOnline ? 'Online' : 'Offline'}</span>
         </div>
 
-        {/* Notifications */}
-        <button className="top-nav-icon-btn">
-          <Bell size={20} />
-          <span className="top-nav-notification-badge">5</span>
-        </button>
-
         {/* User Avatar */}
         <button className="top-nav-avatar">
-          <span>JD</span>
+          <span>{user?.fullName?.charAt(0).toUpperCase() || user?.username?.charAt(0).toUpperCase() || 'U'}</span>
         </button>
       </div>
     </header>
