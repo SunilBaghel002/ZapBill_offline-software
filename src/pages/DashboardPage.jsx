@@ -300,6 +300,77 @@ const OrderCard = ({ order, onClick }) => {
   );
 };
 
+// Add Balance Modal Component
+const AddBalanceModal = ({ isOpen, onClose, onAdd }) => {
+  const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!amount || isNaN(amount) || amount <= 0) return;
+    setLoading(true);
+    await onAdd(parseFloat(amount));
+    setAmount('');
+    setLoading(false);
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center'
+    }} onClick={onClose}>
+      <div 
+        style={{
+          background: 'white', width: '90%', maxWidth: '400px', 
+          borderRadius: '16px', padding: '24px', position: 'relative', boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+        }} 
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, fontSize: '20px', color: '#1e293b' }}>Add Cash to Drawer</h2>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b' }}>
+            <XCircle size={24} />
+          </button>
+        </div>
+        
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold', color: '#475569' }}>
+              Amount to Add (₹)
+            </label>
+            <input 
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Enter amount"
+              style={{
+                width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', 
+                fontSize: '16px', outline: 'none'
+              }}
+              autoFocus
+              required
+            />
+            <p style={{ fontSize: '12px', color: '#64748b', marginTop: '8px' }}>
+              This increments the opening balance and physical cash drawer calculation for all active shifts.
+            </p>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <button type="button" onClick={onClose} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', background: 'white', cursor: 'pointer', fontWeight: 'bold', color: '#64748b' }}>
+              Cancel
+            </button>
+            <button type="submit" disabled={loading} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#0096FF', color: 'white', fontWeight: 'bold', cursor: loading ? 'not-allowed' : 'pointer' }}>
+              {loading ? 'Adding...' : 'Add Balance'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+
 const DashboardPage = () => {
   const [stats, setStats] = useState({
     todayRevenue: 0,
@@ -318,8 +389,24 @@ const DashboardPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [chartData, setChartData] = useState([]);
   const [topItems, setTopItems] = useState([]);
+  const [showAddBalanceModal, setShowAddBalanceModal] = useState(false);
 
   const { user } = useAuthStore();
+
+  const handleAddBalance = async (amount) => {
+    try {
+      const result = await window.electronAPI.invoke('day:addBalance', { amount });
+      if (result.success) {
+        setShowAddBalanceModal(false);
+        await loadDashboardData();
+      } else {
+        alert(result.error || 'Failed to add balance');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to add balance');
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -406,11 +493,17 @@ const DashboardPage = () => {
         ).length;
       }
 
+      // Calculate Cash in Hand using cash_sales or cash_amount based on API response
+      const cashSales = todaySales.cash_amount !== undefined ? todaySales.cash_amount : 
+                       (todaySales.cash_sales !== undefined ? todaySales.cash_sales : 0);
+      const cashInHand = (todaySales.opening_balance || 0) + cashSales - (todaySales.total_expenses || 0);
+
       setStats({
         todayRevenue: todaySales.total_revenue || 0,
         todayExpenses: todaySales.total_expenses || 0,
         openingBalance: todaySales.opening_balance || 0,
         netProfit: todaySales.net_revenue || 0,
+        cashInHand: cashInHand || 0,
         totalOrders: todaySales.total_orders || 0,
         activeOrders: activeCount,
         revenueTrend,
@@ -482,6 +575,9 @@ const DashboardPage = () => {
           <p className="page-subtitle" style={{ color: '#64748b', fontSize: '15px' }}>Welcome back, <span style={{ color: '#0096FF', fontWeight: '700' }}>{user?.full_name || user?.username}</span>! Here's your restaurant's overview.</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn btn-secondary" onClick={() => setShowAddBalanceModal(true)} style={{ borderRadius: '12px', padding: '10px 16px', background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}>
+            <Wallet size={18} /> Add Cash
+          </button>
           <button className="btn btn-secondary" onClick={loadDashboardData} style={{ borderRadius: '12px', padding: '10px 16px' }}>
             <Clock size={18} /> Refresh
           </button>
@@ -523,10 +619,10 @@ const DashboardPage = () => {
           color="danger"
         />
         <StatCard
-          title="Net Profit"
-          value={`₹${stats.netProfit.toLocaleString()}`}
-          trend={stats.revenueTrend.direction} 
-          trendValue={stats.revenueTrend.value}
+          title="Cash in Hand"
+          value={`₹${(stats.cashInHand || 0).toLocaleString()}`}
+          trend="neutral" 
+          trendValue={0}
           icon={DollarSign}
           color="success"
         />
@@ -693,7 +789,16 @@ const DashboardPage = () => {
         </div>
       </div>
       {/* Order Details Modal */}
-      <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+      <OrderDetailsModal
+        order={selectedOrder}
+        onClose={() => setSelectedOrder(null)}
+      />
+
+      <AddBalanceModal
+        isOpen={showAddBalanceModal}
+        onClose={() => setShowAddBalanceModal(false)}
+        onAdd={handleAddBalance}
+      />
     </div>
   );
 };

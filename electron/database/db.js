@@ -125,6 +125,20 @@ class Database {
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Create item_discounts table
+    this.db.run(`CREATE TABLE IF NOT EXISTS item_discounts (
+      id TEXT PRIMARY KEY,
+      menu_item_id TEXT REFERENCES menu_items(id),
+      variant_name TEXT,
+      discount_type TEXT CHECK(discount_type IN ('percentage', 'flat')),
+      discount_value REAL NOT NULL,
+      start_date TEXT,
+      end_date TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     // Create indexes
     try {
       this.db.run("CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)");
@@ -2135,6 +2149,30 @@ class Database {
     return this.getDayStatus(today);
   }
 
+  addDayBalance(amount) {
+    const today = new Date().toLocaleDateString('en-CA');
+    const existing = this.getDayStatus(today);
+    if (!existing) {
+      throw new Error('Day is not currently open');
+    }
+    
+    // Add to day logs
+    this.db.run(`
+      UPDATE day_logs 
+      SET opening_balance = opening_balance + ?
+      WHERE business_date = ?
+    `, [amount, today]);
+    
+    // Update all currently active shifts so their individual math checks out
+    this.db.run(`
+      UPDATE shifts 
+      SET start_cash = start_cash + ? 
+      WHERE status = 'active'
+    `, [amount]);
+    
+    return this.getDayStatus(today);
+  }
+
   autoCloseDays() {
     const today = new Date().toLocaleDateString('en-CA');
     this.db.run(`
@@ -2996,11 +3034,67 @@ class Database {
       ['printer_bill', ''],
       ['printer_kot', '']
     ];
-    
     for (const [key, value] of defaultSettings) {
       this.run(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`, [key, value]);
     }
   }
+
+  // ==========================================
+  // DISCOUNTS MANAGEMENT
+  // ==========================================
+  
+  getAllItemDiscounts() {
+    return this.execute(`
+      SELECT d.*, m.name as item_name 
+      FROM item_discounts d
+      LEFT JOIN menu_items m ON d.menu_item_id = m.id
+      ORDER BY d.created_at DESC
+    `);
+  }
+
+  getActiveItemDiscounts() {
+    // Get all discounts that are active, and either don't have dates, or are currently valid
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+    
+    // Simplistic handling of dates: If start_date/end_date is set, compare against today/now
+    return this.execute(`
+      SELECT d.*, m.name as item_name 
+      FROM item_discounts d
+      LEFT JOIN menu_items m ON d.menu_item_id = m.id
+      WHERE d.is_active = 1
+      AND (d.start_date IS NULL OR d.start_date <= ?)
+      AND (d.end_date IS NULL OR d.end_date >= ?)
+    `, [today, today]);
+  }
+
+  addItemDiscount(discount) {
+    const { v4: uuidv4 } = require('uuid');
+    const id = discount.id || uuidv4();
+    this.insert('item_discounts', {
+      ...discount,
+      id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    return this.getItemDiscount(id);
+  }
+
+  updateItemDiscount(id, updates) {
+    updates.updated_at = new Date().toISOString();
+    this.update('item_discounts', id, updates);
+    return this.getItemDiscount(id);
+  }
+
+  deleteItemDiscount(id) {
+    this.run('DELETE FROM item_discounts WHERE id = ?', [id]);
+    return { success: true };
+  }
+
+  getItemDiscount(id) {
+    return this.execute('SELECT * FROM item_discounts WHERE id = ?', [id])[0];
+  }
+
 }
 
 module.exports = { Database };

@@ -636,6 +636,52 @@ function setupIpcHandlers() {
     }
   });
 
+  // ============ DISCOUNTS OPERATIONS ============
+  ipcMain.handle('discounts:getAll', async () => {
+    try {
+      return db.getAllItemDiscounts();
+    } catch (error) {
+      log.error('Get all discounts error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('discounts:getActive', async () => {
+    try {
+      return db.getActiveItemDiscounts();
+    } catch (error) {
+      log.error('Get active discounts error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('discounts:add', async (event, discount) => {
+    try {
+      return db.addItemDiscount(discount);
+    } catch (error) {
+      log.error('Add discount error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('discounts:update', async (event, { id, updates }) => {
+    try {
+      return db.updateItemDiscount(id, updates);
+    } catch (error) {
+      log.error('Update discount error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('discounts:delete', async (event, { id }) => {
+    try {
+      return db.deleteItemDiscount(id);
+    } catch (error) {
+      log.error('Delete discount error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // ============ INVENTORY OPERATIONS ============
   ipcMain.handle('inventory:getAll', async () => {
     try {
@@ -748,6 +794,16 @@ function setupIpcHandlers() {
       return { success: true, status };
     } catch (error) {
       log.error('Open day error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('day:addBalance', async (event, { amount }) => {
+    try {
+      const status = db.addDayBalance(amount);
+      return { success: true, status };
+    } catch (error) {
+      log.error('Add day balance error:', error);
       return { success: false, error: error.message };
     }
   });

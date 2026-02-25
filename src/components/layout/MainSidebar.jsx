@@ -14,7 +14,8 @@ import {
   LogOut,
   RefreshCw,
   Wallet,
-  Printer
+  Printer,
+  Tag
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useShift } from '../../context/ShiftContext';
@@ -57,6 +58,7 @@ const MainSidebar = ({ isOpen, onClose }) => {
     { path: '/pos', icon: ShoppingCart, label: 'POS / Billing', adminOnly: false },
     { path: '/orders', icon: ClipboardList, label: 'Orders', badge: activeOrdersCount > 0 ? activeOrdersCount : null, adminOnly: false },
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu', adminOnly: true },
+    { path: '/discounts', icon: Tag, label: 'Discounts', adminOnly: true },
     { path: '/kot', icon: ChefHat, label: 'Kitchen (KOT)', adminOnly: false },
     { path: '/inventory', icon: Package, label: 'Inventory', adminOnly: false },
     { 

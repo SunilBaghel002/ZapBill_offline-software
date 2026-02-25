@@ -9,12 +9,31 @@ const ShiftModal = ({ isOpen, type, onClose }) => {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [animate, setAnimate] = useState(false);
+  const [expectedCash, setExpectedCash] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => setAnimate(true), 50);
+      
+      const fetchExpectedCash = async () => {
+        try {
+          const today = new Date().toLocaleDateString('en-CA');
+          const todayReport = await window.electronAPI.invoke('reports:daily', { date: today });
+          if (todayReport && todayReport.sales) {
+            const cashSales = todayReport.sales.cash_amount !== undefined ? todayReport.sales.cash_amount : 
+                             (todayReport.sales.cash_sales !== undefined ? todayReport.sales.cash_sales : 0);
+            const cash = (todayReport.sales.opening_balance || 0) + cashSales - (todayReport.sales.total_expenses || 0);
+            setExpectedCash(cash);
+          }
+        } catch (err) {
+          console.error('Failed to fetch expected cash:', err);
+        }
+      };
+      
+      fetchExpectedCash();
     } else {
       setAnimate(false);
+      setExpectedCash(null);
     }
   }, [isOpen]);
 
@@ -143,6 +162,15 @@ const ShiftModal = ({ isOpen, type, onClose }) => {
                   ? 'Please enter the starting cash amount in your drawer to begin your shift.'
                   : 'Please enter the final cash amount in your drawer to close your shift.'}
               </p>
+
+              {expectedCash !== null && (
+                <div style={{ marginTop: '16px', padding: '12px 16px', background: 'rgba(16, 185, 129, 0.1)', color: '#059669', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontWeight: '600', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                     <Wallet size={16} /> Expected Cash in Drawer:
+                  </span>
+                  <span style={{ fontWeight: '800', fontSize: '16px' }}>₹{expectedCash.toLocaleString()}</span>
+                </div>
+              )}
             </div>
 
             {error && (

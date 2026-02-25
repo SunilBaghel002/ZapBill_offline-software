@@ -16,6 +16,7 @@ import UsersPage from './pages/UsersPage';
 import SettingsPage from './pages/SettingsPage';
 import PrintersPage from './pages/PrintersPage';
 import ExpensesPage from './pages/ExpensesPage';
+import DiscountsPage from './pages/DiscountsPage';
 
 // Components
 import Layout from './components/common/Layout';
@@ -113,6 +114,11 @@ function App() {
               <Route path="settings" element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <SettingsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="discounts" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <DiscountsPage />
                 </ProtectedRoute>
               } />
               <Route path="expenses" element={

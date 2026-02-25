@@ -61,7 +61,20 @@ export const useCartStore = create(
           // Calculate unit price based on variant and addons
           let finalPrice = menuItem.price;
           if (variant) finalPrice = parseFloat(variant.price);
-          
+
+          // Apply item-level discount if present
+          let appliedDiscount = 0;
+          if (menuItem.appliedDiscount) {
+             if (menuItem.appliedDiscount.type === 'percentage') {
+               appliedDiscount = finalPrice * (menuItem.appliedDiscount.value / 100);
+             } else if (menuItem.appliedDiscount.type === 'flat') {
+               appliedDiscount = menuItem.appliedDiscount.value;
+             }
+             finalPrice -= appliedDiscount;
+             // Ensure price doesn't go negative
+             if (finalPrice < 0) finalPrice = 0;
+          }
+
           const addonsTotal = addons.reduce((sum, addon) => sum + parseFloat(addon.price), 0);
           finalPrice += addonsTotal;
 

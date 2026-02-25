@@ -123,9 +123,16 @@ const validInvokeChannels = [
   // Day Management
   'day:getStatus',
   'day:open',
+  'day:addBalance',
   // App
   'app:getVersion',
   'app:checkForUpdates',
+  // Discounts
+  'discounts:getAll',
+  'discounts:getActive',
+  'discounts:add',
+  'discounts:update',
+  'discounts:delete',
 ];
 
 const validOnChannels = [

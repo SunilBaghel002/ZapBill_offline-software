@@ -227,8 +227,10 @@ const POSPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [masterAddons, setMasterAddons] = useState([]);
   const [globalAddons, setGlobalAddons] = useState([]);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [activeItemDiscounts, setActiveItemDiscounts] = useState([]);
 
-  // New States for Add-ons and Hold Order
+  // UI States for Add-ons and Hold Order
   const [showAddonModal, setShowAddonModal] = useState(false);
   const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
   const [showHeldOrders, setShowHeldOrders] = useState(false);
@@ -330,21 +332,23 @@ const POSPage = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [cats, items, active, ma, ga] = await Promise.all([
+      const [cats, items, active, ma, ga, discounts] = await Promise.all([
         window.electronAPI.invoke('menu:getCategories'),
         window.electronAPI.invoke('menu:getItems', {}),
         window.electronAPI.invoke('menu:getActiveMenu'),
         window.electronAPI.invoke('menu:getMasterAddons'),
-        window.electronAPI.invoke('menu:getAddons')
+        window.electronAPI.invoke('menu:getAddons'),
+        window.electronAPI.invoke('discounts:getActive')
       ]);
       
-      console.log('POS Data Loaded:', { cats: cats.length, items: items.length, activeMenu: active?.name });
+      console.log('POS Data Loaded:', { cats: cats.length, items: items.length, activeMenu: active?.name, discounts: discounts?.length });
       
       setCategories(cats);
       setMenuItems(items);
       setActiveMenu(active);
       setMasterAddons(ma || []);
       setGlobalAddons(ga || []);
+      setActiveItemDiscounts(discounts || []);
 
       // Default to All Items
       setSelectedCategory(null);
@@ -392,24 +396,21 @@ const POSPage = () => {
     const variants = item.variants ? (typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants) : [];
     const addons = item.addons ? (typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons) : [];
 
+    // Find if there's an active discount for this specific item (all variants)
+    const itemDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name));
+    
+    // Attach discount to the item object so it can be used in AddonModal or CartStore
+    const itemWithPossibleDiscount = { ...item, appliedDiscount: itemDiscount };
+
     if (variants.length > 0 || addons.length > 0) {
-      setSelectedItemForAddon({ ...item, parsedVariants: variants, parsedAddons: addons });
+      setSelectedItemForAddon({ ...itemWithPossibleDiscount, parsedVariants: variants, parsedAddons: addons, activeItemDiscounts });
       setShowAddonModal(true);
     } else {
-      cart.addItem(item);
+      cart.addItem(itemWithPossibleDiscount);
     }
   };
 
   const handleCheckout = async () => {
-    // Direct Checkout: Create Order -> KOT -> Print -> Clear
-    // Validate Customer Details
-    if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
-      setShowCustomerForm(true);
-      setActiveCartTab('user');
-      showAlert("Customer Name and Phone Number are mandatory!", "warning");
-      return;
-    }
-
     // IMMEDIATE ACTION: Create Order -> KOT -> Print
     try {
       const result = await cart.createOrder(user?.id);
@@ -495,13 +496,6 @@ const POSPage = () => {
     if (cart.items.length === 0) return;
 
     try {
-      // Validate Customer Details
-      if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
-        setShowCustomerForm(true);
-        showAlert("Customer Name and Phone Number are mandatory!", "warning");
-        return;
-      }
-
       // Create a temporary order object for KOT
       const kotOrder = {
         order_type: cart.orderType,
@@ -543,14 +537,6 @@ const POSPage = () => {
     if (cart.items.length === 0) return;
 
     try {
-      // Validate Customer Details
-      if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
-        setShowCustomerForm(true);
-        setActiveCartTab('user');
-        showAlert("Customer Name and Phone Number are mandatory!", "warning");
-        return;
-      }
-
       // Create order
       const result = await cart.createOrder(user?.id);
 
@@ -581,14 +567,6 @@ const POSPage = () => {
     if (cart.items.length === 0) return;
 
     try {
-      // Validate Customer Details
-      if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
-        setShowCustomerForm(true);
-        setActiveCartTab('user');
-        showAlert("Customer Name and Phone Number are mandatory!", "warning");
-        return;
-      }
-
       // Create order first
       const result = await cart.createOrder(user?.id);
 
@@ -617,14 +595,6 @@ const POSPage = () => {
     if (cart.items.length === 0) return;
 
     try {
-      // Validate Customer Details
-      if (!cart.customerName?.trim() || !cart.customerPhone?.trim()) {
-        setShowCustomerForm(true);
-        setActiveCartTab('user');
-        showAlert("Customer Name and Phone Number are mandatory!", "warning");
-        return;
-      }
-
       const result = await cart.createOrder(user?.id);
 
       if (result.success) {
@@ -1200,13 +1170,6 @@ const POSPage = () => {
               <span className="pos-bill-value">₹{cart.getSubtotal().toFixed(2)}</span>
             </div>
 
-            {cart.getDiscountAmount() > 0 && (
-              <div className="pos-bill-row discount">
-                <span className="pos-bill-label">Discount ({cart.discountType === 'percentage' ? `${cart.discountValue}%` : 'Flat'})</span>
-                <span className="pos-bill-value">- ₹{cart.getDiscountAmount().toFixed(2)}</span>
-              </div>
-            )}
-
             <div className="pos-bill-row">
               <span className="pos-bill-label">SGST 2.5%</span>
               <span className="pos-bill-value">₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
@@ -1240,32 +1203,6 @@ const POSPage = () => {
               </div>
             </div>
 
-            <div className="pos-bill-controls">
-              <button
-                className="pos-bill-toggle-btn"
-                onClick={() => setShowDiscountModal(true)}
-              >
-                <Percent size={14} /> Add Discount
-              </button>
-              <div className="pos-bill-toggles">
-                <label className={`pos-bill-checkbox ${cart.isComplimentary ? 'checked' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={cart.isComplimentary}
-                    onChange={(e) => cart.setIsComplimentary(e.target.checked)}
-                  />
-                  <span>Complimentary</span>
-                </label>
-                <label className={`pos-bill-checkbox ${cart.isSalesReturn ? 'checked' : ''}`}>
-                  <input
-                    type="checkbox"
-                    checked={cart.isSalesReturn}
-                    onChange={(e) => cart.setIsSalesReturn(e.target.checked)}
-                  />
-                  <span>Return</span>
-                </label>
-              </div>
-            </div>
           </div>
 
           {/* 4. Bill Details Sheet - POSITIONED ABSOLUTE TO PANEL */}
@@ -1278,19 +1215,6 @@ const POSPage = () => {
               <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#37474F' }}>
                 <span>Subtotal</span>
                 <span style={{ fontWeight: 700, color: '#1e293b' }}>₹{cart.getSubtotal().toFixed(2)}</span>
-              </div>
-
-              {/* Editable Discount */}
-              <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', fontSize: '14px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#37474F' }}>
-                  Discount
-                  <button onClick={() => setShowDiscountModal(true)} style={{ background: '#E3F2FD', border: 'none', borderRadius: '4px', cursor: 'pointer', color: '#1565C0', padding: '2px 6px', display: 'flex', alignItems: 'center' }}>
-                    <Edit2 size={10} style={{ marginRight: '2px' }} /> Edit
-                  </button>
-                </span>
-                <span style={{ color: cart.discountValue > 0 ? '#388e3c' : '#78909c', fontWeight: cart.discountValue > 0 ? 600 : 400 }}>
-                  {cart.discountValue > 0 ? `-₹${cart.getDiscountAmount().toFixed(2)}` : '₹0.00'}
-                </span>
               </div>
 
               {/* Taxes breakdown */}
@@ -1345,41 +1269,6 @@ const POSPage = () => {
               }}>
                 <span>Grand Total</span>
                 <span>₹{cart.getGrandTotal().toFixed(2)}</span>
-              </div>
-
-              {/* Return Calculation */}
-              <div style={{ 
-                marginTop: '20px', 
-                padding: '16px', 
-                background: '#f8fafc', 
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <span style={{ fontWeight: '700', color: '#64748b', fontSize: '13px', textTransform: 'uppercase' }}>Customer Paid</span>
-                  <input
-                    type="number"
-                    value={cart.customerPaid || ''}
-                    onChange={(e) => cart.setCustomerPaid(parseFloat(e.target.value) || 0)}
-                    placeholder="₹ 0.00"
-                    style={{ 
-                      width: '120px', 
-                      textAlign: 'right', 
-                      border: '1px solid #cbd5e1', 
-                      padding: '8px 12px', 
-                      borderRadius: '8px', 
-                      fontWeight: '800',
-                      fontSize: '16px',
-                      color: '#1e293b'
-                    }}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: '700', color: '#64748b', fontSize: '13px', textTransform: 'uppercase' }}>Return Amount</span>
-                  <span style={{ fontSize: '22px', fontWeight: '900', color: '#10b981' }}>
-                    ₹{Math.max(0, (cart.customerPaid || 0) - cart.getGrandTotal()).toFixed(0)}
-                  </span>
-                </div>
               </div>
 
               {/* Save & Send to KOT Button REMOVED as per request */}
@@ -1574,6 +1463,9 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
   const [addonSearch, setAddonSearch] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
 
+  // activeItemDiscounts was passed along as part of `item` object.
+  const activeItemDiscounts = item.activeItemDiscounts || [];
+
   // Resolve addons from Master Addon group for the selected variant
   const getVariantMasterAddons = () => {
     if (!selectedVariant?.master_addon_id) return [];
@@ -1601,7 +1493,37 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
   });
 
   const calculateTotal = () => {
-    let total = selectedVariant ? parseFloat(selectedVariant.price) : item.price;
+    let basePrice = item.price;
+    let appliedDiscount = null;
+
+    if (selectedVariant) {
+      basePrice = parseFloat(selectedVariant.price);
+      // Check if there's a variant-specific discount for this item
+      const variantDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && d.variant_name === selectedVariant.name);
+      if (variantDiscount) {
+        appliedDiscount = variantDiscount;
+      } else {
+        // Fallback to item-level discount if no variant-specific discount
+        appliedDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name || d.variant_name === ''));
+      }
+    } else {
+      // Non-variant item discount logic
+      appliedDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name || d.variant_name === ''));
+    }
+
+    // Apply the discount to the base price before addons
+    if (appliedDiscount) {
+       let discountAmount = 0;
+       if (appliedDiscount.discount_type === 'percentage') {
+         discountAmount = basePrice * (appliedDiscount.discount_value / 100);
+       } else if (appliedDiscount.discount_type === 'flat') {
+         discountAmount = appliedDiscount.discount_value;
+       }
+       basePrice -= discountAmount;
+       if (basePrice < 0) basePrice = 0;
+    }
+
+    let total = basePrice;
     selectedAddons.forEach(addon => {
       total += parseFloat(addon.price) * (addon.quantity || 1);
     });
@@ -1781,16 +1703,37 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
           />
         </div>
 
-        {/* Modal Footer */}
+        {/* Action Buttons */}
         <div className="addon-modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
+          <div className="addon-quantity-control">
+            <button className="btn btn-ghost btn-icon" onClick={() => setQuantity(Math.max(1, quantity - 1))}>
+              <Minus size={20} />
+            </button>
+            <span className="qty-display">{quantity}</span>
+            <button className="btn btn-ghost btn-icon" onClick={() => setQuantity(quantity + 1)}>
+              <Plus size={20} />
+            </button>
+          </div>
           <button
-            className="btn btn-save"
-            onClick={() => onAddToCart(item, quantity, specialInstructions, selectedVariant, selectedAddons)}
+            className="btn btn-primary addon-add-btn"
+            onClick={() => {
+              // Flatten addons for cart state
+              const flattenedAddons = selectedAddons.flatMap(addon => {
+                return Array(addon.quantity).fill({ ...addon });
+              });
+              
+              let appliedDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name || d.variant_name === ''));
+              if (selectedVariant) {
+                const variantDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && d.variant_name === selectedVariant.name);
+                if (variantDiscount) appliedDiscount = variantDiscount;
+              }
+
+              onAddToCart({ ...item, appliedDiscount }, quantity, specialInstructions, selectedVariant, flattenedAddons);
+              onClose();
+            }}
           >
-            Save
+            <span>Add to Cart</span>
+            <span className="addon-add-btn-price">₹{calculateTotal().toFixed(2)}</span>
           </button>
         </div>
       </div>
@@ -2221,7 +2164,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-3)' }}>
               <div>
-                <label className="label">Customer Name *</label>
+                <label className="label">Customer Name (Optional)</label>
                 <input
                   type="text"
                   className="input"
@@ -2232,7 +2175,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
                 />
               </div>
               <div>
-                <label className="label">Phone Number *</label>
+                <label className="label">Phone Number (Optional)</label>
                 <input
                   type="tel"
                   className="input"
@@ -2287,7 +2230,6 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
               className="btn btn-primary"
               style={{ flex: 1 }}
               onClick={handleProceedToPayment}
-              disabled={!customerName.trim() || !customerPhone.trim()}
             >
               Proceed to Payment
             </button>
