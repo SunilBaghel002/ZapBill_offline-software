@@ -422,7 +422,19 @@ const POSPage = () => {
     }
   };
 
+  const validatePhone = () => {
+    if (cart.customerPhone && cart.customerPhone.trim() !== '') {
+      const phone = cart.customerPhone.trim();
+      if (!/^\d{10}$/.test(phone)) {
+        showAlert('Customer Mobile Number must be exactly 10 digits.', 'error');
+        return false;
+      }
+    }
+    return true;
+  };
+
   const handleCheckout = async () => {
+    if (!validatePhone()) return;
     // IMMEDIATE ACTION: Create Order -> KOT -> Print
     try {
       const result = await cart.createOrder(user?.id);
@@ -506,6 +518,7 @@ const POSPage = () => {
   // KOT Only - Send to kitchen without completing order
   const handleKOTOnly = async () => {
     if (cart.items.length === 0) return;
+    if (!validatePhone()) return;
 
     try {
       // Create a temporary order object for KOT
@@ -547,6 +560,7 @@ const POSPage = () => {
   // Save & KOT - Create order and send to kitchen (no receipt)
   const handleSaveAndKOT = async () => {
     if (cart.items.length === 0) return;
+    if (!validatePhone()) return;
 
     try {
       // Create order
@@ -577,6 +591,7 @@ const POSPage = () => {
   // KOT & Print - Send to kitchen and print receipt preview
   const handleKOTAndPrint = async () => {
     if (cart.items.length === 0) return;
+    if (!validatePhone()) return;
 
     try {
       // Create order first
@@ -605,6 +620,7 @@ const POSPage = () => {
   // Save & Print - Complete order and print receipt
   const handleSaveAndPrint = async () => {
     if (cart.items.length === 0) return;
+    if (!validatePhone()) return;
 
     try {
       const result = await cart.createOrder(user?.id);
@@ -911,21 +927,6 @@ const POSPage = () => {
               >
                 <ChefHat size={15} /> Chef
               </button>
-
-              {/* Tab 4: Summary */}
-              <button
-                onClick={() => setActiveCartTab(activeCartTab === 'summary' ? null : 'summary')}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
-                  padding: '8px 4px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600,
-                  background: activeCartTab === 'summary' ? '#E8F5E9' : '#F5F5F5',
-                  color: activeCartTab === 'summary' ? '#2E7D32' : '#546E7A',
-                  border: activeCartTab === 'summary' ? '1.5px solid #A5D6A7' : '1px solid #E0E0E0',
-                  transition: 'all 0.15s'
-                }}
-              >
-                <FileText size={15} /> Info
-              </button>
             </div>
           </div>
 
@@ -1151,7 +1152,7 @@ const POSPage = () => {
 
           <div className="pos-cart-table-header">
             <span>ITEMS</span>
-            <span style={{ paddingLeft: '8px' }}>QTY.</span>
+            <span style={{ textAlign: 'center' }}>QTY.</span>
             <span style={{ textAlign: 'right' }}>PRICE</span>
           </div>
 
@@ -1164,27 +1165,32 @@ const POSPage = () => {
               </div>
             ) : (
               cart.items.map(item => (
-                <div key={item.id} className="pos-cart-item">
+                <div key={item.id} className="pos-cart-item" style={{ padding: '14px 16px', minHeight: '65px' }}>
                   <div className="pos-cart-item-details">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button className="pos-cart-item-remove" onClick={() => cart.removeItem(item.id)}>
-                        <X size={14} style={{ background: '#D32F2F', borderRadius: '50%', color: 'white', padding: '2px' }} />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <button className="pos-cart-item-remove" style={{ marginTop: '2px', marginLeft: 0 }} onClick={() => cart.removeItem(item.id)}>
+                        <X size={20} style={{ background: '#D32F2F', borderRadius: '50%', color: 'white', padding: '3px' }} />
                       </button>
-                      <span className="pos-cart-item-name">{item.name}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span className="pos-cart-item-name" style={{ fontSize: '16px', lineHeight: '1.2' }}>{item.name}</span>
+                        {item.variant && item.variant.name && (
+                           <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{item.variant.name}</span>
+                        )}
+                      </div>
                     </div>
                     {item.addons && item.addons.length > 0 && (
-                      <div className="pos-cart-item-addons">
+                      <div className="pos-cart-item-addons" style={{ paddingLeft: '30px', marginTop: '6px', fontSize: '12px' }}>
                         {item.addons.map(a => a.name).join(', ')}
                       </div>
                     )}
                     {item.specialInstructions && (
-                      <div style={{ fontSize: '11px', color: '#E65100', fontStyle: 'italic', marginTop: '2px', paddingLeft: '22px' }}>
+                      <div style={{ fontSize: '11px', color: '#E65100', fontStyle: 'italic', marginTop: '4px', paddingLeft: '30px' }}>
                         📝 {item.specialInstructions}
                       </div>
                     )}
                   </div>
 
-                  <div className="pos-cart-qty-ctrl">
+                  <div className="pos-cart-qty-ctrl" style={{ margin: '0 120px', height: '32px' }}>
                     <button className="pos-cart-qty-btn" onClick={() => cart.updateQuantity(item.id, item.quantity - 1)}>-</button>
                     <div className="pos-cart-qty-val">{item.quantity}</div>
                     <button className="pos-cart-qty-btn" onClick={() => cart.updateQuantity(item.id, item.quantity + 1)}>+</button>
