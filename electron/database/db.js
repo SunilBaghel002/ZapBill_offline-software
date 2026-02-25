@@ -1195,7 +1195,7 @@ class Database {
       container_charge: order.container_charge || 0,
       customer_paid: order.customer_paid || 0,
       total_amount: order.total_amount || 0,
-      payment_method: order.payment_method || null,
+      payment_method: (order.payment_method === 'split' ? 'mixed' : order.payment_method) || null,
       payment_status: order.payment_status || 'pending',
       notes: order.notes || '',
     urgency: order.urgency || 'normal',

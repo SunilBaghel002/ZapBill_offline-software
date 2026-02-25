@@ -134,7 +134,7 @@ const CustomerHistoryModal = ({ isOpen, onClose, history, customerName, customer
                       {order.payment_method === 'upi' ? 'UPI' :
                         order.payment_method === 'card' ? 'Card' :
                           order.payment_method === 'due' ? 'Pay Later' :
-                            order.payment_method === 'split' ? 'Split' :
+                            (order.payment_method === 'split' || order.payment_method === 'mixed') ? 'Split' :
                               order.payment_method === 'cash' ? 'Cash' : '-'}
                     </td>
                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: '#263238' }}>₹{order.total_amount}</td>
@@ -263,6 +263,18 @@ const POSPage = () => {
     setPendingOrderAction(() => action);
     setShowConfirmModal(true);
   };
+
+  // Split Payment State
+  const [showSplitPaymentSheet, setShowSplitPaymentSheet] = useState(false);
+  const [splitPayments, setSplitPayments] = useState([{ method: 'cash', amount: '' }, { method: 'upi', amount: '' }]);
+
+  const handleSplitPaymentChange = (index, field, value) => {
+    const newSplits = [...splitPayments];
+    newSplits[index][field] = value;
+    setSplitPayments(newSplits);
+  };
+  const addSplitPaymentMethod = () => setSplitPayments([...splitPayments, { method: 'card', amount: '' }]);
+  const removeSplitPaymentMethod = (index) => setSplitPayments(splitPayments.filter((_, i) => i !== index));
 
   // Custom Alert State
   const [alertState, setAlertState] = useState({
@@ -1295,7 +1307,151 @@ const POSPage = () => {
                 <span>₹{cart.getGrandTotal().toFixed(2)}</span>
               </div>
 
+              {/* Customer Payment & Return Calculator */}
+              <div style={{
+                marginTop: '24px',
+                padding: '16px',
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '700', color: '#475569' }}>Customer Paid Amount</label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748B', fontWeight: 'bold' }}>₹</span>
+                    <input
+                      type="number"
+                      value={cart.customerPaid || ''}
+                      onChange={(e) => cart.setCustomerPaid(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      style={{
+                        width: '120px',
+                        padding: '10px 12px 10px 28px',
+                        fontSize: '16px',
+                        fontWeight: '800',
+                        color: '#1E293B',
+                        textAlign: 'right',
+                        border: '2px solid #CBD5E1',
+                        borderRadius: '8px',
+                        outline: 'none',
+                        transition: 'border-color 0.2s',
+                        background: 'white'
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#0096FF'}
+                      onBlur={(e) => e.target.style.borderColor = '#CBD5E1'}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px dashed #CBD5E1' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: '#475569' }}>Change to Return</span>
+                  <span style={{ fontSize: '24px', fontWeight: '900', color: (cart.customerPaid > cart.getGrandTotal()) ? '#10B981' : '#94A3B8' }}>
+                    ₹{Math.max(0, (cart.customerPaid || 0) - cart.getGrandTotal()).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
               {/* Save & Send to KOT Button REMOVED as per request */}
+            </div>
+          </div>
+
+          {/* Split Payment Sheet - POSITIONED ABSOLUTE TO PANEL */}
+          <div className={`pos-bottom-sheet ${showSplitPaymentSheet ? 'active' : ''}`} style={{ paddingBottom: '120px' }}>
+            <div className="sheet-header" style={{ padding: '12px 16px', background: '#0096FF', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '16px 16px 0 0' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Split size={18} /> Split Payment
+              </h3>
+              <button onClick={() => setShowSplitPaymentSheet(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><ChevronDown size={24} /></button>
+            </div>
+            <div className="sheet-body" style={{ padding: '20px', background: 'white', flex: 1, overflowY: 'auto' }}>
+              <div style={{ background: '#F8FAFC', padding: '16px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #E2E8F0' }}>
+                 <span style={{ fontSize: '14px', color: '#475569', fontWeight: '600' }}>Grand Total</span>
+                 <span style={{ fontSize: '20px', color: '#0096FF', fontWeight: '800' }}>₹{cart.getGrandTotal().toFixed(2)}</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                {splitPayments.map((split, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <select
+                      value={split.method}
+                      onChange={(e) => handleSplitPaymentChange(index, 'method', e.target.value)}
+                      style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none', background: 'white', color: '#334155' }}
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="card">Card</option>
+                      <option value="upi">UPI</option>
+                      <option value="due">Due</option>
+                    </select>
+                    <div style={{ position: 'relative', width: '140px' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748B' }}>₹</span>
+                      <input
+                        type="number"
+                        value={split.amount}
+                        onChange={(e) => handleSplitPaymentChange(index, 'amount', parseFloat(e.target.value) || '')}
+                        placeholder="0.00"
+                        style={{ width: '100%', padding: '10px 12px 10px 28px', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none', textAlign: 'right' }}
+                      />
+                    </div>
+                    {splitPayments.length > 2 && (
+                      <button 
+                        onClick={() => removeSplitPaymentMethod(index)}
+                        style={{ background: '#FEE2E2', border: 'none', width: '36px', height: '36px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#EF4444' }}
+                      >
+                        <X size={16} strokeWidth={3} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                 onClick={addSplitPaymentMethod}
+                 style={{ width: '100%', padding: '10px', background: 'transparent', border: '1px dashed #0096FF', color: '#0096FF', borderRadius: '6px', fontWeight: '600', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '20px' }}
+              >
+                 <Plus size={16} /> Add Payment Method
+              </button>
+
+              {(() => {
+                const totalSplitPaid = splitPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+                const remaining = cart.getGrandTotal() - totalSplitPaid;
+                return (
+                  <div style={{ paddingTop: '16px', borderTop: '1px dashed #CBD5E1' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                       <span style={{ color: '#64748B' }}>Total Split Configured:</span>
+                       <span style={{ fontWeight: 'bold', color: '#334155' }}>₹{totalSplitPaid.toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <span style={{ color: remaining > 0 ? '#EF4444' : '#10B981', fontWeight: 'bold' }}>
+                         {remaining > 0 ? 'Remaining to collect:' : 'Change to return:'}
+                       </span>
+                       <span style={{ fontSize: '18px', fontWeight: '800', color: remaining > 0 ? '#EF4444' : '#10B981' }}>
+                         ₹{Math.abs(remaining).toFixed(2)}
+                       </span>
+                    </div>
+                    
+                    <button 
+                      onClick={() => {
+                         cart.setPaymentDetails({ splits: splitPayments });
+                         setShowSplitPaymentSheet(false);
+                      }}
+                      style={{
+                         width: '100%',
+                         padding: '12px',
+                         background: '#0096FF',
+                         color: 'white',
+                         border: 'none',
+                         borderRadius: '8px',
+                         fontWeight: 'bold',
+                         fontSize: '16px',
+                         marginTop: '20px',
+                         cursor: 'pointer'
+                      }}
+                    >
+                       Confirm Split
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -1308,12 +1464,17 @@ const POSPage = () => {
                 { id: 'card', label: 'Card', icon: CreditCard },
                 { id: 'upi', label: 'UPI', icon: Smartphone },
                 { id: 'due', label: 'Due', icon: Clock },
-                { id: 'split', label: 'Split', icon: Split }
+                { id: 'mixed', label: 'Split', icon: Split }
               ].map(mode => (
                 <button
                   key={mode.id}
                   className={`payment-mode-btn ${cart.paymentMethod === mode.id ? 'active' : ''}`}
-                  onClick={() => cart.setPaymentMethod(mode.id)}
+                  onClick={() => {
+                    cart.setPaymentMethod(mode.id);
+                    if (mode.id === 'mixed') {
+                      setShowSplitPaymentSheet(true);
+                    }
+                  }}
                 >
                   <mode.icon className="payment-mode-icon" size={20} />
                   <span className="payment-mode-label">{mode.label}</span>
@@ -1432,6 +1593,7 @@ const POSPage = () => {
           subtotal={cart.getSubtotal()}
         />
       )}
+
 
       {/* Strict Design: Customer History Drawer */}
       <div className={`pos-drawer-overlay ${showHistoryDrawer ? 'active' : ''}`} onClick={() => setShowHistoryDrawer(false)}></div>
@@ -1597,7 +1759,31 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
         <div className="addon-modal-header">
           <div>
             <span className="addon-modal-title">{item.name}</span>
-            <span className="addon-modal-price"> | ₹{(selectedVariant ? parseFloat(selectedVariant.price) : item.price).toFixed(2)}</span>
+            <span className="addon-modal-price">
+              {(() => {
+                let basePrice = item.price;
+                let appliedDiscount = null;
+                if (selectedVariant) {
+                  basePrice = parseFloat(selectedVariant.price);
+                  appliedDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && d.variant_name === selectedVariant.name) || activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name || d.variant_name === ''));
+                } else {
+                  appliedDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name || d.variant_name === ''));
+                }
+                let displayPrice = basePrice;
+                if (appliedDiscount) {
+                   if (appliedDiscount.discount_type === 'percentage') displayPrice -= displayPrice * (appliedDiscount.discount_value / 100);
+                   else displayPrice -= appliedDiscount.discount_value;
+                   if (displayPrice < 0) displayPrice = 0;
+                }
+                return (
+                  <>
+                    <span style={{ margin: '0 12px', color: '#B0BEC5', fontSize: '22px', fontWeight: '300' }}>|</span>
+                    {appliedDiscount && <span style={{ textDecoration: 'line-through', color: '#90A4AE', marginRight: '8px', fontSize: '16px', fontWeight: '500' }}>₹{basePrice.toFixed(2)}</span>}
+                    <span style={{ color: '#0096FF', fontSize: '22px', fontWeight: '800' }}>₹{displayPrice.toFixed(2)}</span>
+                  </>
+                );
+              })()}
+            </span>
           </div>
           <button className="btn btn-ghost btn-icon" onClick={onClose}>
             <X size={20} />
@@ -1607,16 +1793,46 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
         {/* Variant Tabs at Top */}
         {item.parsedVariants.length > 0 && (
           <div className="addon-variant-tabs">
-            {item.parsedVariants.map((variant, idx) => (
+            {item.parsedVariants.map((variant, idx) => {
+              const variantDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && d.variant_name === variant.name);
+              const itemDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name || d.variant_name === ''));
+              let appliedDiscount = variantDiscount || itemDiscount;
+
+              let displayPrice = parseFloat(variant.price);
+              if (appliedDiscount) {
+                 if (appliedDiscount.discount_type === 'percentage') {
+                   displayPrice -= displayPrice * (appliedDiscount.discount_value / 100);
+                 } else {
+                   displayPrice -= appliedDiscount.discount_value;
+                 }
+                 if (displayPrice < 0) displayPrice = 0;
+              }
+
+              return (
               <button
                 key={idx}
                 className={`addon-variant-tab ${selectedVariant === variant ? 'active' : ''}`}
                 onClick={() => setSelectedVariant(variant)}
+                style={{ position: 'relative' }}
               >
+                {appliedDiscount && (
+                  <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: '#FFF3E0', color: '#E65100', border: '1px solid #FFE0B2', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold', zIndex: 1 }}>
+                    {appliedDiscount.discount_type === 'percentage' ? `${appliedDiscount.discount_value}% OFF` : `₹${appliedDiscount.discount_value} OFF`}
+                  </div>
+                )}
                 <span className="addon-variant-tab-name">{variant.name}</span>
-                <span className="addon-variant-tab-price">₹{parseFloat(variant.price).toFixed(0)}</span>
+                <span className="addon-variant-tab-price">
+                  {appliedDiscount ? (
+                    <>
+                      <span style={{ textDecoration: 'line-through', color: '#90A4AE', marginRight: '4px', fontSize: '12px' }}>₹{parseFloat(variant.price).toFixed(0)}</span>
+                      <span style={{ color: selectedVariant === variant ? '#0096FF' : '#37474F' }}>₹{displayPrice.toFixed(0)}</span>
+                    </>
+                  ) : (
+                    <>₹{parseFloat(variant.price).toFixed(0)}</>
+                  )}
+                </span>
               </button>
-            ))}
+            )})}
           </div>
         )}
 
@@ -1670,33 +1886,36 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
                           right: 0, 
                           background: '#E49B0F', 
                           color: 'white', 
-                          padding: '2px 8px', 
-                          borderRadius: '0 0 0 8px',
-                          fontSize: '12px',
+                          padding: '4px 10px', 
+                          borderRadius: '0 0 0 12px',
+                          fontSize: '15px',
                           fontWeight: 'bold',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px'
+                          gap: '6px'
                         }}>
-                          {qty > 1 && (
+                          {qty >= 1 && (
                             <div 
                               onClick={(e) => decreaseAddon(e, addon)}
                               style={{ 
                                 cursor: 'pointer',
                                 background: 'rgba(0,0,0,0.2)',
                                 borderRadius: '50%',
-                                width: '16px',
-                                height: '16px',
+                                width: '22px',
+                                height: '22px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                marginRight: '4px'
+                                marginRight: '2px',
+                                transition: 'background 0.2s',
                               }}
+                              onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.4)'}
+                              onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
                             >
-                              -
+                              <Minus size={14} strokeWidth={3} />
                             </div>
                           )}
-                          x{qty}
+                          <span style={{ fontSize: '14px', marginTop: '1px' }}>x{qty}</span>
                         </div>
                       )}
                     </div>
@@ -1728,18 +1947,37 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
         </div>
 
         {/* Action Buttons */}
-        <div className="addon-modal-footer">
-          <div className="addon-quantity-control">
-            <button className="btn btn-ghost btn-icon" onClick={() => setQuantity(Math.max(1, quantity - 1))}>
-              <Minus size={20} />
+        <div className="addon-modal-footer" style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', borderTop: '1px solid #ECEFF1' }}>
+          
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '12px 20px', borderRadius: '8px', border: '1px solid #CFD8DC', color: '#546E7A', fontWeight: 'bold' }}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          
+          <div className="addon-quantity-control" style={{ display: 'flex', alignItems: 'center', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '4px' }}>
+            <button 
+              className="btn btn-icon" 
+              style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'white', color: '#334155', border: '1px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} 
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+            >
+              <Minus size={18} strokeWidth={2.5} />
             </button>
-            <span className="qty-display">{quantity}</span>
-            <button className="btn btn-ghost btn-icon" onClick={() => setQuantity(quantity + 1)}>
-              <Plus size={20} />
+            <span className="qty-display" style={{ width: '44px', textAlign: 'center', fontWeight: 'bold', fontSize: '16px', color: '#1E293B' }}>{quantity}</span>
+            <button 
+              className="btn btn-icon" 
+              style={{ width: '36px', height: '36px', borderRadius: '6px', background: 'white', color: '#334155', border: '1px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} 
+              onClick={() => setQuantity(quantity + 1)}
+            >
+              <Plus size={18} strokeWidth={2.5} />
             </button>
           </div>
+
           <button
             className="btn btn-primary addon-add-btn"
+            style={{ flex: 1, padding: '14px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '16px', fontWeight: 'bold' }}
             onClick={() => {
               // Flatten addons for cart state
               const flattenedAddons = selectedAddons.flatMap(addon => {
@@ -1757,7 +1995,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
             }}
           >
             <span>Add to Cart</span>
-            <span className="addon-add-btn-price">₹{calculateTotal().toFixed(2)}</span>
+            <span className="addon-add-btn-price" style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 8px', borderRadius: '6px' }}>₹{calculateTotal().toFixed(2)}</span>
           </button>
         </div>
       </div>

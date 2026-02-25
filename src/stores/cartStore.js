@@ -313,7 +313,7 @@ export const useCartStore = create(
           discount_reason: state.discountReason || null,
           service_charge: state.getServiceCharge(),
           total_amount: state.getGrandTotal(),
-          payment_method: state.paymentMethod,
+          payment_method: state.paymentMethod === 'split' ? 'mixed' : state.paymentMethod,
           is_complimentary: state.isComplimentary ? 1 : 0,
           is_sales_return: state.isSalesReturn ? 1 : 0,
           delivery_charge: state.deliveryCharge || 0,
