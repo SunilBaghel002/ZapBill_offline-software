@@ -3082,7 +3082,7 @@ class Database {
 
   updateItemDiscount(id, updates) {
     updates.updated_at = new Date().toISOString();
-    this.update('item_discounts', id, updates);
+    this.update('item_discounts', updates, { id });
     return this.getItemDiscount(id);
   }
 

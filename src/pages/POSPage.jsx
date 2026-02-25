@@ -776,7 +776,21 @@ const POSPage = () => {
           <div className="pos-menu-area">
             <div className="pos-menu-grid">
               {filteredItems.length > 0 ? (
-                filteredItems.map(item => (
+                filteredItems.map(item => {
+                  const itemDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name));
+                  let displayPrice = item.price;
+                  if (itemDiscount) {
+                     let discountAmount = 0;
+                     if (itemDiscount.discount_type === 'percentage') {
+                       discountAmount = displayPrice * (itemDiscount.discount_value / 100);
+                     } else if (itemDiscount.discount_type === 'flat') {
+                       discountAmount = itemDiscount.discount_value;
+                     }
+                     displayPrice -= discountAmount;
+                     if (displayPrice < 0) displayPrice = 0;
+                  }
+
+                  return (
                   <div key={item.id} className={`pos-menu-card ${item.is_vegetarian ? 'veg' : 'nonveg'}`} onClick={() => handleAddToCart(item)}>
                     <div 
                       className={`favorite-btn ${item.is_favorite ? 'is-fav' : ''}`}
@@ -786,10 +800,20 @@ const POSPage = () => {
                     </div>
                     <div className="pos-menu-card-inner">
                       <span className="pos-menu-card-name">{item.name}</span>
-                      <span className="pos-menu-card-price">₹{item.price.toFixed(0)}</span>
+                      <span className="pos-menu-card-price">
+                        {itemDiscount ? (
+                          <>
+                            <span style={{ textDecoration: 'line-through', color: '#90A4AE', marginRight: '6px', fontSize: '11px' }}>₹{item.price.toFixed(0)}</span>
+                            <span style={{ color: '#0096FF' }}>₹{displayPrice.toFixed(0)}</span>
+                          </>
+                        ) : (
+                          <>₹{displayPrice.toFixed(0)}</>
+                        )}
+                      </span>
                     </div>
                   </div>
-                ))
+                  );
+                })
 
               ) : (
                 <div className="pos-empty-state">

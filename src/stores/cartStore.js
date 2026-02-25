@@ -65,10 +65,10 @@ export const useCartStore = create(
           // Apply item-level discount if present
           let appliedDiscount = 0;
           if (menuItem.appliedDiscount) {
-             if (menuItem.appliedDiscount.type === 'percentage') {
-               appliedDiscount = finalPrice * (menuItem.appliedDiscount.value / 100);
-             } else if (menuItem.appliedDiscount.type === 'flat') {
-               appliedDiscount = menuItem.appliedDiscount.value;
+             if (menuItem.appliedDiscount.discount_type === 'percentage') {
+               appliedDiscount = finalPrice * (menuItem.appliedDiscount.discount_value / 100);
+             } else if (menuItem.appliedDiscount.discount_type === 'flat') {
+               appliedDiscount = menuItem.appliedDiscount.discount_value;
              }
              finalPrice -= appliedDiscount;
              // Ensure price doesn't go negative

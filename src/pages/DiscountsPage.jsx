@@ -34,7 +34,7 @@ const DiscountsPage = () => {
     setIsLoading(true);
     try {
       const dbDiscounts = await window.electronAPI.invoke('discounts:getAll');
-      const items = await window.electronAPI.invoke('menu:getItems');
+      const items = await window.electronAPI.invoke('menu:getItems', {});
       
       setDiscounts(dbDiscounts || []);
       setMenuItems(items || []);

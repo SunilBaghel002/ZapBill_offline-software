@@ -13,7 +13,8 @@ import {
   LogOut,
   ChefHat,
   RefreshCw,
-  Wallet
+  Wallet,
+  Tag
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useShift } from '../../context/ShiftContext';
@@ -56,6 +57,7 @@ const Sidebar = () => {
       ]
     },
     { path: '/expenses', icon: Wallet, label: 'Expenses', adminOnly: false },
+    { path: '/discounts', icon: Tag, label: 'Discounts', adminOnly: true },
     { path: '/users', icon: Users, label: 'Users', adminOnly: true },
     { path: '/printers', icon: Printer, label: 'Printers', adminOnly: false },
     { path: '/settings', icon: Settings, label: 'Settings', adminOnly: true },

@@ -258,8 +258,10 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('menu:getItems', async (event, { categoryId }) => {
+  ipcMain.handle('menu:getItems', async (event, params = {}) => {
     try {
+      // Safely destructure or default to undefined
+      const categoryId = params ? params.categoryId : undefined;
       return db.getMenuItems(categoryId);
     } catch (error) {
       log.error('Get menu items error:', error);
