@@ -135,6 +135,16 @@ CREATE TABLE IF NOT EXISTS orders (
     is_deleted INTEGER DEFAULT 0
 );
 
+-- Order Payments (For Mixed/Split Payments)
+CREATE TABLE IF NOT EXISTS order_payments (
+    id TEXT PRIMARY KEY,
+    order_id TEXT REFERENCES orders(id) ON DELETE CASCADE,
+    payment_method TEXT CHECK(payment_method IN ('cash', 'card', 'upi', 'due')),
+    amount REAL NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    is_deleted INTEGER DEFAULT 0
+);
+
 -- Order Items
 CREATE TABLE IF NOT EXISTS order_items (
     id TEXT PRIMARY KEY,

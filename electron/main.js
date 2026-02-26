@@ -501,10 +501,10 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('order:complete', async (event, { id, paymentMethod }) => {
+  ipcMain.handle('order:complete', async (event, { id, paymentMethod, paymentDetails }) => {
     try {
       log.info('Completing order:', id, 'with payment method:', paymentMethod);
-      const result = db.completeOrder(id, paymentMethod);
+      const result = db.completeOrder(id, paymentMethod, paymentDetails);
       log.info('Order completion result:', result);
       return result;
     } catch (error) {

@@ -29,6 +29,7 @@ import {
 } from 'recharts';
 import { format, subDays } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
+import { Link } from 'react-router-dom';
 
 // StatCard Component
 // StatCard Component
@@ -382,7 +383,12 @@ const DashboardPage = () => {
     revenueTrend: { direction: 'neutral', value: 0 },
     ordersTrend: { direction: 'neutral', value: 0 },
     avgOrderTrend: { direction: 'neutral', value: 0 },
-    activeOrdersTrend: { direction: 'neutral', value: 0 }
+    activeOrdersTrend: { direction: 'neutral', value: 0 },
+    cashAmount: 0,
+    upiAmount: 0,
+    cardAmount: 0,
+    mixedAmount: 0,
+    dueAmount: 0
   });
   const [recentOrders, setRecentOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -481,8 +487,13 @@ const DashboardPage = () => {
         ordersTrend = calculateTrend(todaySales.total_orders, yesterdaySales.total_orders);
       }
 
-      // Common Data: Recent Orders
-      const recentOrdersData = await window.electronAPI.invoke('order:getRecent', { limit: 8 });
+      // Common Data: Recent Orders (Biller specific if not admin)
+      let recentOrdersData = [];
+      if (todayReport && Array.isArray(todayReport.orders)) {
+        recentOrdersData = todayReport.orders.slice(0, 8);
+      } else {
+        recentOrdersData = await window.electronAPI.invoke('order:getRecent', { limit: 8 });
+      }
 
       // Active Orders count from recent list (approximate)
       let activeCount = 0;
@@ -508,7 +519,12 @@ const DashboardPage = () => {
         activeOrders: activeCount,
         revenueTrend,
         ordersTrend,
-        activeOrdersTrend: { direction: 'neutral', value: 0 } 
+        activeOrdersTrend: { direction: 'neutral', value: 0 },
+        cashAmount: todaySales.cash_amount || 0,
+        upiAmount: todaySales.upi_amount || 0,
+        cardAmount: todaySales.card_amount || 0,
+        mixedAmount: todaySales.mixed_amount || 0,
+        dueAmount: todaySales.due_amount || 0
       });
 
       // Fetch weekly trend for chart
@@ -581,9 +597,9 @@ const DashboardPage = () => {
           <button className="btn btn-secondary" onClick={loadDashboardData} style={{ borderRadius: '12px', padding: '10px 16px' }}>
             <Clock size={18} /> Refresh
           </button>
-          <a href="/pos" className="btn btn-primary" style={{ borderRadius: '12px', padding: '10px 20px', fontWeight: '700' }}>
+          <Link to="/pos" className="btn btn-primary" style={{ borderRadius: '12px', padding: '10px 20px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
             <Plus size={18} /> New Order
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -634,6 +650,47 @@ const DashboardPage = () => {
           icon={BarChart3}
           color="info"
         />
+        {/* New Payment Method Cards */}
+        {stats.cashAmount > 0 && (
+          <StatCard
+            title="Cash Sales"
+            value={`₹${stats.cashAmount.toLocaleString()}`}
+            trend="neutral"
+            trendValue={0}
+            icon={DollarSign}
+            color="success"
+          />
+        )}
+        {stats.upiAmount > 0 && (
+          <StatCard
+            title="UPI Sales"
+            value={`₹${stats.upiAmount.toLocaleString()}`}
+            trend="neutral"
+            trendValue={0}
+            icon={TrendingUp}
+            color="primary"
+          />
+        )}
+        {stats.cardAmount > 0 && (
+          <StatCard
+            title="Card Sales"
+            value={`₹${stats.cardAmount.toLocaleString()}`}
+            trend="neutral"
+            trendValue={0}
+            icon={CheckCircle}
+            color="warning"
+          />
+        )}
+        {(stats.mixedAmount > 0 || stats.dueAmount > 0) && (
+          <StatCard
+            title="Other Sales"
+            value={`₹${(stats.mixedAmount + stats.dueAmount).toLocaleString()}`}
+            trend="neutral"
+            trendValue={0}
+            icon={MoreHorizontal}
+            color="info"
+          />
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '32px', marginBottom: '32px' }}>
@@ -736,7 +793,7 @@ const DashboardPage = () => {
               </div>
             )}
           </div>
-          <a href="/reports?category=sales" style={{ 
+          <Link to="/reports?category=sales" style={{ 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'center', 
@@ -751,7 +808,7 @@ const DashboardPage = () => {
             textDecoration: 'none'
           }}>
             Detailed Sales Report <ArrowUpRight size={16} />
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -759,7 +816,7 @@ const DashboardPage = () => {
       <div className="dashboard-section">
         <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 className="section-title" style={{ fontSize: '20px', fontWeight: '900', color: '#1e293b', margin: 0 }}>Recent Orders</h2>
-          <a href="/orders" className="section-link" style={{ 
+          <Link to="/orders" className="section-link" style={{ 
             display: 'flex', 
             alignItems: 'center', 
             gap: '6px', 
@@ -769,7 +826,7 @@ const DashboardPage = () => {
             textDecoration: 'none'
           }}>
             View All Orders <ArrowRight size={16} />
-          </a>
+          </Link>
         </div>
         <div className="orders-grid" style={{ 
           display: 'grid', 

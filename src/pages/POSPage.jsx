@@ -632,6 +632,7 @@ const POSPage = () => {
         await window.electronAPI.invoke('order:complete', {
           id: result.id,
           paymentMethod: cart.paymentMethod,
+          paymentDetails: cart.paymentDetails,
         });
 
         // Print Receipt
