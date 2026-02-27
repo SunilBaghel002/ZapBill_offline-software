@@ -1874,7 +1874,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1050 }}>
-      <div className="modal addon-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1000px', width: '90%', maxHeight: '90vh', height: 'auto' }}>
+      <div className="modal addon-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1400px', width: '95%', maxHeight: '90vh', height: 'auto' }}>
         {/* Modal Header */}
         <div className="addon-modal-header">
           <div>
