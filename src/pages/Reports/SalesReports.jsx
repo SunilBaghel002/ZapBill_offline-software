@@ -52,6 +52,13 @@ const SalesReports = () => {
         default:
           break;
       }
+      if (activeTab === 'item-wise' && Array.isArray(result)) {
+        result = result.map(row => ({
+          ...row,
+          displayName: row.variant_name ? `${row.item_name} (${row.variant_name})` : row.item_name
+        }));
+      }
+
       console.log(`[SalesReports] Received ${result?.length} rows`, result);
       setData(result || []);
     } catch (error) {
@@ -146,7 +153,7 @@ const SalesReports = () => {
               <ResponsiveContainer width="100%" height="90%">
                 <BarChart data={data.slice(0, 10)}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="item_name" tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={70} />
+                  <XAxis dataKey="displayName" tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={70} />
                   <YAxis tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} tickFormatter={(val) => `₹${val}`} />
                   <Tooltip 
                     cursor={{ fill: '#f8fafc' }}
@@ -261,7 +268,10 @@ const SalesReports = () => {
                   <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }}>
                     {activeTab === 'item-wise' && (
                       <>
-                        <td style={tdStyle}>{item.item_name}</td>
+                        <td style={tdStyle}>
+                          <div style={{ fontWeight: 600 }}>{item.item_name}</div>
+                          {item.variant_name && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>{item.variant_name}</div>}
+                        </td>
                         <td style={tdStyle}>{item.category_name}</td>
                         <td style={{...tdStyle, textAlign: 'right', fontWeight: 600}}>{item.total_quantity}</td>
                         <td style={{...tdStyle, textAlign: 'right', fontWeight: 700, color: '#10b981'}}>₹{item.total_revenue?.toFixed(2)}</td>

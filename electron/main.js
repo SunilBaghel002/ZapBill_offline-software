@@ -558,6 +558,15 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('customer:getDueStatus', async (event, { phone }) => {
+    try {
+      return db.getCustomerDueStatus(phone);
+    } catch (error) {
+      log.error('Get customer due status error:', error);
+      return { hasDue: false, totalDue: 0, dueCount: 0 };
+    }
+  });
+
   ipcMain.handle('order:getByPhone', async (event, { phone }) => {
     try {
       return db.getOrdersByPhone(phone);

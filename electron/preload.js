@@ -89,6 +89,7 @@ const validInvokeChannels = [
   // Customers
   'customer:search',
   'customer:getHistory',
+  'customer:getDueStatus',
   // Data Import
   'data:importMenu',
   'data:importInventory',

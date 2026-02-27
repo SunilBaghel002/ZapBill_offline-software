@@ -131,11 +131,20 @@ const CustomerHistoryModal = ({ isOpen, onClose, history, customerName, customer
                       {order.items?.map(i => `${i.quantity} x ${i.item_name}`).join(', ')}
                     </td>
                     <td style={{ padding: '12px', color: '#546E7A', textTransform: 'capitalize' }}>
-                      {order.payment_method === 'upi' ? 'UPI' :
-                        order.payment_method === 'card' ? 'Card' :
-                          order.payment_method === 'due' ? 'Pay Later' :
-                            (order.payment_method === 'split' || order.payment_method === 'mixed') ? 'Split' :
-                              order.payment_method === 'cash' ? 'Cash' : '-'}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span>
+                          {order.payment_method === 'upi' ? 'UPI' :
+                           order.payment_method === 'card' ? 'Card' :
+                           order.payment_method === 'due' ? 'Pay Later' :
+                           (order.payment_method === 'split' || order.payment_method === 'mixed') ? 'Split' :
+                           order.payment_method === 'cash' ? 'Cash' : '-'}
+                        </span>
+                        {order.payment_status !== 'completed' && order.status !== 'cancelled' && (
+                          <span style={{ fontSize: '10px', color: '#f44336', fontWeight: 'bold' }}>
+                            (DUE)
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: '#263238' }}>₹{order.total_amount}</td>
                   </tr>
@@ -249,6 +258,7 @@ const POSPage = () => {
   const [historyData, setHistoryData] = useState([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [customerAddress, setCustomerAddress] = useState('');
+  const [customerDue, setCustomerDue] = useState({ hasDue: false, totalDue: 0 });
   const [showTableDropdown, setShowTableDropdown] = useState(false);
   const [showOrderInfo, setShowOrderInfo] = useState(false);
 
@@ -297,9 +307,28 @@ const POSPage = () => {
     setAlertState(prev => ({ ...prev, isOpen: false }));
   };
 
+  const checkCustomerDue = async (phone) => {
+    if (phone && phone.length >= 10) {
+      try {
+        const dueInfo = await window.electronAPI.invoke('customer:getDueStatus', { phone });
+        setCustomerDue(dueInfo);
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      setCustomerDue({ hasDue: false, totalDue: 0 });
+    }
+  };
+
   const handlePhoneInput = async (e) => {
     const val = e.target.value;
     cart.setCustomerPhone(val);
+
+    if (val.length >= 10) {
+      checkCustomerDue(val);
+    } else {
+      setCustomerDue({ hasDue: false, totalDue: 0 });
+    }
 
     if (val.length > 2) {
       try {
@@ -318,7 +347,7 @@ const POSPage = () => {
   const selectCustomer = (cust) => {
     cart.setCustomerName(cust.customer_name);
     cart.setCustomerPhone(cust.customer_phone);
-    // If we had address/locality in DB, we'd set them here
+    checkCustomerDue(cust.customer_phone);
     setShowSuggestions(false);
   };
 
@@ -414,7 +443,15 @@ const POSPage = () => {
     // Attach discount to the item object so it can be used in AddonModal or CartStore
     const itemWithPossibleDiscount = { ...item, appliedDiscount: itemDiscount };
 
-    if (variants.length > 0 || addons.length > 0) {
+    // Parse master_addon_ids
+    let masterAddonIds = [];
+    try {
+      if (item.master_addon_ids) {
+        masterAddonIds = typeof item.master_addon_ids === 'string' ? JSON.parse(item.master_addon_ids) : item.master_addon_ids;
+      }
+    } catch(e) {}
+
+    if (variants.length > 0 || addons.length > 0 || masterAddonIds.length > 0) {
       setSelectedItemForAddon({ ...itemWithPossibleDiscount, parsedVariants: variants, parsedAddons: addons, activeItemDiscounts });
       setShowAddonModal(true);
     } else {
@@ -563,6 +600,8 @@ const POSPage = () => {
     if (!validatePhone()) return;
 
     try {
+      const pm = cart.paymentMethod;
+      const pd = cart.paymentDetails;
       // Create order
       const result = await cart.createOrder(user?.id);
 
@@ -575,7 +614,16 @@ const POSPage = () => {
           items: order.items
         });
 
-        // Charges are already reset by createOrder -> clearCart
+        const isFullyPaid = ['cash', 'card', 'upi'].includes(pm) || 
+          (pm === 'split' && !pd?.splits?.some(s => s.method === 'due' && s.amount > 0));
+
+        if (isFullyPaid) {
+          await window.electronAPI.invoke('order:complete', {
+            id: result.id,
+            paymentMethod: pm,
+            paymentDetails: pd,
+          });
+        }
 
         showAlert(`Order #${result.orderNumber} Saved & Sent to KOT!`, "success");
         setShowBillSheet(false);
@@ -594,6 +642,8 @@ const POSPage = () => {
     if (!validatePhone()) return;
 
     try {
+      const pm = cart.paymentMethod;
+      const pd = cart.paymentDetails;
       // Create order first
       const result = await cart.createOrder(user?.id);
 
@@ -606,6 +656,17 @@ const POSPage = () => {
           items: order.items,
           printBill: true
         }).catch(err => console.error("KOT+Bill Print Failed", err));
+
+        const isFullyPaid = ['cash', 'card', 'upi'].includes(pm) || 
+          (pm === 'split' && !pd?.splits?.some(s => s.method === 'due' && s.amount > 0));
+
+        if (isFullyPaid) {
+          await window.electronAPI.invoke('order:complete', {
+            id: result.id,
+            paymentMethod: pm,
+            paymentDetails: pd,
+          });
+        }
 
         showAlert(`Order #${result.orderNumber} placed! KOT & Receipt printed.`, "success");
       } else {
@@ -987,7 +1048,9 @@ const POSPage = () => {
 
               {/* Mobile Number with Autocomplete */}
               <div style={{ position: 'relative' }}>
-                <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Mobile Number:</label>
+                <label style={{ color: customerDue.hasDue ? '#f44336' : '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Mobile Number: {customerDue.hasDue && <span style={{ fontSize: '10px' }}>(DEBTOR)</span>}
+                </label>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     type="text"
@@ -997,7 +1060,11 @@ const POSPage = () => {
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                     autoComplete="off"
                     autoFocus
-                    style={{ border: '1px solid #CFD8DC', borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', flex: 1 }}
+                    style={{ 
+                      border: `1px solid ${customerDue.hasDue ? '#f44336' : '#CFD8DC'}`, 
+                      background: customerDue.hasDue ? '#FFEBEE' : 'white',
+                      borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', flex: 1 
+                    }}
                   />
                   <button
                     onClick={fetchHistory}
@@ -1031,13 +1098,19 @@ const POSPage = () => {
 
               {/* Name */}
               <div>
-                <label style={{ color: '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Customer Name:</label>
+                <label style={{ color: customerDue.hasDue ? '#f44336' : '#546E7A', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Customer Name: {customerDue.hasDue && <span style={{ fontSize: '10px' }}>(OVERDUE: ₹{customerDue.totalDue})</span>}
+                </label>
                 <input
                   type="text"
                   placeholder="Enter Name"
                   value={cart.customerName || ''}
                   onChange={(e) => cart.setCustomerName(e.target.value)}
-                  style={{ border: '1px solid #CFD8DC', borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', width: '100%' }}
+                  style={{ 
+                    border: `1px solid ${customerDue.hasDue ? '#f44336' : '#CFD8DC'}`, 
+                    background: customerDue.hasDue ? '#FFEBEE' : 'white',
+                    borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', width: '100%' 
+                  }}
                 />
               </div>
 
@@ -1651,7 +1724,9 @@ const POSPage = () => {
 // Addon Selection Modal Component - Redesigned to match reference
 const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], globalAddons = [] }) => {
   const [quantity, setQuantity] = useState(1);
-  const [selectedVariant, setSelectedVariant] = useState(item.parsedVariants.length > 0 ? item.parsedVariants[0] : null);
+  const parsedVariants = item.parsedVariants || [];
+  const parsedAddons = item.parsedAddons || [];
+  const [selectedVariant, setSelectedVariant] = useState(parsedVariants.length > 0 ? parsedVariants[0] : null);
   const [selectedAddons, setSelectedAddons] = useState([]);
   const [addonSearch, setAddonSearch] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
@@ -1659,31 +1734,41 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
   // activeItemDiscounts was passed along as part of `item` object.
   const activeItemDiscounts = item.activeItemDiscounts || [];
 
-  // Resolve addons from Master Addon group for the selected variant
-  const getVariantMasterAddons = () => {
-    if (!selectedVariant?.master_addon_id) return [];
-    const masterAddon = masterAddons.find(ma => ma.id === selectedVariant.master_addon_id);
-    if (!masterAddon) return [];
+  // Resolve master addon groups assigned directly to the item OR selected variant
+  const getAssignedMasterAddons = () => {
+    let idsToFetch = [];
     
-    let addonIds = [];
-    try {
-      addonIds = typeof masterAddon.addon_ids === 'string' ? JSON.parse(masterAddon.addon_ids) : (masterAddon.addon_ids || []);
-    } catch (e) {
-      console.error('Error parsing master addon ids', e);
-      return [];
+    // 1. From item (new schema)
+    if (item.master_addon_ids) {
+      try {
+        const parsed = typeof item.master_addon_ids === 'string' ? JSON.parse(item.master_addon_ids) : item.master_addon_ids;
+        if (Array.isArray(parsed)) idsToFetch = [...idsToFetch, ...parsed];
+      } catch (e) {
+        console.error('Error parsing item master_addon_ids', e);
+      }
     }
     
-    return globalAddons.filter(ga => addonIds.includes(ga.id));
+    // 2. From variant (legacy fallback, as variants used to have a single master_addon_id string)
+    if (selectedVariant?.master_addon_id) {
+       if (!idsToFetch.includes(selectedVariant.master_addon_id)) {
+           idsToFetch.push(selectedVariant.master_addon_id);
+       }
+    }
+
+    return masterAddons.filter(ma => idsToFetch.includes(ma.id)).map(ma => {
+       // Parse global addon IDs inside the group
+       let addonIds = [];
+       try {
+         addonIds = typeof ma.addon_ids === 'string' ? JSON.parse(ma.addon_ids) : (ma.addon_ids || []);
+       } catch (e) {}
+       
+       const groupAddons = globalAddons.filter(ga => addonIds.includes(ga.id));
+       return { ...ma, groupAddons };
+    }).filter(ma => ma.groupAddons.length > 0);
   };
 
-  const variantSpecificAddons = getVariantMasterAddons();
-  // Deduplicate by name if needed, assuming item-specific addons take precedence or we just merge
-  const allAvailableAddons = [...item.parsedAddons];
-  variantSpecificAddons.forEach(va => {
-    if (!allAvailableAddons.some(a => a.name === va.name)) {
-      allAvailableAddons.push(va);
-    }
-  });
+  const assignedGroups = getAssignedMasterAddons();
+  const itemLevelAddons = parsedAddons;
 
   const calculateTotal = () => {
     let basePrice = item.price;
@@ -1723,45 +1808,73 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
     return total * quantity;
   };
 
-  const toggleAddon = (addon) => {
-    const existing = selectedAddons.find(a => a.name === addon.name);
-    if (existing) {
-      setSelectedAddons(selectedAddons.map(a => 
-        a.name === addon.name ? { ...a, quantity: (a.quantity || 1) + 1 } : a
-      ));
+  const toggleAddonForGroup = (addon, group) => {
+    const isSingle = group.selection_type === 'single';
+
+    if (isSingle) {
+      // For single select, remove all other selected addons from THIS group
+      const otherGroupAddonIds = group.groupAddons.filter(ga => ga.id !== addon.id).map(ga => ga.id);
+      let newSelected = selectedAddons.filter(sa => !otherGroupAddonIds.includes(sa.id));
+      
+      const existing = newSelected.find(a => a.id === addon.id);
+      // Toggle off if already selected, otherwise add
+      if (existing) {
+         setSelectedAddons(newSelected.filter(a => a.id !== addon.id));
+      } else {
+         setSelectedAddons([...newSelected, { ...addon, quantity: 1, _groupId: group.id }]);
+      }
     } else {
-      setSelectedAddons([...selectedAddons, { ...addon, quantity: 1 }]);
+      // Multi select - allow multiple quantity
+      toggleAddon(addon, group.id);
     }
   };
 
-  const decreaseAddon = (e, addon) => {
+  const toggleAddon = (addon, groupId = null) => {
+    const existing = selectedAddons.find(a => a.name === addon.name && a._groupId === groupId);
+    if (existing) {
+      setSelectedAddons(selectedAddons.map(a => 
+        (a.name === addon.name && a._groupId === groupId) ? { ...a, quantity: (a.quantity || 1) + 1 } : a
+      ));
+    } else {
+      setSelectedAddons([...selectedAddons, { ...addon, quantity: 1, _groupId: groupId }]);
+    }
+  };
+
+  const decreaseAddon = (e, addon, groupId = null) => {
     e.stopPropagation();
-    const existing = selectedAddons.find(a => a.name === addon.name);
+    const existing = selectedAddons.find(a => a.name === addon.name && a._groupId === groupId);
     if (existing) {
       if (existing.quantity > 1) {
         setSelectedAddons(selectedAddons.map(a => 
-          a.name === addon.name ? { ...a, quantity: a.quantity - 1 } : a
+          (a.name === addon.name && a._groupId === groupId) ? { ...a, quantity: a.quantity - 1 } : a
         ));
       } else {
-        setSelectedAddons(selectedAddons.filter(a => a.name !== addon.name));
+        setSelectedAddons(selectedAddons.filter(a => !(a.name === addon.name && a._groupId === groupId)));
       }
     }
   };
 
-  const filteredAddons = allAvailableAddons.filter(addon =>
-    addon.name.toLowerCase().includes(addonSearch.toLowerCase())
-  );
+  const allAvailableAddons = [...itemLevelAddons, ...assignedGroups.flatMap(g => g.groupAddons || [])];
 
-  // Sync selected addons when variant changes - remove any that are no longer available
+  // Calculate if all mandatory groups are satisfied
+  const isSatisfied = () => {
+    for (const group of assignedGroups) {
+      if (group.is_mandatory) {
+         const hasSelection = selectedAddons.some(sa => sa._groupId === group.id);
+         if (!hasSelection) return false;
+      }
+    }
+    return true;
+  };
+
+  // Sync selected addons when variant changes
   useEffect(() => {
-    setSelectedAddons(prev => prev.filter(selected => 
-      allAvailableAddons.some(available => available.name === selected.name)
-    ));
+    setSelectedAddons([]);
   }, [selectedVariant]);
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1050 }}>
-      <div className="modal addon-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '90%', maxHeight: '90vh', height: 'auto' }}>
+      <div className="modal addon-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1000px', width: '90%', maxHeight: '90vh', height: 'auto' }}>
         {/* Modal Header */}
         <div className="addon-modal-header">
           <div>
@@ -1798,9 +1911,9 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
         </div>
 
         {/* Variant Tabs at Top */}
-        {item.parsedVariants.length > 0 && (
+        {parsedVariants.length > 0 && (
           <div className="addon-variant-tabs">
-            {item.parsedVariants.map((variant, idx) => {
+            {parsedVariants.map((variant, idx) => {
               const variantDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && d.variant_name === variant.name);
               const itemDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name || d.variant_name === ''));
               let appliedDiscount = variantDiscount || itemDiscount;
@@ -1861,21 +1974,109 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
 
         {/* Addon Groups */}
         <div className="addon-groups">
-          {allAvailableAddons.length > 0 && (
+          
+          {/* Render Master Add-on Groups */}
+          {assignedGroups.map(group => {
+            const isSingle = group.selection_type === 'single';
+
+            return (
+              <div key={group.id} className="addon-group">
+                <div className="addon-group-header">
+                  <span className="addon-group-name">
+                    <span style={{ width: '4px', height: '16px', background: '#FF9800', borderRadius: '4px', display: 'inline-block' }}></span>
+                    {group.name}
+                  </span>
+                  <span className="addon-group-info" style={{ fontSize: '12px', color: '#78909C' }}>
+                    {isSingle ? 'Choose 1 option' : 'Click to add/increase quantity'}
+                  </span>
+                </div>
+                
+                <div className="addon-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
+                  {group.groupAddons
+                    .filter(a => a.name.toLowerCase().includes(addonSearch.toLowerCase()))
+                    .map((addon) => {
+                    const selected = selectedAddons.find(a => a.id === addon.id && a._groupId === group.id);
+                    const isSelected = !!selected;
+                    const qty = selected?.quantity || 0;
+                    
+                    return (
+                      <div
+                        key={addon.id}
+                        className={`addon-item ${addon.type !== 'veg' ? 'nonveg' : ''} ${isSelected ? 'selected' : ''}`}
+                        onClick={() => toggleAddonForGroup(addon, group)}
+                        style={{ position: 'relative', overflow: 'hidden' }}
+                      >
+                        <span className="addon-item-name">{addon.name}</span>
+                        {parseFloat(addon.price) > 0 && <span className="addon-item-price">₹{parseFloat(addon.price).toFixed(0)}</span>}
+                        
+                        {isSelected && (
+                          <div style={{ 
+                            position: 'absolute', 
+                            top: 0, 
+                            right: 0, 
+                            background: '#E49B0F', 
+                            color: 'white', 
+                            padding: '4px 10px', 
+                            borderRadius: '0 0 0 12px',
+                            fontSize: '15px',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            {qty >= 1 && (
+                              <div 
+                                onClick={(e) => decreaseAddon(e, addon, group.id)}
+                                style={{ 
+                                  cursor: 'pointer',
+                                  background: 'rgba(0,0,0,0.2)',
+                                  borderRadius: '50%',
+                                  width: '22px',
+                                  height: '22px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginRight: '2px',
+                                  transition: 'background 0.2s',
+                                }}
+                                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,0,0,0.4)'}
+                                onMouseOut={e => e.currentTarget.style.background = 'rgba(0,0,0,0.2)'}
+                              >
+                                <Minus size={14} strokeWidth={3} />
+                              </div>
+                            )}
+                            <span style={{ fontSize: '14px', marginTop: '1px' }}>x{qty}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Render Item-Level Addons (Inline) */}
+          {itemLevelAddons.length > 0 && (
             <div className="addon-group">
               <div className="addon-group-header">
                 <span className="addon-group-name">
                   <span style={{ width: '4px', height: '16px', background: '#FF9800', borderRadius: '4px', display: 'inline-block' }}></span>
-                  {selectedVariant?.name || 'Default'}
+                  Extra Add-ons
                 </span>
-                <span className="addon-group-info" style={{ fontSize: '12px', color: '#78909C' }}>Click to add/increase quantity</span>
+                <span className="addon-group-info" style={{ fontSize: '12px', color: '#78909C' }}>
+                  Click to add/increase quantity
+                </span>
               </div>
+              
               <div className="addon-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
-                {filteredAddons.map((addon, idx) => {
-                  const selected = selectedAddons.find(a => a.name === addon.name);
+                {itemLevelAddons
+                  .filter(a => a.name.toLowerCase().includes(addonSearch.toLowerCase()))
+                  .map((addon, idx) => {
+                  const selected = selectedAddons.find(a => a.name === addon.name && a._groupId === null);
                   const isSelected = !!selected;
                   const qty = selected?.quantity || 0;
-                  
+
                   return (
                     <div
                       key={idx}
@@ -1884,8 +2085,8 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
                       style={{ position: 'relative', overflow: 'hidden' }}
                     >
                       <span className="addon-item-name">{addon.name}</span>
-                      <span className="addon-item-price">₹{parseFloat(addon.price).toFixed(0)}</span>
-                      
+                      {parseFloat(addon.price) > 0 && <span className="addon-item-price">₹{parseFloat(addon.price).toFixed(0)}</span>}
+
                       {isSelected && (
                         <div style={{ 
                           position: 'absolute', 
@@ -1903,7 +2104,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
                         }}>
                           {qty >= 1 && (
                             <div 
-                              onClick={(e) => decreaseAddon(e, addon)}
+                              onClick={(e) => decreaseAddon(e, addon, null)}
                               style={{ 
                                 cursor: 'pointer',
                                 background: 'rgba(0,0,0,0.2)',
@@ -1933,7 +2134,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
           )}
 
           {/* Empty state if no addons */}
-          {item.parsedAddons.length === 0 && (
+          {assignedGroups.length === 0 && itemLevelAddons.length === 0 && (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-500)' }}>
               <p>No add-ons available for this item</p>
             </div>
@@ -1984,8 +2185,11 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
 
           <button
             className="btn btn-primary addon-add-btn"
-            style={{ flex: 1, padding: '14px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '16px', fontWeight: 'bold' }}
+            disabled={!isSatisfied()}
+            style={{ flex: 1, padding: '14px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '16px', fontWeight: 'bold', opacity: isSatisfied() ? 1 : 0.6 }}
             onClick={() => {
+              if (!isSatisfied()) return;
+              
               // Flatten addons for cart state
               const flattenedAddons = selectedAddons.flatMap(addon => {
                 return Array(addon.quantity).fill({ ...addon });
@@ -2001,7 +2205,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
               onClose();
             }}
           >
-            <span>Add to Cart</span>
+            <span>{isSatisfied() ? 'Add to Cart' : 'Select Required Options'}</span>
             <span className="addon-add-btn-price" style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 8px', borderRadius: '6px' }}>₹{calculateTotal().toFixed(2)}</span>
           </button>
         </div>
@@ -2209,6 +2413,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
   const [orderId, setOrderId] = useState(null);
   const [showBillPreview, setShowBillPreview] = useState(false);
   const [viewingOrder, setViewingOrder] = useState(null);
+  const [customerDue, setCustomerDue] = useState({ hasDue: false, totalDue: 0 });
 
   // Change calculator state
   const [amountReceived, setAmountReceived] = useState('');
@@ -2232,6 +2437,9 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
     try {
       const orders = await window.electronAPI.invoke('order:getByPhone', { phone });
       setCustomerHistory(orders || []);
+      
+      const dueInfo = await window.electronAPI.invoke('customer:getDueStatus', { phone });
+      setCustomerDue(dueInfo);
     } catch (error) {
       console.error('Failed to load customer history:', error);
       setCustomerHistory([]);
@@ -2433,18 +2641,26 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-3)' }}>
               <div>
-                <label className="label">Customer Name (Optional)</label>
+                <label className="label" style={{ color: customerDue.hasDue ? '#f44336' : 'inherit' }}>
+                  Customer Name (Optional) {customerDue.hasDue && <span style={{ fontSize: '10px' }}>(OVERDUE: ₹{customerDue.totalDue})</span>}
+                </label>
                 <input
                   type="text"
                   className="input"
                   placeholder="Enter customer name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
+                  style={{ 
+                    border: customerDue.hasDue ? '1px solid #f44336' : '', 
+                    background: customerDue.hasDue ? '#FFEBEE' : '' 
+                  }}
                   autoFocus
                 />
               </div>
               <div>
-                <label className="label">Phone Number (Optional)</label>
+                <label className="label" style={{ color: customerDue.hasDue ? '#f44336' : 'inherit' }}>
+                  Phone Number (Optional) {customerDue.hasDue && <span style={{ fontSize: '10px' }}>(DEBTOR)</span>}
+                </label>
                 <input
                   type="tel"
                   className="input"
@@ -2452,6 +2668,10 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   onBlur={(e) => lookupCustomerHistory(e.target.value)}
+                  style={{ 
+                    border: customerDue.hasDue ? '1px solid #f44336' : '', 
+                    background: customerDue.hasDue ? '#FFEBEE' : '' 
+                  }}
                 />
               </div>
               <div>

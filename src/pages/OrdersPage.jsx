@@ -77,7 +77,11 @@ const OrdersPage = () => {
 
     // Apply status filter
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(order => order.status === statusFilter);
+      if (statusFilter === 'due') {
+        filtered = filtered.filter(order => order.payment_status !== 'completed' && order.status !== 'cancelled');
+      } else {
+        filtered = filtered.filter(order => order.status === statusFilter);
+      }
     }
 
     // Apply date filter
@@ -262,6 +266,7 @@ const OrdersPage = () => {
             <option value="active">Active</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
+            <option value="due">Due Payment</option>
           </select>
         </div>
       </div>
@@ -339,12 +344,26 @@ const OrdersPage = () => {
                 <td style={{ fontWeight: 600 }}>₹{(order.total_amount || 0).toFixed(2)}</td>
                 <td>
                   {order.payment_method && (
-                    <span className="badge badge-success">
-                      {order.payment_method.toUpperCase()}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span className={`badge ${order.payment_status === 'completed' ? 'badge-success' : 'badge-warning'}`}>
+                        {order.payment_method.toUpperCase()}
+                      </span>
+                      {order.payment_status !== 'completed' && order.status !== 'cancelled' && (
+                        <span style={{ fontSize: '10px', color: '#e53935', fontWeight: 'bold' }}>
+                          DUE: ₹{(order.total_amount - (order.customer_paid || 0)).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </td>
-                <td>{getStatusBadge(order.status)}</td>
+                <td>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {getStatusBadge(order.status)}
+                    {order.payment_status === 'partial' && (
+                      <span className="badge badge-info" style={{ fontSize: '10px' }}>PARTIAL</span>
+                    )}
+                  </div>
+                </td>
                 <td>
                   <div style={{ display: 'flex', gap: 'var(--spacing-1)' }}>
                     <button 
@@ -362,6 +381,16 @@ const OrdersPage = () => {
                         style={{ color: 'var(--success-600)' }}
                       >
                         <CheckCircle size={16} />
+                      </button>
+                    )}
+                    {order.payment_status !== 'completed' && order.status === 'completed' && (
+                      <button 
+                        className="btn btn-ghost btn-icon btn-sm"
+                        onClick={() => handleCompleteOrderInput(order)}
+                        title="Settle Payment"
+                        style={{ color: 'var(--primary-600)' }}
+                      >
+                        <DollarSign size={16} />
                       </button>
                     )}
                     <button 

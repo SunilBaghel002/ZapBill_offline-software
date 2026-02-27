@@ -295,12 +295,25 @@ class Database {
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             addon_ids TEXT, -- JSON array of global addon IDs
+            is_mandatory INTEGER DEFAULT 0,
+            selection_type TEXT CHECK(selection_type IN ('single', 'multi')) DEFAULT 'multi',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             is_deleted INTEGER DEFAULT 0
         )
       `);
     } catch (error) { console.log('Migration note:', error.message); }
+
+    try {
+      // Add missing columns to master_addons if they don't exist
+      try { this.db.run("ALTER TABLE master_addons ADD COLUMN is_mandatory INTEGER DEFAULT 0"); } catch (e) {}
+      try { this.db.run("ALTER TABLE master_addons ADD COLUMN selection_type TEXT DEFAULT 'multi'"); } catch (e) {}
+    } catch (error) { console.log('Migration note (master_addons columns):', error.message); }
+
+    try {
+      // Add master_addon_ids to menu_items
+      this.db.run("ALTER TABLE menu_items ADD COLUMN master_addon_ids TEXT");
+    } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
 
     // Migrate orders table to support 'held' status in CHECK constraint
     this.migrateOrdersTableForHeldStatus();
@@ -900,6 +913,7 @@ class Database {
         preparation_time: item.preparation_time,
         variants: safeStringify(item.variants),
         addons: safeStringify(item.addons),
+        master_addon_ids: safeStringify(item.master_addon_ids),
         updated_at: new Date().toISOString(),
       }, { id: item.id });
       
@@ -920,6 +934,7 @@ class Database {
         preparation_time: item.preparation_time,
         variants: safeStringify(item.variants),
         addons: safeStringify(item.addons),
+        master_addon_ids: safeStringify(item.master_addon_ids),
         menu_id: activeMenu.id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -941,6 +956,8 @@ class Database {
       this.update('master_addons', {
         name: data.name,
         addon_ids: typeof data.addon_ids === 'string' ? data.addon_ids : JSON.stringify(data.addon_ids),
+        is_mandatory: data.is_mandatory ? 1 : 0,
+        selection_type: data.selection_type || 'multi',
         updated_at: new Date().toISOString()
       }, { id: data.id });
       return data.id;
@@ -950,6 +967,8 @@ class Database {
         id,
         name: data.name,
         addon_ids: typeof data.addon_ids === 'string' ? data.addon_ids : JSON.stringify(data.addon_ids),
+        is_mandatory: data.is_mandatory ? 1 : 0,
+        selection_type: data.selection_type || 'multi',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         is_deleted: 0
@@ -1198,6 +1217,24 @@ class Database {
     
     const isoNow = now.toISOString();
 
+    let paymentStatus = order.payment_status || 'pending';
+    const pm = order.payment_method;
+    
+    if (pm === 'cash' || pm === 'card' || pm === 'upi') {
+      paymentStatus = 'completed';
+    } else if ((pm === 'mixed' || pm === 'split') && order.payment_details?.splits) {
+      const hasDue = order.payment_details.splits.some(s => s.method === 'due' && s.amount > 0);
+      const hasPaid = order.payment_details.splits.some(s => ['cash', 'card', 'upi'].includes(s.method) && s.amount > 0);
+      
+      if (hasDue && hasPaid) {
+        paymentStatus = 'partial';
+      } else if (!hasDue && hasPaid) {
+        paymentStatus = 'completed';
+      } else {
+        paymentStatus = 'pending';
+      }
+    }
+
     // Insert order - ensure no undefined values
     const orderData = {
       id: orderId,
@@ -1213,8 +1250,8 @@ class Database {
       container_charge: order.container_charge || 0,
       customer_paid: order.customer_paid || 0,
       total_amount: order.total_amount || 0,
-      payment_method: (order.payment_method === 'split' ? 'mixed' : order.payment_method) || null,
-      payment_status: order.payment_status || 'pending',
+      payment_method: (pm === 'split' ? 'mixed' : pm) || null,
+      payment_status: paymentStatus,
       notes: order.notes || '',
     urgency: order.urgency || 'normal',
     chef_instructions: order.chef_instructions || '',
@@ -1361,10 +1398,25 @@ class Database {
   completeOrder(id, paymentMethod, paymentDetails) {
     const now = new Date().toISOString();
     
+    // Determine payment status
+    let paymentStatus = 'completed';
+    if (paymentMethod === 'due') {
+      paymentStatus = 'pending';
+    } else if (paymentMethod === 'mixed' && paymentDetails?.splits) {
+      const hasDue = paymentDetails.splits.some(s => s.method === 'due' && s.amount > 0);
+      const hasPaid = paymentDetails.splits.some(s => ['cash', 'card', 'upi'].includes(s.method) && s.amount > 0);
+      
+      if (hasDue && hasPaid) {
+        paymentStatus = 'partial';
+      } else if (hasDue) {
+        paymentStatus = 'pending';
+      }
+    }
+
     this.update('orders', {
       status: 'completed',
       payment_method: paymentMethod,
-      payment_status: 'completed',
+      payment_status: paymentStatus,
       updated_at: now,
     }, { id });
 
@@ -1794,14 +1846,21 @@ class Database {
     
     // Top Items (Include active/served orders too, not just completed)
     const topItems = this.execute(`
-      SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      SELECT 
+        CASE 
+          WHEN oi.variant IS NOT NULL AND oi.variant != '' AND oi.variant != 'null' AND oi.variant != '[object Object]' 
+            THEN oi.item_name || ' (' || json_extract(oi.variant, '$.name') || ')'
+          ELSE oi.item_name
+        END as item_name,
+        SUM(oi.quantity) as total_quantity, 
+        SUM(oi.item_total) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE DATE(o.created_at, 'localtime') = ? 
         AND o.status != 'cancelled' 
         AND o.is_deleted = 0 
         AND oi.is_deleted = 0
-      GROUP BY oi.item_name
+      GROUP BY item_name
       ORDER BY total_quantity DESC
       LIMIT 10
     `, [date]);
@@ -1969,14 +2028,21 @@ class Database {
 
     // 2. Top Items
     const topItems = this.execute(`
-      SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      SELECT 
+        CASE 
+          WHEN oi.variant IS NOT NULL AND oi.variant != '' AND oi.variant != 'null' AND oi.variant != '[object Object]' 
+            THEN oi.item_name || ' (' || json_extract(oi.variant, '$.name') || ')'
+          ELSE oi.item_name
+        END as item_name,
+        SUM(oi.quantity) as total_quantity, 
+        SUM(oi.item_total) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE DATE(o.created_at, 'localtime') BETWEEN ? AND ?
         AND o.status != 'cancelled' 
         AND o.is_deleted = 0 
         AND oi.is_deleted = 0
-      GROUP BY oi.item_name
+      GROUP BY item_name
       ORDER BY total_quantity DESC
       LIMIT 10
     `, [startDate, endDate]);
@@ -2367,7 +2433,14 @@ class Database {
 
     // 2. Top Items (Weekly)
     const topItems = this.execute(`
-      SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      SELECT 
+        CASE 
+          WHEN oi.variant IS NOT NULL AND oi.variant != '' AND oi.variant != 'null' AND oi.variant != '[object Object]' 
+            THEN oi.item_name || ' (' || json_extract(oi.variant, '$.name') || ')'
+          ELSE oi.item_name
+        END as item_name,
+        SUM(oi.quantity) as total_quantity, 
+        SUM(oi.item_total) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE DATE(o.created_at, 'localtime') >= ? 
@@ -2375,7 +2448,7 @@ class Database {
         AND o.status != 'cancelled' 
         AND o.is_deleted = 0 
         AND oi.is_deleted = 0
-      GROUP BY oi.item_name
+      GROUP BY item_name
       ORDER BY total_quantity DESC
       LIMIT 10
     `, [startDate, startDate]);
@@ -2473,14 +2546,21 @@ class Database {
 
     // 2. Top Items (Monthly)
     const topItems = this.execute(`
-      SELECT oi.item_name, SUM(oi.quantity) as total_quantity, SUM(oi.item_total) as total_revenue
+      SELECT 
+        CASE 
+          WHEN oi.variant IS NOT NULL AND oi.variant != '' AND oi.variant != 'null' AND oi.variant != '[object Object]' 
+            THEN oi.item_name || ' (' || json_extract(oi.variant, '$.name') || ')'
+          ELSE oi.item_name
+        END as item_name,
+        SUM(oi.quantity) as total_quantity, 
+        SUM(oi.item_total) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE strftime('%Y-%m', o.created_at, 'localtime') = ?
         AND o.status != 'cancelled' 
         AND o.is_deleted = 0 
         AND oi.is_deleted = 0
-      GROUP BY oi.item_name
+      GROUP BY item_name
       ORDER BY total_quantity DESC
       LIMIT 10
     `, [monthStr]);
@@ -2651,6 +2731,27 @@ class Database {
     return orders;
   }
 
+  getCustomerDueStatus(phone) {
+    if (!phone) return { hasDue: false, totalDue: 0, dueCount: 0 };
+    const results = this.execute(`
+      SELECT 
+        COUNT(*) as due_count,
+        SUM(total_amount) as total_amount
+      FROM orders
+      WHERE customer_phone = ? 
+        AND payment_status != 'completed'
+        AND status != 'cancelled'
+        AND is_deleted = 0
+    `, [phone]);
+    
+    const data = results[0] || { due_count: 0, total_amount: 0 };
+    return {
+      hasDue: data.due_count > 0,
+      totalDue: data.total_amount || 0,
+      dueCount: data.due_count || 0
+    };
+  }
+
   // ===== Sessions =====
   logSession(userId, action) {
     this.insert('sessions', {
@@ -2794,6 +2895,7 @@ class Database {
     return this.execute(`
       SELECT 
         mi.name as item_name,
+        json_extract(oi.variant, '$.name') as variant_name,
         c.name as category_name,
         SUM(oi.quantity) as total_quantity,
         SUM(oi.item_total) as total_revenue,
@@ -2805,7 +2907,7 @@ class Database {
       WHERE o.is_deleted = 0 
         AND o.status != 'cancelled'
         AND date(o.created_at, 'localtime') BETWEEN date(?) AND date(?)
-      GROUP BY mi.name, c.name
+      GROUP BY mi.name, json_extract(oi.variant, '$.name'), c.name
       ORDER BY total_revenue DESC
     `, [startDate, endDate]);
   }

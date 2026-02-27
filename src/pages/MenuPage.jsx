@@ -666,6 +666,7 @@ const ItemModal = ({ item, categories, onClose, onSave, globalAddons, onRefreshA
     preparation_time: item?.preparation_time || '',
     variants: [],
     addons: [],
+    master_addon_ids: []
   });
 
   // Safe init
@@ -684,10 +685,18 @@ const ItemModal = ({ item, categories, onClose, onSave, globalAddons, onRefreshA
       }
     } catch (e) { console.error('Error parsing addons', e) }
 
+    let initialMasterAddonIds = [];
+    try {
+      if (item?.master_addon_ids) {
+        initialMasterAddonIds = typeof item.master_addon_ids === 'string' ? JSON.parse(item.master_addon_ids) : item.master_addon_ids;
+      }
+    } catch (e) { console.error('Error parsing master_addon_ids', e) }
+
     setFormData(prev => ({
       ...prev,
       variants: initialVariants || [],
-      addons: initialAddons || []
+      addons: initialAddons || [],
+      master_addon_ids: initialMasterAddonIds || []
     }));
   }, [item]);
 
@@ -711,6 +720,7 @@ const ItemModal = ({ item, categories, onClose, onSave, globalAddons, onRefreshA
         preparation_time: formData.preparation_time ? parseInt(formData.preparation_time) : null,
         is_vegetarian: formData.is_vegetarian ? 1 : 0,
         is_available: formData.is_available ? 1 : 0,
+        master_addon_ids: formData.master_addon_ids,
       };
 
       if (item?.id) {
@@ -1116,6 +1126,49 @@ const ItemModal = ({ item, categories, onClose, onSave, globalAddons, onRefreshA
                         <Plus size={12} /> {ga.name} (₹{ga.price})
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* Master Add-ons Selector */}
+                <div style={{ background: '#f5f3ff', padding: '16px', borderRadius: '12px', marginBottom: '24px', border: '1px solid #ede9fe' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <h4 style={{ fontSize: '0.9rem', color: '#5b21b6', margin: 0 }}>Assign Master Add-on Groups</h4>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', paddingBottom: '8px' }}>
+                    {(!masterAddons || masterAddons.length === 0) && <p style={{ fontSize: '0.875rem', color: '#5b21b6' }}>No master add-on groups found.</p>}
+                    {masterAddons?.map(ma => {
+                      const isAssigned = formData.master_addon_ids.includes(ma.id);
+                      return (
+                        <button
+                          key={ma.id}
+                          type="button"
+                          onClick={() => {
+                            if (isAssigned) {
+                              setFormData({ ...formData, master_addon_ids: formData.master_addon_ids.filter(id => id !== ma.id) });
+                            } else {
+                              setFormData({ ...formData, master_addon_ids: [...formData.master_addon_ids, ma.id] });
+                            }
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            background: isAssigned ? '#5b21b6' : 'white',
+                            border: `1px solid ${isAssigned ? '#5b21b6' : '#ddd6fe'}`,
+                            borderRadius: '20px',
+                            fontSize: '0.875rem',
+                            color: isAssigned ? 'white' : '#5b21b6',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          {isAssigned ? <X size={12} /> : <Plus size={12} />} {ma.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1585,6 +1638,8 @@ const MasterAddonEditModal = ({ masterAddon, globalAddons, onClose, onSave }) =>
   const [selectedAddonIds, setSelectedAddonIds] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectionType, setSelectionType] = useState(masterAddon?.selection_type || 'multi');
+  const [isMandatory, setIsMandatory] = useState(masterAddon?.is_mandatory ? true : false);
 
   useEffect(() => {
     if (masterAddon?.addon_ids) {
@@ -1611,7 +1666,9 @@ const MasterAddonEditModal = ({ masterAddon, globalAddons, onClose, onSave }) =>
         data: {
           id: masterAddon?.id,
           name,
-          addon_ids: selectedAddonIds
+          addon_ids: selectedAddonIds,
+          selection_type: selectionType,
+          is_mandatory: isMandatory
         }
       });
       onSave();
@@ -1713,6 +1770,53 @@ const MasterAddonEditModal = ({ masterAddon, globalAddons, onClose, onSave }) =>
                 ))}
               </div>
               <p className="text-muted text-xs mt-2">{selectedAddonIds.length} add-ons selected</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+              <div className="input-group">
+                <label className="input-label">Selection Type</label>
+                <select
+                  className="input"
+                  value={selectionType}
+                  onChange={(e) => setSelectionType(e.target.value)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <option value="single">Single Choice (Radio)</option>
+                  <option value="multi">Multiple Choice (Checkboxes)</option>
+                </select>
+              </div>
+
+              <div className="input-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', height: '38px', margin: 0 }}>
+                  <div style={{
+                    width: '36px',
+                    height: '20px',
+                    background: isMandatory ? 'var(--primary-500)' : '#e5e7eb',
+                    borderRadius: '20px',
+                    position: 'relative',
+                    transition: 'background 0.2s'
+                  }}>
+                    <div style={{
+                      width: '16px',
+                      height: '16px',
+                      background: 'white',
+                      borderRadius: '50%',
+                      position: 'absolute',
+                      top: '2px',
+                      left: isMandatory ? '18px' : '2px',
+                      transition: 'left 0.2s',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                    }} />
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isMandatory}
+                    onChange={(e) => setIsMandatory(e.target.checked)}
+                    style={{ display: 'none' }}
+                  />
+                  <span style={{ fontWeight: 500, fontSize: '0.9rem', color: '#374151' }}>Is Mandatory?</span>
+                </label>
+              </div>
             </div>
           </div>
 
