@@ -545,7 +545,15 @@ const ReportsPage = () => {
                         <tbody>
                             {reportType === 'daily' ? (
                                 orders.length > 0 ? orders.slice(0, 10).map(order => (
-                                    <tr key={order.id} onClick={() => setSelectedOrder(order)} style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}>
+                                    <tr key={order.id} onClick={async () => {
+                                        try {
+                                          const fullOrder = await window.electronAPI.invoke('order:getById', { id: order.id });
+                                          setSelectedOrder(fullOrder);
+                                        } catch (error) {
+                                          console.error('Failed to load full order:', error);
+                                          setSelectedOrder(order);
+                                        }
+                                    }} style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}>
                                         <td style={{...tdStyle, fontWeight: 700, color: '#6366f1'}}>#{order.order_number}</td>
                                         <td style={tdStyle}>{new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
                                         <td style={{...tdStyle, textTransform: 'capitalize'}}>{order.order_type.replace('_', ' ')}</td>

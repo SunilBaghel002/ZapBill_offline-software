@@ -179,6 +179,19 @@ class Database {
 
   migrateSchema() {
     try {
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS order_payments (
+            id TEXT PRIMARY KEY,
+            order_id TEXT REFERENCES orders(id) ON DELETE CASCADE,
+            payment_method TEXT CHECK(payment_method IN ('cash', 'card', 'upi', 'due')),
+            amount REAL NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            is_deleted INTEGER DEFAULT 0
+        )
+      `);
+    } catch (error) { console.log('Migration note (order_payments):', error.message); }
+
+    try {
       // Add is_deleted to order_items if missing
       this.db.run("ALTER TABLE order_items ADD COLUMN is_deleted INTEGER DEFAULT 0");
     } catch (error) {
@@ -234,6 +247,11 @@ class Database {
       // Add menu_id to categories and menu_items
       try { this.db.run("ALTER TABLE categories ADD COLUMN menu_id TEXT"); } catch (e) {}
       try { this.db.run("ALTER TABLE menu_items ADD COLUMN menu_id TEXT"); } catch (e) {}
+    } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    try {
+      // Add is_deleted to order_items
+      try { this.db.run("ALTER TABLE order_items ADD COLUMN is_deleted INTEGER DEFAULT 0"); } catch (e) {}
     } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
 
     try {
@@ -1232,6 +1250,22 @@ class Database {
       this.insert('order_items', itemData);
     }
 
+    // Insert split payments right away if provided
+    if (orderData.payment_method === 'mixed' && order.payment_details?.splits) {
+      for (const split of order.payment_details.splits) {
+        if (split.amount > 0) {
+           this.insert('order_payments', {
+             id: uuidv4(),
+             order_id: orderId,
+             payment_method: split.method,
+             amount: split.amount,
+             created_at: isoNow,
+             is_deleted: 0
+           });
+        }
+      }
+    }
+
     // Add to sync queue
     this.addToSyncQueue('order', orderId, 'create', {
       ...order,
@@ -1336,6 +1370,7 @@ class Database {
 
     // Handle split payments if provided
     if (paymentMethod === 'mixed' && paymentDetails?.splits) {
+      this.run(`DELETE FROM order_payments WHERE order_id = ?`, [id]);
       for (const split of paymentDetails.splits) {
         if (split.amount > 0) {
            this.insert('order_payments', {
@@ -1753,7 +1788,7 @@ class Database {
       FROM orders 
       WHERE DATE(created_at, 'localtime') = ? 
         AND is_deleted = 0
-    `, [date, date]);
+    `, [date, date, date, date, date, date]);
     
     const orders = this.execute(`SELECT * FROM orders WHERE DATE(created_at, 'localtime') = ? AND is_deleted = 0 ORDER BY created_at DESC`, [date]);
     
@@ -1837,7 +1872,7 @@ class Database {
       WHERE DATE(created_at, 'localtime') = ? 
         AND cashier_id = ?
         AND is_deleted = 0
-    `, [date, userId]);
+    `, [date, userId, date, userId, date, userId, date, userId, date, userId]);
 
     const expenses = this.execute(`
       SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE date = ? AND employee_id = ?
@@ -1880,9 +1915,20 @@ class Database {
         u.role,
         COUNT(CASE WHEN o.status != 'cancelled' THEN 1 END) as total_orders,
         COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.total_amount ELSE 0 END), 0) as total_revenue,
-        COALESCE(SUM(CASE WHEN o.payment_method = 'cash' AND o.status = 'completed' THEN o.total_amount ELSE 0 END), 0) as cash_amount,
-        COALESCE(SUM(CASE WHEN o.payment_method = 'card' AND o.status = 'completed' THEN o.total_amount ELSE 0 END), 0) as card_amount,
-        COALESCE(SUM(CASE WHEN o.payment_method = 'upi' AND o.status = 'completed' THEN o.total_amount ELSE 0 END), 0) as upi_amount
+        
+        COALESCE(SUM(CASE WHEN o.payment_method = 'cash' AND o.status = 'completed' THEN o.total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'cash' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') = ? AND o2.cashier_id = u.id AND o2.status = 'completed' AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as cash_amount,
+        
+        COALESCE(SUM(CASE WHEN o.payment_method = 'card' AND o.status = 'completed' THEN o.total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'card' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') = ? AND o2.cashier_id = u.id AND o2.status = 'completed' AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as card_amount,
+        
+        COALESCE(SUM(CASE WHEN o.payment_method = 'upi' AND o.status = 'completed' THEN o.total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'upi' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') = ? AND o2.cashier_id = u.id AND o2.status = 'completed' AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as upi_amount,
+        
+        COALESCE(SUM(CASE WHEN o.payment_method = 'mixed' AND o.status = 'completed' THEN o.total_amount ELSE 0 END), 0) as mixed_amount,
+        
+        COALESCE(SUM(CASE WHEN o.payment_method = 'due' AND o.status = 'completed' THEN o.total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'due' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') = ? AND o2.cashier_id = u.id AND o2.status = 'completed' AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as due_amount
       FROM users u
       LEFT JOIN orders o ON o.cashier_id = u.id 
         AND DATE(o.created_at, 'localtime') = ? 
@@ -1890,7 +1936,7 @@ class Database {
       WHERE u.is_deleted = 0 AND u.is_active = 1 AND u.role IN ('cashier', 'admin')
       GROUP BY u.id
       ORDER BY total_revenue DESC
-    `, [date]);
+    `, [date, date, date, date, date, date]);
   }
 
   // Get custom date range report with add-on statistics
@@ -1902,13 +1948,24 @@ class Database {
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount,
-        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as cash_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as card_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as upi_amount
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'cash' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') BETWEEN ? AND ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as cash_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'card' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') BETWEEN ? AND ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as card_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'upi' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') BETWEEN ? AND ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as upi_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'mixed' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as mixed_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'due' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'due' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') BETWEEN ? AND ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as due_amount
       FROM orders 
       WHERE DATE(created_at, 'localtime') BETWEEN ? AND ?
         AND is_deleted = 0
-    `, [startDate, endDate]);
+    `, [startDate, endDate, startDate, endDate, startDate, endDate, startDate, endDate, startDate, endDate]);
 
     // 2. Top Items
     const topItems = this.execute(`
@@ -2097,18 +2154,34 @@ class Database {
       SELECT 
         COUNT(*) as total_orders,
         COALESCE(SUM(total_amount), 0) as total_revenue,
-        COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total_amount ELSE 0 END), 0) as cash_sales,
-        COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total_amount ELSE 0 END), 0) as card_sales,
-        COALESCE(SUM(CASE WHEN payment_method = 'upi' THEN total_amount ELSE 0 END), 0) as upi_sales,
-        COALESCE(SUM(CASE WHEN payment_method = 'mixed' THEN total_amount ELSE 0 END), 0) as mixed_sales,
-        COALESCE(SUM(CASE WHEN payment_method = 'due' THEN total_amount ELSE 0 END), 0) as due_sales
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'cash' AND o2.payment_method = 'mixed' AND o2.cashier_id = ? AND o2.created_at >= ? AND o2.created_at <= ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as cash_sales,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'card' AND o2.payment_method = 'mixed' AND o2.cashier_id = ? AND o2.created_at >= ? AND o2.created_at <= ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as card_sales,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'upi' AND o2.payment_method = 'mixed' AND o2.cashier_id = ? AND o2.created_at >= ? AND o2.created_at <= ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as upi_sales,
+        
+        COALESCE(SUM(CASE WHEN payment_method NOT IN ('cash', 'card', 'upi', 'due', 'mixed') AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method NOT IN ('cash', 'card', 'upi', 'due') AND o2.payment_method = 'mixed' AND o2.cashier_id = ? AND o2.created_at >= ? AND o2.created_at <= ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as mixed_sales,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'due' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'due' AND o2.payment_method = 'mixed' AND o2.cashier_id = ? AND o2.created_at >= ? AND o2.created_at <= ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as due_sales
       FROM orders
       WHERE cashier_id = ? 
         AND created_at >= ? 
         AND created_at <= ?
         AND status != 'cancelled'
         AND is_deleted = 0
-    `, [shift.user_id, shift.start_time, endTime])[0];
+    `, [
+      shift.user_id, shift.start_time, endTime,
+      shift.user_id, shift.start_time, endTime,
+      shift.user_id, shift.start_time, endTime,
+      shift.user_id, shift.start_time, endTime,
+      shift.user_id, shift.start_time, endTime
+    ])[0];
 
     const expenses = this.execute(`
       SELECT COALESCE(SUM(amount), 0) as total_expenses
@@ -2330,14 +2403,24 @@ class Database {
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount,
-        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as cash_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as card_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as upi_amount
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'cash' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') >= ? AND DATE(o2.created_at, 'localtime') < date(?, '+7 days') AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as cash_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'card' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') >= ? AND DATE(o2.created_at, 'localtime') < date(?, '+7 days') AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as card_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'upi' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') >= ? AND DATE(o2.created_at, 'localtime') < date(?, '+7 days') AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as upi_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'due' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'due' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') >= ? AND DATE(o2.created_at, 'localtime') < date(?, '+7 days') AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as due_amount
+        
       FROM orders 
       WHERE DATE(created_at, 'localtime') >= ? 
         AND DATE(created_at, 'localtime') < date(?, '+7 days')
         AND is_deleted = 0
-    `, [startDate, startDate])[0];
+    `, [startDate, startDate, startDate, startDate, startDate, startDate, startDate, startDate, startDate, startDate])[0];
 
     // Weekly Expenses
   const weeklyExpenses = this.execute(`
@@ -2424,13 +2507,23 @@ class Database {
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN tax_amount ELSE 0 END), 0) as total_tax,
         COALESCE(SUM(CASE WHEN status != 'cancelled' THEN discount_amount ELSE 0 END), 0) as total_discount,
-        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as cash_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as card_amount,
-        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as upi_amount
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'cash' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'cash' AND o2.payment_method = 'mixed' AND strftime('%Y-%m', o2.created_at, 'localtime') = ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as cash_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'card' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'card' AND o2.payment_method = 'mixed' AND strftime('%Y-%m', o2.created_at, 'localtime') = ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as card_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'upi' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'upi' AND o2.payment_method = 'mixed' AND strftime('%Y-%m', o2.created_at, 'localtime') = ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as upi_amount,
+        
+        COALESCE(SUM(CASE WHEN payment_method = 'due' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'due' AND o2.payment_method = 'mixed' AND strftime('%Y-%m', o2.created_at, 'localtime') = ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as due_amount
+        
       FROM orders 
       WHERE strftime('%Y-%m', created_at, 'localtime') = ?
         AND is_deleted = 0
-    `, [monthStr])[0];
+    `, [monthStr, monthStr, monthStr, monthStr, monthStr])[0];
 
     // Monthly Expenses
   const monthlyExpenses = this.execute(`

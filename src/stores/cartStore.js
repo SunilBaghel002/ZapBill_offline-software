@@ -319,6 +319,7 @@ export const useCartStore = create(
           delivery_charge: state.deliveryCharge || 0,
           container_charge: state.containerCharge || 0,
           customer_paid: state.customerPaid || 0,
+          payment_details: state.paymentDetails,
           status: status,
           is_hold: isHold
         };

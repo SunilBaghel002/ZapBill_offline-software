@@ -504,9 +504,14 @@ const DashboardPage = () => {
         ).length;
       }
 
-      // Calculate Cash in Hand using cash_sales or cash_amount based on API response
       const cashSales = todaySales.cash_amount !== undefined ? todaySales.cash_amount : 
                        (todaySales.cash_sales !== undefined ? todaySales.cash_sales : 0);
+      const upiSales = todaySales.upi_amount !== undefined ? todaySales.upi_amount : (todaySales.upi_sales || 0);
+      const cardSales = todaySales.card_amount !== undefined ? todaySales.card_amount : (todaySales.card_sales || 0);
+      const dueSales = todaySales.due_amount !== undefined ? todaySales.due_amount : (todaySales.due_sales || 0);
+      
+      const otherSales = Math.max(0, (todaySales.total_revenue || 0) - (cashSales + upiSales + cardSales + dueSales));
+      
       const cashInHand = (todaySales.opening_balance || 0) + cashSales - (todaySales.total_expenses || 0);
 
       setStats({
@@ -520,11 +525,11 @@ const DashboardPage = () => {
         revenueTrend,
         ordersTrend,
         activeOrdersTrend: { direction: 'neutral', value: 0 },
-        cashAmount: todaySales.cash_amount || 0,
-        upiAmount: todaySales.upi_amount || 0,
-        cardAmount: todaySales.card_amount || 0,
-        mixedAmount: todaySales.mixed_amount || 0,
-        dueAmount: todaySales.due_amount || 0
+        cashAmount: cashSales,
+        upiAmount: upiSales,
+        cardAmount: cardSales,
+        mixedAmount: otherSales,
+        dueAmount: dueSales
       });
 
       // Fetch weekly trend for chart
@@ -681,13 +686,23 @@ const DashboardPage = () => {
             color="warning"
           />
         )}
-        {(stats.mixedAmount > 0 || stats.dueAmount > 0) && (
+        {stats.dueAmount > 0 && (
           <StatCard
-            title="Other Sales"
-            value={`₹${(stats.mixedAmount + stats.dueAmount).toLocaleString()}`}
+            title="Unpaid/Due"
+            value={`₹${stats.dueAmount.toLocaleString()}`}
             trend="neutral"
             trendValue={0}
             icon={MoreHorizontal}
+            color="info"
+          />
+        )}
+        {stats.mixedAmount > 0 && (
+          <StatCard
+            title="Other Sales"
+            value={`₹${stats.mixedAmount.toLocaleString()}`}
+            trend="neutral"
+            trendValue={0}
+            icon={ShoppingBag}
             color="info"
           />
         )}
@@ -835,7 +850,15 @@ const DashboardPage = () => {
         }}>
           {recentOrders.length > 0 ? (
             recentOrders.map(order => (
-              <OrderCard key={order.id} order={order} onClick={setSelectedOrder} />
+              <OrderCard key={order.id} order={order} onClick={async (selected) => {
+                try {
+                  const fullOrder = await window.electronAPI.invoke('order:getById', { id: selected.id });
+                  setSelectedOrder(fullOrder);
+                } catch (error) {
+                  console.error('Failed to fetch full order:', error);
+                  setSelectedOrder(selected);
+                }
+              }} />
             ))
           ) : (
             <div className="empty-state" style={{ gridColumn: '1 / -1', padding: '60px' }}>
