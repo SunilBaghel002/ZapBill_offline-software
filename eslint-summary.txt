@@ -1,0 +1,224 @@
+
+--- db.js ---
+Line 145[ERROR]: Empty block statement. (no-empty)
+Line 230[ERROR]: Empty block statement. (no-empty)
+Line 231[ERROR]: Empty block statement. (no-empty)
+Line 232[ERROR]: Empty block statement. (no-empty)
+Line 237[ERROR]: Empty block statement. (no-empty)
+Line 238[ERROR]: Empty block statement. (no-empty)
+Line 243[ERROR]: Empty block statement. (no-empty)
+Line 248[ERROR]: Empty block statement. (no-empty)
+Line 249[ERROR]: Empty block statement. (no-empty)
+Line 254[ERROR]: Empty block statement. (no-empty)
+Line 309[ERROR]: Empty block statement. (no-empty)
+Line 310[ERROR]: Empty block statement. (no-empty)
+Line 821[ERROR]: Empty block statement. (no-empty)
+Line 1506[WARN]: 'needsSequenceUpdate' is assigned a value but never used. (no-unused-vars)
+Line 1553[ERROR]: Duplicate name 'getAllOrders'. (no-dupe-class-members)
+Line 1623[WARN]: 'mixedAdd' is assigned a value but never used. (no-unused-vars)
+Line 1628[WARN]: 'dueAdd' is assigned a value but never used. (no-unused-vars)
+Line 2716[ERROR]: Duplicate name 'getOrdersByPhone'. (no-dupe-class-members)
+Line 2766[ERROR]: Duplicate name 'getSetting'. (no-dupe-class-members)
+Line 2800[ERROR]: Duplicate name 'getUserByUsername'. (no-dupe-class-members)
+Line 2805[ERROR]: Duplicate name 'getUserByPin'. (no-dupe-class-members)
+Line 2810[ERROR]: Duplicate name 'logSession'. (no-dupe-class-members)
+Line 2810[WARN]: 'userId' is defined but never used. (no-unused-vars)
+Line 2810[WARN]: 'action' is defined but never used. (no-unused-vars)
+Line 3024[ERROR]: Duplicate name 'getInventoryHistory'. (no-dupe-class-members)
+Line 3102[ERROR]: Duplicate name 'getSetting'. (no-dupe-class-members)
+
+--- main.js ---
+Line 1314[ERROR]: 'syncService' is not defined. (no-undef)
+Line 1319[ERROR]: 'syncService' is not defined. (no-undef)
+
+--- auth.service.js ---
+Line 88[WARN]: 'userId' is defined but never used. (no-unused-vars)
+
+--- printer.service.js ---
+Line 228[ERROR]: Empty block statement. (no-empty)
+Line 238[ERROR]: Empty block statement. (no-empty)
+Line 370[ERROR]: Empty block statement. (no-empty)
+Line 380[ERROR]: Empty block statement. (no-empty)
+
+--- App.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+
+--- DayOpeningModal.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 8[WARN]: 'user' is assigned a value but never used. (no-unused-vars)
+
+--- Layout.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 1[WARN]: 'useState' is defined but never used. (no-unused-vars)
+
+--- ShiftModal.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+
+--- MainSidebar.jsx ---
+Line 27[WARN]: 'endShift' is assigned a value but never used. (no-unused-vars)
+Line 140[WARN]: 'isActive' is assigned a value but never used. (no-unused-vars)
+
+--- Sidebar.jsx ---
+Line 26[WARN]: 'endShift' is assigned a value but never used. (no-unused-vars)
+Line 35[WARN]: 'setActiveOrdersCount' is assigned a value but never used. (no-unused-vars)
+Line 106[WARN]: 'isActive' is assigned a value but never used. (no-unused-vars)
+
+--- TopNav.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 15[WARN]: 'setIsOnline' is assigned a value but never used. (no-unused-vars)
+
+--- CustomAlert.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+
+--- ShiftContext.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 33[WARN]: React Hook useEffect has a missing dependency: 'checkActiveShift'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+Line 54[WARN]: React Hook useEffect has a missing dependency: 'checkActiveShift'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+
+--- DashboardPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 7[WARN]: 'Users' is defined but never used. (no-unused-vars)
+Line 39[WARN]: 'isNeutral' is assigned a value but never used. (no-unused-vars)
+Line 421[WARN]: React Hook useEffect has a missing dependency: 'loadDashboardData'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+Line 596[ERROR]: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`. (react/no-unescaped-entities)
+Line 596[ERROR]: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`. (react/no-unescaped-entities)
+
+--- DiscountsPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 3[WARN]: 'Tag' is defined but never used. (no-unused-vars)
+Line 3[WARN]: 'CheckCircle' is defined but never used. (no-unused-vars)
+Line 3[WARN]: 'XCircle' is defined but never used. (no-unused-vars)
+Line 7[WARN]: 'user' is assigned a value but never used. (no-unused-vars)
+Line 31[WARN]: React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+
+--- ExpensesPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 12[WARN]: 'loading' is assigned a value but never used. (no-unused-vars)
+Line 34[WARN]: React Hook useEffect has a missing dependency: 'fetchExistingExpenses'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+
+--- InventoryPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 8[WARN]: 'Save' is defined but never used. (no-unused-vars)
+Line 9[WARN]: 'TrendingDown' is defined but never used. (no-unused-vars)
+
+--- KOTPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 11[WARN]: 'Users' is defined but never used. (no-unused-vars)
+Line 14[WARN]: 'Phone' is defined but never used. (no-unused-vars)
+Line 148[ERROR]: Empty block statement. (no-empty)
+Line 154[ERROR]: Empty block statement. (no-empty)
+Line 529[ERROR]: Empty block statement. (no-empty)
+Line 535[ERROR]: Empty block statement. (no-empty)
+
+--- LoginPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 4[WARN]: 'UtensilsCrossed' is defined but never used. (no-unused-vars)
+
+--- MenuPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 92[WARN]: 'handleEditAddon' is assigned a value but never used. (no-unused-vars)
+Line 105[WARN]: 'handleEditMasterAddon' is assigned a value but never used. (no-unused-vars)
+Line 711[WARN]: 'activeTab' is assigned a value but never used. (no-unused-vars)
+Line 711[WARN]: 'setActiveTab' is assigned a value but never used. (no-unused-vars)
+
+--- OrdersPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 13[WARN]: 'Download' is defined but never used. (no-unused-vars)
+Line 19[WARN]: 'TrendingUp' is defined but never used. (no-unused-vars)
+Line 51[WARN]: React Hook useEffect has a missing dependency: 'applyFilters'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+
+--- POSPage.jsx ---
+Line 18[WARN]: 'Leaf' is defined but never used. (no-unused-vars)
+Line 25[WARN]: 'Keyboard' is defined but never used. (no-unused-vars)
+Line 33[WARN]: 'Percent' is defined but never used. (no-unused-vars)
+Line 34[WARN]: 'Save' is defined but never used. (no-unused-vars)
+Line 40[WARN]: 'Wine' is defined but never used. (no-unused-vars)
+Line 44[WARN]: 'Edit2' is defined but never used. (no-unused-vars)
+Line 239[WARN]: 'recentOrders' is assigned a value but never used. (no-unused-vars)
+Line 239[WARN]: 'setRecentOrders' is assigned a value but never used. (no-unused-vars)
+Line 250[WARN]: 'showCustomerForm' is assigned a value but never used. (no-unused-vars)
+Line 250[WARN]: 'setShowCustomerForm' is assigned a value but never used. (no-unused-vars)
+Line 262[WARN]: 'showTableDropdown' is assigned a value but never used. (no-unused-vars)
+Line 262[WARN]: 'setShowTableDropdown' is assigned a value but never used. (no-unused-vars)
+Line 263[WARN]: 'showOrderInfo' is assigned a value but never used. (no-unused-vars)
+Line 263[WARN]: 'setShowOrderInfo' is assigned a value but never used. (no-unused-vars)
+Line 272[WARN]: 'triggerOrderConfirmation' is assigned a value but never used. (no-unused-vars)
+Line 452[ERROR]: Empty block statement. (no-empty)
+Line 598[WARN]: 'handleSaveAndKOT' is assigned a value but never used. (no-unused-vars)
+Line 712[WARN]: 'calculateTotal' is assigned a value but never used. (no-unused-vars)
+Line 834[WARN]: 'index' is defined but never used. (no-unused-vars)
+Line 1763[ERROR]: Empty block statement. (no-empty)
+Line 2409[WARN]: 'paymentMethod' is assigned a value but never used. (no-unused-vars)
+Line 2424[WARN]: 'showHistory' is assigned a value but never used. (no-unused-vars)
+Line 2424[WARN]: 'setShowHistory' is assigned a value but never used. (no-unused-vars)
+Line 2425[WARN]: 'loadingHistory' is assigned a value but never used. (no-unused-vars)
+Line 2970[ERROR]: 'showMainSidebar' is not defined. (no-undef)
+Line 2971[ERROR]: 'setShowMainSidebar' is not defined. (no-undef)
+Line 2974[ERROR]: 'showDiscountModal' is not defined. (no-undef)
+Line 2981[ERROR]: 'setShowDiscountModal' is not defined. (no-undef)
+Line 2985[ERROR]: 'setShowDiscountModal' is not defined. (no-undef)
+Line 2987[ERROR]: 'setShowDiscountModal' is not defined. (no-undef)
+
+--- PrintersPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 12[WARN]: 'ArrowRight' is defined but never used. (no-unused-vars)
+Line 500[ERROR]: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`. (react/no-unescaped-entities)
+Line 675[ERROR]: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. (react/no-unescaped-entities)
+Line 675[ERROR]: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. (react/no-unescaped-entities)
+Line 835[ERROR]: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`. (react/no-unescaped-entities)
+Line 887[ERROR]: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`. (react/no-unescaped-entities)
+Line 888[ERROR]: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. (react/no-unescaped-entities)
+Line 888[ERROR]: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. (react/no-unescaped-entities)
+Line 888[ERROR]: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. (react/no-unescaped-entities)
+Line 888[ERROR]: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. (react/no-unescaped-entities)
+Line 905[ERROR]: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. (react/no-unescaped-entities)
+Line 905[ERROR]: `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`. (react/no-unescaped-entities)
+
+--- ReportsPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 9[WARN]: 'BarChart3' is defined but never used. (no-unused-vars)
+Line 14[WARN]: 'Calendar' is defined but never used. (no-unused-vars)
+Line 19[WARN]: 'PieChartIcon' is defined but never used. (no-unused-vars)
+Line 21[WARN]: 'Filter' is defined but never used. (no-unused-vars)
+Line 23[WARN]: 'CreditCard' is defined but never used. (no-unused-vars)
+Line 149[WARN]: 'setRowsPerPage' is assigned a value but never used. (no-unused-vars)
+Line 158[WARN]: React Hook useEffect has a missing dependency: 'loadReport'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+Line 264[WARN]: 'paymentData' is assigned a value but never used. (no-unused-vars)
+Line 270[WARN]: 'innerRadius' is defined but never used. (no-unused-vars)
+Line 270[WARN]: 'index' is defined but never used. (no-unused-vars)
+
+--- CRMReports.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 18[WARN]: React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+
+--- InventoryReports.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 15[WARN]: React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+
+--- PaymentReports.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 19[WARN]: React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+Line 41[WARN]: 'innerRadius' is defined but never used. (no-unused-vars)
+Line 41[WARN]: 'index' is defined but never used. (no-unused-vars)
+
+--- SalesReports.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 23[WARN]: React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+Line 79[WARN]: 'innerRadius' is defined but never used. (no-unused-vars)
+Line 79[WARN]: 'index' is defined but never used. (no-unused-vars)
+
+--- StaffReports.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 17[WARN]: React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+
+--- SettingsPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 3[WARN]: 'Settings' is defined but never used. (no-unused-vars)
+Line 389[ERROR]: `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`. (react/no-unescaped-entities)
+
+--- UsersPage.jsx ---
+Line 1[WARN]: 'React' is defined but never used. (no-unused-vars)
+Line 34[WARN]: React Hook useEffect has a missing dependency: 'loadReport'. Either include it or remove the dependency array. (react-hooks/exhaustive-deps)
+
+--- cartStore.js ---
+Line 167[ERROR]: Duplicate key 'setIsComplimentary'. (no-dupe-keys)

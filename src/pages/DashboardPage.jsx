@@ -593,7 +593,7 @@ const DashboardPage = () => {
       <div className="page-header" style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 className="page-title" style={{ fontSize: '28px', fontWeight: '900', color: '#1e293b' }}>Dashboard</h1>
-          <p className="page-subtitle" style={{ color: '#64748b', fontSize: '15px' }}>Welcome back, <span style={{ color: '#0096FF', fontWeight: '700' }}>{user?.full_name || user?.username}</span>! Here's your restaurant's overview.</p>
+          <p className="page-subtitle" style={{ color: '#64748b', fontSize: '15px' }}>Welcome back, <span style={{ color: '#0096FF', fontWeight: '700' }}>{user?.full_name || user?.username}</span>! Here&apos;s your restaurant&apos;s overview.</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-secondary" onClick={() => setShowAddBalanceModal(true)} style={{ borderRadius: '12px', padding: '10px 16px', background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}>

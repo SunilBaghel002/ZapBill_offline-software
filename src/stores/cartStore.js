@@ -164,7 +164,6 @@ export const useCartStore = create(
       setPaymentDetails: (details) => set({ paymentDetails: details }),
       setIsPaid: (paid) => set({ isPaid: paid }),
       setIsComplimentary: (comp) => set({ isComplimentary: comp }),
-      setIsComplimentary: (comp) => set({ isComplimentary: comp }),
       setIsSalesReturn: (ret) => set({ isSalesReturn: ret }),
       
       setDeliveryCharge: (amount) => set({ deliveryCharge: amount }),

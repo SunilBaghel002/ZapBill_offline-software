@@ -228,6 +228,9 @@ const ConfirmOrderModal = ({ isOpen, onClose, onConfirm, total, itemsCount }) =>
 };
 
 const POSPage = () => {
+  const { user } = useAuthStore();
+  const cart = useCartStore();
+
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -362,8 +365,7 @@ const POSPage = () => {
     }
   };
 
-  const { user } = useAuthStore();
-  const cart = useCartStore();
+
 
   // Load categories and menu items
   useEffect(() => {

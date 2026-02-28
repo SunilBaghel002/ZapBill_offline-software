@@ -674,10 +674,6 @@ class Database {
     });
   }
 
-  getAllOrders(limit = 50) {
-    return this.execute(`SELECT * FROM orders WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ?`, [limit]);
-  }
-
   getRecentOrders(limit = 10) {
     const orders = this.execute(`SELECT * FROM orders WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT ?`, [limit]);
     
@@ -1364,20 +1360,6 @@ class Database {
 
     query += ` ORDER BY created_at DESC`;
     return this.execute(query, params);
-  }
-
-  getOrdersByPhone(phone) {
-    if (!phone) return [];
-    
-    return this.execute(`
-      SELECT o.id, o.order_number, o.total_amount, o.status, o.created_at, o.payment_method
-      FROM orders o
-      WHERE o.customer_phone LIKE ?
-        AND o.is_deleted = 0
-        AND o.status = 'completed'
-      ORDER BY o.created_at DESC
-      LIMIT 10
-    `, [`%${phone}%`]);
   }
 
   // Get order by ID with items
@@ -2752,16 +2734,6 @@ class Database {
     };
   }
 
-  // ===== Sessions =====
-  logSession(userId, action) {
-    this.insert('sessions', {
-      id: uuidv4(),
-      user_id: userId,
-      login_time: action === 'login' ? new Date().toISOString() : null,
-      logout_time: action === 'logout' ? new Date().toISOString() : null,
-    });
-  }
-
   // ===== Settings =====
   getSetting(key) {
     const results = this.execute(`SELECT value FROM settings WHERE key = ?`, [key]);
@@ -2797,19 +2769,6 @@ class Database {
     return { success: true };
   }
 
-  getUserByUsername(username) {
-    const users = this.execute('SELECT * FROM users WHERE username = ?', [username]);
-    return users[0] || null;
-  }
-
-  getUserByPin(pin) {
-    const users = this.execute('SELECT * FROM users WHERE pin_code = ? AND is_active = 1', [pin]);
-    return users[0] || null;
-  }
-
-  logSession(userId, action) {
-    // Implementation for session logging if needed
-  }
   // ===== Expenses =====
   createExpenses(expenses) {
     const placeholders = expenses.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
@@ -3021,7 +2980,7 @@ class Database {
     `);
   }
 
-  getInventoryHistory(startDate, endDate) {
+  getInventoryHistoryByRange(startDate, endDate) {
     return this.execute(`
       SELECT 
         it.*,
@@ -3096,12 +3055,6 @@ class Database {
         AND date(created_at, 'localtime') BETWEEN date(?) AND date(?)
       GROUP BY payment_method
     `, [startDate, endDate]);
-  }
-
-  // ─── Settings Helper ────────────────────────────────
-  getSetting(key) {
-    const rows = this.execute(`SELECT value FROM settings WHERE key = ?`, [key]);
-    return rows.length > 0 ? rows[0].value : null;
   }
 
   // ============ PRINTING SYSTEM ============

@@ -6,6 +6,7 @@ const { Database } = require('./database/db');
 const AuthService = require('./services/auth.service');
 const PrinterService = require('./services/printer.service');
 const dataImporter = require('./services/dataImporter');
+const SyncService = require('./services/sync.service');
 const fs = require('fs');
 
 // Configure logging
@@ -18,6 +19,8 @@ let tray = null;
 let db = null;
 let authService = null;
 let printerService = null;
+let syncService = null;
+
 
 // Determine if in development mode
 const isDev = !app.isPackaged;
@@ -122,11 +125,13 @@ async function initializeServices() {
   // Ensure printing tables exist (migration for existing databases)
   try { db.ensurePrintingTables(); } catch (e) { log.warn('ensurePrintingTables:', e.message); }
   
-  // Initialize services (fully offline - no sync)
+  // Initialize services
   authService = new AuthService(db);
   printerService = new PrinterService();
+  syncService = new SyncService(db);
+  syncService.initialize();
   
-  log.info('Services initialized successfully (offline mode)');
+  log.info('Services initialized successfully');
 }
 
 function setupIpcHandlers() {
@@ -1008,7 +1013,7 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle('reports:inventoryHistory', async (event, { startDate, endDate }) => {
-    try { return db.getInventoryHistory(startDate, endDate); } catch (e) { log.error(e); return []; }
+    try { return db.getInventoryHistoryByRange(startDate, endDate); } catch (e) { log.error(e); return []; }
   });
 
   // CRM
