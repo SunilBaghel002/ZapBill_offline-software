@@ -61,6 +61,9 @@ class Database {
     // Ensure at least one menu exists and link existing data
     this.ensureDefaultMenu();
     
+    // Ensure at least one user exists (admin/admin)
+    this.seedDefaultUser();
+    
     console.log('Database initialized at:', this.dbPath);
     return this;
   }
@@ -2605,13 +2608,13 @@ class Database {
   const openingBalance = monthlyOpening[0]?.total_opening || 0;
   const totalRevenue = (sales && sales.total_revenue) || 0;
 
-  return {
-    sales: {
-      ...(sales || { total_orders: 0, total_revenue: 0 }),
-      total_expenses: totalExpenses,
-      opening_balance: openingBalance,
-      net_revenue: totalRevenue - totalExpenses
-    },
+    return {
+      sales: {
+        ...(sales || { total_orders: 0, total_revenue: 0 }),
+        total_expenses: totalExpenses,
+        opening_balance: openingBalance,
+        net_revenue: totalRevenue - totalExpenses
+      },
       dailyTrend,
       topItems,
       categorySales
@@ -2640,41 +2643,45 @@ class Database {
     return users[0] || null;
   }
 
-  saveUser(user) {
-    if (user.id) {
-      const updateData = {
-        username: user.username,
-        full_name: user.fullName,
-        role: user.role,
-        is_active: user.isActive ? 1 : 0,
-        updated_at: new Date().toISOString(),
-      };
-      
-      if (user.password) {
-        updateData.password_hash = user.password;
+  logSession(userId, action) {
+    this.insert('sessions', {
+      id: uuidv4(),
+      user_id: userId,
+      login_time: action === 'login' ? new Date().toISOString() : null,
+      logout_time: action === 'logout' ? new Date().toISOString() : null,
+    });
+  }
+
+  seedDefaultUser() {
+    try {
+      // Check if users table exists and if any user exists
+      const usersCount = this.execute("SELECT COUNT(*) as count FROM users WHERE is_deleted = 0")[0].count;
+      if (usersCount === 0) {
+        // Create initial admin user
+        const adminUser = {
+          id: uuidv4(),
+          username: 'admin',
+          // Hash for 'admin'
+          password_hash: '$2a$10$Fi0vUmfTcmW3dejG4clk5.neWpsyPF9Tsi8Y6eG4kcHpugmwDplX.',
+          full_name: 'Administrator',
+          role: 'admin',
+          is_active: 1,
+          pin_code: '1234',
+          created_at: new Date().toISOString()
+        };
+        this.run(`INSERT INTO users (id, username, password_hash, full_name, role, is_active, pin_code, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                 [adminUser.id, adminUser.username, adminUser.password_hash, adminUser.full_name, adminUser.role, adminUser.is_active, adminUser.pin_code, adminUser.created_at]);
+        
+        console.log('Default admin user created: admin / admin');
       }
-      if (user.pinCode) {
-        updateData.pin_code = user.pinCode;
-      }
-      
-      this.update('users', updateData, { id: user.id });
-      return user.id;
-    } else {
-      const id = uuidv4();
-      this.insert('users', {
-        id,
-        username: user.username,
-        password_hash: user.password,
-        full_name: user.fullName,
-        role: user.role,
-        pin_code: user.pinCode || null,
-        is_active: 1,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        is_deleted: 0,
-      });
-      return id;
+    } catch (error) {
+      console.error('Error seeding default user:', error);
     }
+  }
+
+  deleteUser(id) {
+    this.delete('users', { id });
   }
 
   deleteUser(id) {
