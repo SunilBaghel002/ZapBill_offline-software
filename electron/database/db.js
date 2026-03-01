@@ -1864,26 +1864,33 @@ class Database {
     `, [date]);
 
     // Total Expenses for the day
-    const expenses = this.execute(`
-        SELECT COALESCE(SUM(amount), 0) as total_expenses 
-        FROM expenses 
-        WHERE date = ?
-    `, [date]);
+  const expenses = this.execute(`
+      SELECT 
+        COALESCE(SUM(amount), 0) as total_expenses,
+        COALESCE(SUM(CASE WHEN reason = 'Cash Withdrawal' THEN amount ELSE 0 END), 0) as withdrawal_total,
+        COALESCE(SUM(CASE WHEN reason = 'Staff Advance' THEN amount ELSE 0 END), 0) as staff_advance_total
+      FROM expenses 
+      WHERE date = ?
+  `, [date]);
 
-    // Day Opening Balance
+  // Day Opening Balance
     const dayLog = this.execute(`SELECT opening_balance FROM day_logs WHERE business_date = ?`, [date])[0];
     const openingBalance = dayLog?.opening_balance || 0;
     
     const totalExpenses = expenses[0]?.total_expenses || 0;
-    const totalRevenue = sales[0]?.total_revenue || 0;
+  const withdrawalTotal = expenses[0]?.withdrawal_total || 0;
+  const staffAdvanceTotal = expenses[0]?.staff_advance_total || 0;
+  const totalRevenue = sales[0]?.total_revenue || 0;
 
-    return {
-      sales: {
-        ...sales[0],
-        total_expenses: totalExpenses,
-        opening_balance: openingBalance,
-        net_revenue: totalRevenue - totalExpenses
-      },
+  return {
+    sales: {
+      ...sales[0],
+      total_expenses: totalExpenses,
+      withdrawal_total: withdrawalTotal,
+      staff_advance_total: staffAdvanceTotal,
+      opening_balance: openingBalance,
+      net_revenue: totalRevenue - totalExpenses
+    },
       orders,
       topItems,
       categorySales
@@ -1919,8 +1926,13 @@ class Database {
     `, [date, userId, date, userId, date, userId, date, userId, date, userId]);
 
     const expenses = this.execute(`
-      SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE date = ? AND employee_id = ?
-    `, [date, userId]);
+    SELECT 
+      COALESCE(SUM(amount), 0) as total_expenses,
+      COALESCE(SUM(CASE WHEN reason = 'Cash Withdrawal' THEN amount ELSE 0 END), 0) as withdrawal_total,
+      COALESCE(SUM(CASE WHEN reason = 'Staff Advance' THEN amount ELSE 0 END), 0) as staff_advance_total
+    FROM expenses 
+    WHERE date = ? AND employee_id = ?
+  `, [date, userId]);
 
     const shifts = this.execute(`
       SELECT COALESCE(SUM(start_cash), 0) as total_start_cash 
@@ -1935,16 +1947,20 @@ class Database {
     `, [date, userId]);
 
     const totalRevenue = sales[0]?.total_revenue || 0;
-    const totalExpenses = expenses[0]?.total_expenses || 0;
-    const openingBalance = shifts[0]?.total_start_cash || 0;
+  const totalExpenses = expenses[0]?.total_expenses || 0;
+  const withdrawalTotal = expenses[0]?.withdrawal_total || 0;
+  const staffAdvanceTotal = expenses[0]?.staff_advance_total || 0;
+  const openingBalance = shifts[0]?.total_start_cash || 0;
 
     return {
       sales: {
-        ...(sales[0] || { total_orders: 0, total_revenue: 0, cash_amount: 0, card_amount: 0, upi_amount: 0, mixed_amount: 0, due_amount: 0 }),
-        total_expenses: totalExpenses,
-        opening_balance: openingBalance,
-        net_revenue: totalRevenue - totalExpenses
-      },
+      ...(sales[0] || { total_orders: 0, total_revenue: 0, cash_amount: 0, card_amount: 0, upi_amount: 0, mixed_amount: 0, due_amount: 0 }),
+      total_expenses: totalExpenses,
+      withdrawal_total: withdrawalTotal,
+      staff_advance_total: staffAdvanceTotal,
+      opening_balance: openingBalance,
+      net_revenue: totalRevenue - totalExpenses
+    },
       orders,
     };
   }
@@ -2146,7 +2162,7 @@ class Database {
     const id = uuidv4();
     const startTime = new Date().toISOString();
 
-    this.db.run(`
+    this.run(`
       INSERT INTO shifts (id, user_id, start_time, start_cash, status)
       VALUES (?, ?, ?, ?, 'active')
     `, [id, userId, startTime, startCash]);
@@ -2162,7 +2178,7 @@ class Database {
 
     const endTime = new Date().toISOString();
     
-    this.db.run(`
+    this.run(`
       UPDATE shifts 
       SET end_time = ?, end_cash = ?, status = 'closed', updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -2186,7 +2202,7 @@ class Database {
     
     const today = new Date().toLocaleDateString('en-CA');
     
-    this.db.run(`
+    this.run(`
       UPDATE shifts 
       SET status = 'closed', end_time = datetime('now'), end_cash = 0, updated_at = CURRENT_TIMESTAMP
       WHERE status = 'active' AND date(start_time, 'localtime') < ?
@@ -2340,14 +2356,14 @@ class Database {
     }
     
     // Add to day logs
-    this.db.run(`
+    this.run(`
       UPDATE day_logs 
       SET opening_balance = opening_balance + ?
       WHERE business_date = ?
     `, [amount, today]);
     
     // Update all currently active shifts so their individual math checks out
-    this.db.run(`
+    this.run(`
       UPDATE shifts 
       SET start_cash = start_cash + ? 
       WHERE status = 'active'
@@ -2358,7 +2374,7 @@ class Database {
 
   autoCloseDays() {
     const today = new Date().toLocaleDateString('en-CA');
-    this.db.run(`
+    this.run(`
       UPDATE day_logs 
       SET status = 'closed', closing_time = business_date || ' 23:59:59', updated_at = CURRENT_TIMESTAMP
       WHERE status = 'open' AND business_date < ?
@@ -2801,6 +2817,7 @@ class Database {
         `INSERT INTO expenses (id, reason, amount, explanation, employee_id, employee_name, paid_from, date, created_at, updated_at) VALUES ${placeholders}`,
         values
       );
+      this.save();
     }
     return { success: true };
   }

@@ -135,341 +135,227 @@ const MenuPage = () => {
     );
   }
 
-  if (showItemModal) {
+  if (isLoading) {
     return (
-      <ItemModal
-        item={editingItem}
-        categories={categories}
-        onClose={() => {
-          setShowItemModal(false);
-          setEditingItem(null);
-        }}
-        onSave={() => {
-          setShowItemModal(false);
-          setEditingItem(null);
-          loadData();
-        }}
-        onAddCategory={() => {
-          setEditingCategory(null);
-          setShowCategoryModal(true);
-        }}
-        globalAddons={addons}
-        masterAddons={masterAddons}
-        onRefreshAddons={loadData}
-      />
+      <div className="empty-state">
+        <div className="loading-spinner" />
+        <p className="mt-4">Loading menu...</p>
+      </div>
     );
   }
 
   return (
-    <div className="page-container" style={{ height: 'calc(100vh - 65px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        background: 'white',
-        padding: '16px 24px',
-        margin: '0',
-        zIndex: 20,
-        borderBottom: '1px solid var(--gray-200)',
-        flexShrink: 0
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '1.5rem', margin: 0 }}>Menu Management</h1>
-            <p className="text-muted" style={{ fontSize: '0.875rem', margin: '4px 0 0 0' }}>Manage items, categories & add-ons</p>
-          </div>
-          
-          {/* Menu Profile Selector */}
-          <div 
-            onClick={() => setShowMenuManager(true)}
-            style={{ 
-              background: 'var(--primary-50)', 
-              padding: '6px 14px', 
-              borderRadius: '20px', 
-              border: '1px solid var(--primary-200)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              cursor: 'pointer',
-              marginLeft: '12px'
-            }}
-          >
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-500)' }} />
-            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--primary-700)' }}>
-              Menu: {activeMenu?.name || 'Loading...'}
-            </span>
-            <RefreshCw size={14} style={{ color: 'var(--primary-400)' }} />
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowGlobalAddonsModal(true)}
-          >
-            <List size={18} />
-            Global Add-ons
-          </button>
-          <button className="btn btn-secondary" onClick={() => setShowMasterAddonsModal(true)}>
-            <Layers size={18} /> Master Add-ons
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={() => {
-              setEditingCategory(null);
-              setShowCategoryModal(true);
-            }}
-          >
-            <Plus size={18} />
-            Add Category
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setEditingItem(null);
-              setShowItemModal(true);
-            }}
-            style={{ background: '#D32F2F', border: 'none' }}
-          >
-            <Plus size={18} />
-            Add Item
-          </button>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-      <div style={{ marginBottom: 'var(--spacing-4)' }}>
-        <h4 style={{ marginBottom: 'var(--spacing-2)' }}>Categories</h4>
-        <div style={{ display: 'flex', gap: 'var(--spacing-2)', flexWrap: 'wrap' }}>
-          <button
-            className={`category-tab ${!selectedCategory ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(null)}
-          >
-            All ({menuItems.length})
-          </button>
-          {categories.map(cat => (
-            <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <button
-                className={`category-tab ${selectedCategory === cat.id ? 'active' : ''}`}
-                onClick={() => setSelectedCategory(cat.id)}
+    <div className="page-container" style={{ height: 'calc(100vh - 65px)', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {/* Main UI and Item Modal Switch */}
+      {!showItemModal ? (
+        <>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            background: 'white',
+            padding: '16px 24px',
+            margin: '0',
+            zIndex: 20,
+            borderBottom: '1px solid var(--gray-200)',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div>
+                <h1 style={{ fontSize: '1.5rem', margin: 0 }}>Menu Management</h1>
+                <p className="text-muted" style={{ fontSize: '0.875rem', margin: '4px 0 0 0' }}>Manage items, categories & add-ons</p>
+              </div>
+              
+              <div 
+                onClick={() => setShowMenuManager(true)}
+                style={{ 
+                  background: 'var(--primary-50)', 
+                  padding: '6px 14px', 
+                  borderRadius: '20px', 
+                  border: '1px solid var(--primary-200)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  marginLeft: '12px'
+                }}
               >
-                {cat.name} ({menuItems.filter(i => i.category_id === cat.id).length})
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary-500)' }} />
+                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--primary-700)' }}>
+                  Menu: {activeMenu?.name || 'Loading...'}
+                </span>
+                <RefreshCw size={14} style={{ color: 'var(--primary-400)' }} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="btn btn-secondary" onClick={() => setShowGlobalAddonsModal(true)}>
+                <List size={18} /> Global Add-ons
               </button>
-              <button
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => handleEditCategory(cat)}
-                style={{ padding: '4px' }}
-              >
-                <Edit2 size={14} />
+              <button className="btn btn-secondary" onClick={() => setShowMasterAddonsModal(true)}>
+                <Layers size={18} /> Master Add-ons
               </button>
-              <button
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => handleDeleteCategory(cat.id)}
-                style={{ padding: '4px', color: 'var(--danger-500)' }}
-                title="Delete Category"
-              >
-                <Trash2 size={14} />
+              <button className="btn btn-secondary" onClick={() => { setEditingCategory(null); setShowCategoryModal(true); }}>
+                <Plus size={18} /> Add Category
+              </button>
+              <button className="btn btn-primary" onClick={() => { setEditingItem(null); setShowItemModal(true); }} style={{ background: '#D32F2F', border: 'none' }}>
+                <Plus size={18} /> Add Item
               </button>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Search */}
-      <div style={{ marginBottom: 'var(--spacing-4)', maxWidth: '400px' }}>
-        <div style={{ position: 'relative' }}>
-          <Search
-            size={18}
-            style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: 'var(--gray-400)'
-            }}
-          />
-          <input
-            type="text"
-            className="input"
-            placeholder="Search menu items..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '40px' }}
-          />
-        </div>
-      </div>
-
-      {/* Items Table */}
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Category</th>
-              <th>Price</th>
-              <th>Tax</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th style={{ width: '100px' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map(item => (
-              <tr key={item.id}>
-                <td>
-                  <div style={{ fontWeight: 500 }}>{item.name}</div>
-                  {item.description && (
-                    <div className="text-xs text-muted">{item.description}</div>
-                  )}
-                </td>
-                <td>{item.category_name}</td>
-                <td style={{ fontWeight: 600 }}>₹{item.price.toFixed(2)}</td>
-                <td>{item.tax_rate}%</td>
-                <td>
-                  {item.is_vegetarian ? (
-                    <span className="badge badge-success">
-                      <Leaf size={12} style={{ marginRight: '4px' }} />
-                      Veg
-                    </span>
-                  ) : (
-                    <span className="badge badge-error">Non-Veg</span>
-                  )}
-                </td>
-                <td>
-                  <span className={`badge ${item.is_available ? 'badge-success' : 'badge-gray'}`}>
-                    {item.is_available ? 'Available' : 'Unavailable'}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: 'var(--spacing-1)' }}>
-                    <button
-                      className="btn btn-ghost btn-icon btn-sm"
-                      onClick={() => handleEditItem(item)}
-                    >
-                      <Edit2 size={16} />
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+            {/* Categories */}
+            <div style={{ marginBottom: 'var(--spacing-4)' }}>
+              <h4 style={{ marginBottom: 'var(--spacing-2)' }}>Categories</h4>
+              <div style={{ display: 'flex', gap: 'var(--spacing-2)', flexWrap: 'wrap' }}>
+                <button className={`category-tab ${!selectedCategory ? 'active' : ''}`} onClick={() => setSelectedCategory(null)}>
+                  All ({menuItems.length})
+                </button>
+                {categories.map(cat => (
+                  <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <button className={`category-tab ${selectedCategory === cat.id ? 'active' : ''}`} onClick={() => setSelectedCategory(cat.id)}>
+                      {cat.name} ({menuItems.filter(i => i.category_id === cat.id).length})
                     </button>
-                    <button
-                      className="btn btn-ghost btn-icon btn-sm"
-                      onClick={() => handleDeleteItem(item.id)}
-                      style={{ color: 'var(--error-500)' }}
-                    >
-                      <Trash2 size={16} />
+                    <button className="btn btn-ghost btn-icon btn-sm" onClick={() => handleEditCategory(cat)} style={{ padding: '4px' }}>
+                      <Edit2 size={14} />
+                    </button>
+                    <button className="btn btn-ghost btn-icon btn-sm" onClick={() => handleDeleteCategory(cat.id)} style={{ padding: '4px', color: 'var(--danger-500)' }} title="Delete Category">
+                      <Trash2 size={14} />
                     </button>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                ))}
+              </div>
+            </div>
 
-        {filteredItems.length === 0 && (
-          <div className="empty-state">
-            <FolderOpen size={48} />
-            <p className="empty-state-title">No items found</p>
-            <p className="text-muted">Add your first menu item to get started</p>
+            {/* Search */}
+            <div style={{ marginBottom: 'var(--spacing-4)', maxWidth: '400px' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)' }} />
+                <input type="text" className="input" placeholder="Search menu items..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ paddingLeft: '40px' }} />
+              </div>
+            </div>
+
+            {/* Items Table */}
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Tax</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th style={{ width: '100px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map(item => (
+                    <tr key={item.id}>
+                      <td>
+                        <div style={{ fontWeight: 500 }}>{item.name}</div>
+                        {item.description && <div className="text-xs text-muted">{item.description}</div>}
+                      </td>
+                      <td>{item.category_name}</td>
+                      <td style={{ fontWeight: 600 }}>₹{item.price.toFixed(2)}</td>
+                      <td>{item.tax_rate}%</td>
+                      <td>
+                        {item.is_vegetarian ? (
+                          <span className="badge badge-success"><Leaf size={12} style={{ marginRight: '4px' }} /> Veg</span>
+                        ) : (
+                          <span className="badge badge-error">Non-Veg</span>
+                        )}
+                      </td>
+                      <td><span className={`badge ${item.is_available ? 'badge-success' : 'badge-gray'}`}>{item.is_available ? 'Available' : 'Unavailable'}</span></td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 'var(--spacing-1)' }}>
+                          <button className="btn btn-ghost btn-icon btn-sm" onClick={() => handleEditItem(item)}><Edit2 size={16} /></button>
+                          <button className="btn btn-ghost btn-icon btn-sm" onClick={() => handleDeleteItem(item.id)} style={{ color: 'var(--error-500)' }}><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredItems.length === 0 && (
+                <div className="empty-state">
+                  <FolderOpen size={48} />
+                  <p className="empty-state-title">No items found</p>
+                  <p className="text-muted">Add your first menu item to get started</p>
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* Category Modal */}
-      {showCategoryModal && (
-        <CategoryModal
-          category={editingCategory}
-          onClose={() => {
-            setShowCategoryModal(false);
-            setEditingCategory(null);
-          }}
-          onSave={() => {
-            setShowCategoryModal(false);
-            setEditingCategory(null);
-            loadData();
-          }}
-        />
-      )}
-
-
-
-      {/* Global Add-ons List Modal */}
-      {showGlobalAddonsModal && (
-        <GlobalAddonsListModal
-          addons={addons}
-          onClose={() => setShowGlobalAddonsModal(false)}
-          onAdd={() => {
-            setEditingAddon(null);
-            setShowAddonModal(true);
-            // We keep GlobalAddonsListModal open, AddonModal opens on top
-          }}
-          onEdit={(addon) => {
-            setEditingAddon(addon);
-            setShowAddonModal(true);
-          }}
-          onDelete={handleDeleteAddon}
-        />
-      )}
-
-      {/* Addon Modal - Rendered Last to be on Top */}
-      {showAddonModal && (
-        <AddonModal
-          addon={editingAddon}
-          onClose={() => {
-            setShowAddonModal(false);
-            setEditingAddon(null);
-          }}
-          onSave={() => {
-            setShowAddonModal(false);
-            setEditingAddon(null);
-            loadData();
-          }}
-        />
-      )}
-
-      {/* Menu Manager Modal */}
-      {showMenuManager && (
-        <MenuManagerModal 
-          menus={menus}
-          activeMenu={activeMenu}
-          onClose={() => setShowMenuManager(false)}
-          onRefresh={loadData}
-        />
-      )}
-
-      {/* Master Add-ons List Modal */}
-      {showMasterAddonsModal && (
-        <MasterAddonsModal
-          masterAddons={masterAddons}
-          onClose={() => setShowMasterAddonsModal(false)}
-          onAdd={() => {
-            setEditingMasterAddon(null);
-            setShowMasterAddonsModal(false);
-            setEditingMasterAddonModalOpen(true);
-          }}
-          onEdit={(ma) => {
-            setEditingMasterAddon(ma);
-            setShowMasterAddonsModal(false);
-            setEditingMasterAddonModalOpen(true);
-          }}
-          onDelete={handleDeleteMasterAddon}
-        />
-      )}
-
-      {/* Master Add-on Edit Modal */}
-      {editingMasterAddonModalOpen && (
-        <MasterAddonEditModal
-          masterAddon={editingMasterAddon}
+        </>
+      ) : (
+        <ItemModal
+          item={editingItem}
+          categories={categories}
+          onClose={() => { setShowItemModal(false); setEditingItem(null); }}
+          onSave={() => { setShowItemModal(false); setEditingItem(null); loadData(); }}
+          onAddCategory={() => { setEditingCategory(null); setShowCategoryModal(true); }}
           globalAddons={addons}
-          onClose={() => {
-            setEditingMasterAddonModalOpen(false);
-            setEditingMasterAddon(null);
-            setShowMasterAddonsModal(true);
-          }}
-          onSave={() => {
-            setEditingMasterAddonModalOpen(false);
-            setEditingMasterAddon(null);
-            setShowMasterAddonsModal(true);
-            loadData();
-          }}
+          masterAddons={masterAddons}
+          onRefreshAddons={loadData}
         />
       )}
+
+      {/* Modal Overlay Layer */}
+      <div style={{ zIndex: 10000 }}>
+        {showCategoryModal && (
+          <CategoryModal
+            category={editingCategory}
+            onClose={() => { setShowCategoryModal(false); setEditingCategory(null); }}
+            onSave={() => { setShowCategoryModal(false); setEditingCategory(null); loadData(); }}
+          />
+        )}
+
+        {showGlobalAddonsModal && (
+          <GlobalAddonsListModal
+            addons={addons}
+            onClose={() => setShowGlobalAddonsModal(false)}
+            onAdd={() => { setEditingAddon(null); setShowAddonModal(true); }}
+            onEdit={(addon) => { setEditingAddon(addon); setShowAddonModal(true); }}
+            onDelete={handleDeleteAddon}
+          />
+        )}
+
+        {showAddonModal && (
+          <AddonModal
+            addon={editingAddon}
+            onClose={() => { setShowAddonModal(false); setEditingAddon(null); }}
+            onSave={() => { setShowAddonModal(false); setEditingAddon(null); loadData(); }}
+          />
+        )}
+
+        {showMenuManager && (
+          <MenuManagerModal 
+            menus={menus}
+            activeMenu={activeMenu}
+            onClose={() => setShowMenuManager(false)}
+            onRefresh={loadData}
+          />
+        )}
+
+        {showMasterAddonsModal && (
+          <MasterAddonsModal
+            masterAddons={masterAddons}
+            onClose={() => setShowMasterAddonsModal(false)}
+            onAdd={() => { setEditingMasterAddon(null); setShowMasterAddonsModal(false); setEditingMasterAddonModalOpen(true); }}
+            onEdit={(ma) => { setEditingMasterAddon(ma); setShowMasterAddonsModal(false); setEditingMasterAddonModalOpen(true); }}
+            onDelete={handleDeleteMasterAddon}
+          />
+        )}
+
+        {editingMasterAddonModalOpen && (
+          <MasterAddonEditModal
+            masterAddon={editingMasterAddon}
+            globalAddons={addons}
+            onClose={() => { setEditingMasterAddonModalOpen(false); setEditingMasterAddon(null); setShowMasterAddonsModal(true); }}
+            onSave={() => { setEditingMasterAddonModalOpen(false); setEditingMasterAddon(null); setShowMasterAddonsModal(true); loadData(); }}
+          />
+        )}
       </div>
     </div>
   );

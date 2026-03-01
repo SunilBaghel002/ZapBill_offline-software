@@ -388,7 +388,9 @@ const DashboardPage = () => {
     upiAmount: 0,
     cardAmount: 0,
     mixedAmount: 0,
-    dueAmount: 0
+    dueAmount: 0,
+    withdrawalTotal: 0,
+    staffAdvanceTotal: 0
   });
   const [recentOrders, setRecentOrders] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -529,7 +531,9 @@ const DashboardPage = () => {
         upiAmount: upiSales,
         cardAmount: cardSales,
         mixedAmount: otherSales,
-        dueAmount: dueSales
+        dueAmount: dueSales,
+        withdrawalTotal: todaySales.withdrawal_total || 0,
+        staffAdvanceTotal: todaySales.staff_advance_total || 0
       });
 
       // Fetch weekly trend for chart
@@ -703,6 +707,26 @@ const DashboardPage = () => {
             trend="neutral"
             trendValue={0}
             icon={ShoppingBag}
+            color="info"
+          />
+        )}
+        {stats.withdrawalTotal > 0 && (
+          <StatCard
+            title="Cash Withdrawal"
+            value={`₹${stats.withdrawalTotal.toLocaleString()}`}
+            trend="neutral"
+            trendValue={0}
+            icon={TrendingDown}
+            color="danger"
+          />
+        )}
+        {stats.staffAdvanceTotal > 0 && (
+          <StatCard
+            title="Staff Advance"
+            value={`₹${stats.staffAdvanceTotal.toLocaleString()}`}
+            trend="neutral"
+            trendValue={0}
+            icon={Users}
             color="info"
           />
         )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Save, Calendar, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 const ExpensesPage = () => {
@@ -11,20 +11,50 @@ const ExpensesPage = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [cashBalance, setCashBalance] = useState(0);
 
   // Initial empty rows
   const [rows, setRows] = useState([]);
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [showStaffModal, setShowStaffModal] = useState(false);
+  
+  // Modal states
+  const [withdrawalAmount, setWithdrawalAmount] = useState('');
+  const [staffData, setStaffData] = useState({
+    employee_name: '',
+    amount: '',
+    reason: 'Advance Salary',
+    date: new Date().toISOString().split('T')[0]
+  });
 
   const reasons = [
     "Milk", "Vegetables", "Groceries", "Staff-Expense", "Electricity bill",
     "Gas", "Maintenance", "Other", "Cold Drink", "Paneer", "Momos",
     "Disposable", "Ice Cream", "Buns", "Void", "Home", "Raw material",
-    "Mozzarella cheese", "Blend"
+    "Mozzarella cheese", "Blend", "Cash Withdrawal", "Staff Advance"
+  ];
+
+  const staffAdvanceReasons = [
+    "Advance Salary", "Medical Emergency", "Travel/Petrol", "Incentive", "Personal Loan", "Bonus"
   ];
 
   useEffect(() => {
     fetchEmployees();
+    fetchCashBalance();
   }, []);
+
+  const fetchCashBalance = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const report = await window.electronAPI.invoke('reports:daily', { date: today });
+      if (report && report.sales) {
+        const cash = (report.sales.opening_balance || 0) + (report.sales.cash_amount || 0) - (report.sales.total_expenses || 0);
+        setCashBalance(cash);
+      }
+    } catch (error) {
+      console.error("Failed to fetch cash balance", error);
+    }
+  };
 
   // Initialize rows once employees are loaded (to get current user ID) or when date changes
   useEffect(() => {
@@ -62,6 +92,7 @@ const ExpensesPage = () => {
           amount: e.amount,
           explanation: e.explanation,
           employee_id: e.employee_id,
+          employee_name: e.employee_name,
           paid_from: e.paid_from
         }));
         
@@ -134,11 +165,82 @@ const ExpensesPage = () => {
         
         // Silent success
         fetchExistingExpenses(date);
+        fetchCashBalance(); // Refresh balance after save
     } catch (error) {
         console.error("Failed to save expenses", error);
         alert("Failed to save: " + error.message);
     } finally {
         setSaving(false);
+    }
+  };
+
+  const handleWithdrawalSave = async () => {
+    if (!withdrawalAmount || isNaN(withdrawalAmount) || withdrawalAmount <= 0) return;
+    
+    if (parseFloat(withdrawalAmount) > cashBalance) {
+      alert(`Insufficient Cash! Current Cash in Hand is ₹${cashBalance.toFixed(2)}. You cannot withdraw more than this.`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const expense = {
+        reason: 'Cash Withdrawal',
+        amount: parseFloat(withdrawalAmount),
+        explanation: 'Cash withdrawn from drawer',
+        employee_id: user?.id || '',
+        employee_name: user?.full_name || user?.username || 'Admin',
+        paid_from: 'cash',
+        date: new Date().toISOString().split('T')[0]
+      };
+      const result = await window.electronAPI.invoke('expenses:create', { expenses: [expense] });
+      setShowWithdrawalModal(false);
+      setWithdrawalAmount('');
+      fetchExistingExpenses(date);
+      fetchCashBalance();
+    } catch (error) {
+      alert("Failed to save withdrawal");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleStaffAdvanceSave = async () => {
+    if (!staffData.employee_name || !staffData.amount || isNaN(staffData.amount)) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    if (parseFloat(staffData.amount) > cashBalance) {
+      alert(`Insufficient Cash! Current Cash in Hand is ₹${cashBalance.toFixed(2)}. You cannot give advance more than this.`);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const expense = {
+        reason: 'Staff Advance',
+        amount: parseFloat(staffData.amount),
+        explanation: `Staff: ${staffData.employee_name} | Reason: ${staffData.reason}`,
+        employee_id: user?.id, // ID of who gave it
+        employee_name: staffData.employee_name, // Recipient Name
+        paid_from: 'cash',
+        date: staffData.date
+      };
+      await window.electronAPI.invoke('expenses:create', { expenses: [expense] });
+      setShowStaffModal(false);
+      setStaffData({
+        employee_name: '',
+        amount: '',
+        reason: 'Advance Salary',
+        date: new Date().toISOString().split('T')[0]
+      });
+      fetchExistingExpenses(date);
+      fetchCashBalance();
+    } catch (error) {
+      alert("Failed to save staff advance");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -164,6 +266,21 @@ const ExpensesPage = () => {
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-3)' }}>
+            <button 
+              onClick={() => setShowWithdrawalModal(true)}
+              className="btn btn-secondary"
+              style={{ background: 'var(--warning-50)', color: 'var(--warning-700)', borderColor: 'var(--warning-200)' }}
+            >
+              Cash Withdrawal
+            </button>
+            <button 
+              onClick={() => setShowStaffModal(true)}
+              className="btn btn-secondary"
+              style={{ background: 'var(--info-50)', color: 'var(--info-700)', borderColor: 'var(--info-200)' }}
+            >
+              Staff
+            </button>
+            
             {/* Total Badge */}
             <div className="card" style={{ padding: 'var(--spacing-2) var(--spacing-4)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', background: 'var(--primary-50)', border: '1px solid var(--primary-100)' }}>
                 <span style={{ color: 'var(--primary-700)', fontWeight: 600 }}>Total:</span>
@@ -263,9 +380,13 @@ const ExpensesPage = () => {
                 {/* Employee */}
                 <td style={{ padding: 'var(--spacing-2) var(--spacing-3)' }}>
                     {row.id ? (
-                        <div style={{ fontSize: 'var(--font-size-sm)' }}>
-                             {employees.find(e => e.id === row.employee_id)?.full_name || 'Unknown'}
-                        </div>
+                        row.reason === 'Staff Advance' || row.employee_name ? (
+                          <div style={{ fontWeight: 500 }}>{row.employee_name || 'Staff Member'}</div>
+                        ) : (
+                          <div style={{ fontSize: 'var(--font-size-sm)' }}>
+                            {employees.find(e => e.id === row.employee_id)?.full_name || 'Unknown'}
+                          </div>
+                        )
                     ) : (
                         <select 
                             className="input select"
@@ -316,20 +437,46 @@ const ExpensesPage = () => {
         </table>
       </div>
 
-      {/* Footer Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--spacing-6)', paddingBottom: 'var(--spacing-10)' }}>
+      {/* Premium Sticky Footer */}
+      <div style={{ 
+        position: 'sticky', 
+        bottom: 0, 
+        marginTop: 'var(--spacing-8)',
+        padding: 'var(--spacing-4) 0',
+        background: 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(10px)',
+        borderTop: '1px solid var(--gray-100)',
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        zIndex: 10,
+        margin: '0 -24px',
+        paddingLeft: '24px',
+        paddingRight: '24px'
+      }}>
         <button 
             onClick={handleAddRows}
             className="btn btn-secondary"
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              borderRadius: '12px',
+              fontWeight: 600,
+              background: 'white',
+              border: '1px solid var(--gray-200)',
+              boxShadow: 'var(--shadow-sm)'
+            }}
         >
-            <Plus size={16} />
-            Add 10 Rows
+            <Plus size={18} style={{ color: 'var(--primary-500)' }} />
+            Add More Rows
         </button>
 
         <div style={{ display: 'flex', gap: 'var(--spacing-3)' }}>
             <button 
                 onClick={() => navigate(-1)}
-                className="btn btn-secondary"
+                className="btn btn-ghost"
+                style={{ fontWeight: 600, borderRadius: '12px' }}
             >
                 Cancel
             </button>
@@ -337,13 +484,120 @@ const ExpensesPage = () => {
                 onClick={handleSave}
                 disabled={saving}
                 className="btn btn-primary"
-                style={{ minWidth: '150px' }}
+                style={{ 
+                  minWidth: '180px',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                  boxShadow: '0 4px 12px rgba(0, 150, 255, 0.25)'
+                }}
             >
-                <Save size={16} />
-                {saving ? 'Saving...' : 'Save Expenses'}
+                {saving ? (
+                  <RefreshCw size={18} className="animate-spin" />
+                ) : (
+                  <Save size={18} />
+                )}
+                {saving ? 'Saving...' : 'Save All Expenses'}
             </button>
         </div>
       </div>
+
+      {/* Cash Withdrawal Modal */}
+      {showWithdrawalModal && (
+        <div 
+          style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setShowWithdrawalModal(false)}
+        >
+          <div className="card" style={{ width: '400px', padding: '24px' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginBottom: '20px' }}>Cash Withdrawal</h3>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>Amount Withdrawal (₹)</label>
+              <input 
+                type="number"
+                className="input"
+                style={{ width: '100%', fontSize: '18px' }}
+                value={withdrawalAmount}
+                onChange={(e) => setWithdrawalAmount(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button className="btn btn-secondary" onClick={() => setShowWithdrawalModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleWithdrawalSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Confirm Withdrawal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Staff Advance Modal */}
+      {showStaffModal && (
+        <div 
+          style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
+          onClick={() => setShowStaffModal(false)}
+        >
+          <div className="card" style={{ width: '450px', padding: '24px' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginBottom: '20px' }}>Staff Advance</h3>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>Employee Name</label>
+              <input 
+                type="text"
+                className="input"
+                placeholder="Enter staff name..."
+                style={{ width: '100%' }}
+                value={staffData.employee_name}
+                onChange={(e) => setStaffData({...staffData, employee_name: e.target.value})}
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>Amount (₹)</label>
+              <input 
+                type="number"
+                className="input"
+                style={{ width: '100%' }}
+                value={staffData.amount}
+                onChange={(e) => setStaffData({...staffData, amount: e.target.value})}
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>Reason</label>
+              <select 
+                className="input select"
+                style={{ width: '100%' }}
+                value={staffData.reason}
+                onChange={(e) => setStaffData({...staffData, reason: e.target.value})}
+              >
+                {staffAdvanceReasons.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>Date</label>
+              <input 
+                type="date"
+                className="input"
+                style={{ width: '100%' }}
+                value={staffData.date}
+                onChange={(e) => setStaffData({...staffData, date: e.target.value})}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button className="btn btn-secondary" onClick={() => setShowStaffModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleStaffAdvanceSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Issue Advance'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
