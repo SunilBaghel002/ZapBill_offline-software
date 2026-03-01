@@ -67,6 +67,24 @@ const ShiftManager = ({ children }) => {
 };
 
 function App() {
+  // Apply system zoom on mount
+  React.useEffect(() => {
+    const applyZoom = async () => {
+      try {
+        const settings = await window.electronAPI.invoke('settings:getAll');
+        if (Array.isArray(settings)) {
+          const zoom = settings.find(s => s.key === 'system_zoom')?.value;
+          if (zoom && window.electronAPI?.setZoomFactor) {
+            window.electronAPI.setZoomFactor(parseFloat(zoom) / 100);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to apply zoom:', err);
+      }
+    };
+    applyZoom();
+  }, []);
+
   return (
     <ShiftProvider>
       <Router>
@@ -97,7 +115,7 @@ function App() {
               <Route path="orders" element={<OrdersPage />} />
               <Route path="kot" element={<KOTPage />} />
               <Route path="reports" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'biller', 'cashier']}>
                   <ReportsPage />
                 </ProtectedRoute>
               } />

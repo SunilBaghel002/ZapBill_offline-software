@@ -11,7 +11,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
-  IndianRupee
+  IndianRupee,
+  Monitor,
+  Plus,
+  Minus,
+  Check
 } from 'lucide-react';
 
 const SettingsPage = () => {
@@ -153,6 +157,7 @@ const SettingsPage = () => {
   const tabs = [
     { id: 'restaurant', label: 'Restaurant Info', icon: Store, desc: 'Name, address & details', color: 'var(--primary-500)', bg: 'var(--primary-50)' },
     { id: 'tax', label: 'Tax Settings', icon: IndianRupee, desc: 'Tax rates & configuration', color: 'var(--success-500)', bg: 'var(--success-50)' },
+    { id: 'display', label: 'Display', icon: Monitor, desc: 'Visual & zoom settings', color: '#6366f1', bg: '#eef2ff' },
     { id: 'import', label: 'Data Import', icon: Upload, desc: 'Import menu & inventory', color: 'var(--warning-600)', bg: 'var(--warning-50)' },
     { id: 'database', label: 'Database', icon: Database, desc: 'Storage & backup', color: 'var(--info-500)', bg: 'var(--info-50)' },
     { id: 'about', label: 'About', icon: Info, desc: 'System information', color: 'var(--gray-500)', bg: 'var(--gray-100)' }
@@ -482,6 +487,174 @@ const SettingsPage = () => {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeTab === 'display' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '32px', alignItems: 'start' }}>
+                <div style={{ display: 'grid', gap: '28px' }}>
+                  <div style={{ display: 'flex', gap: '14px', padding: '16px 20px', background: '#eef2ff', borderRadius: '12px', border: '1px solid #e0e7ff', alignItems: 'flex-start' }}>
+                    <Monitor size={22} style={{ color: '#6366f1', flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <strong style={{ color: '#4338ca', fontSize: '14px' }}>System Scale & Visibility</strong>
+                      <p style={{ color: '#6366f1', fontSize: '13px', marginTop: '4px', lineHeight: '1.5' }}>
+                        Customize the interface size to match your preference. This adjusts text, buttons, and layouts globally.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <h4 style={{ fontSize: '15px', fontWeight: '600', margin: 0 }}>Global Zoom</h4>
+                      <div style={{ background: 'var(--primary-50)', color: 'var(--primary-700)', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '700' }}>
+                        {settings.system_zoom || '100'}%
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+                      <button
+                        className="btn btn-secondary btn-icon"
+                        onClick={() => {
+                          const current = parseInt(settings.system_zoom || '100');
+                          const newVal = Math.max(80, current - 5);
+                          updateSetting('system_zoom', newVal.toString());
+                          if (window.electronAPI?.setZoomFactor) {
+                            window.electronAPI.setZoomFactor(newVal / 100);
+                          }
+                          // Save immediately to persist across refreshes
+                          window.electronAPI.invoke('settings:update', { key: 'system_zoom', value: newVal.toString() });
+                        }}
+                      >
+                        <Minus size={18} />
+                      </button>
+
+                      <div style={{ flex: 1, position: 'relative', height: '20px', display: 'flex', alignItems: 'center' }}>
+                        <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '4px', background: 'var(--gray-200)', borderRadius: '2px', transform: 'translateY(-50%)' }} />
+                        <div style={{ 
+                          position: 'absolute', top: '50%', left: 0, 
+                          width: `${((parseInt(settings.system_zoom || '100') - 80) / 70) * 100}%`, 
+                          height: '4px', background: 'var(--primary-500)', borderRadius: '2px', transform: 'translateY(-50%)' 
+                        }} />
+                        <input 
+                          type="range" 
+                          min="80" 
+                          max="150" 
+                          step="5"
+                          value={settings.system_zoom || '100'} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateSetting('system_zoom', val);
+                          if (window.electronAPI?.setZoomFactor) {
+                            window.electronAPI.setZoomFactor(parseInt(val) / 100);
+                          }
+                          // Save immediately to persist across refreshes
+                          window.electronAPI.invoke('settings:update', { key: 'system_zoom', value: val.toString() });
+                        }}
+                          style={{ 
+                            position: 'relative', width: '100%', height: '100%', opacity: 0, cursor: 'pointer', zIndex: 2
+                          }}
+                        />
+                        <div style={{ 
+                          position: 'absolute', top: '50%', 
+                          left: `${((parseInt(settings.system_zoom || '100') - 80) / 70) * 100}%`,
+                          width: '18px', height: '18px', background: 'white', border: '3px solid var(--primary-500)', 
+                          borderRadius: '50%', boxShadow: '0 2px 4px rgba(0,0,0,0.2)', transform: 'translate(-50%, -50%)', 
+                          pointerEvents: 'none', transition: 'left 0.1s ease-out'
+                        }} />
+                      </div>
+
+                      <button
+                        className="btn btn-secondary btn-icon"
+                        onClick={() => {
+                          const current = parseInt(settings.system_zoom || '100');
+                          const newVal = Math.min(150, current + 5);
+                          updateSetting('system_zoom', newVal.toString());
+                          if (window.electronAPI?.setZoomFactor) {
+                            window.electronAPI.setZoomFactor(newVal / 100);
+                          }
+                          // Save immediately to persist across refreshes
+                          window.electronAPI.invoke('settings:update', { key: 'system_zoom', value: newVal.toString() });
+                        }}
+                      >
+                        <Plus size={18} />
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                      {[80, 100, 120, 150].map(val => (
+                        <button
+                          key={val}
+                          onClick={() => {
+                            updateSetting('system_zoom', val.toString());
+                            if (window.electronAPI?.setZoomFactor) {
+                              window.electronAPI.setZoomFactor(val / 100);
+                            }
+                            // Save immediately to persist across refreshes
+                            window.electronAPI.invoke('settings:update', { key: 'system_zoom', value: val.toString() });
+                          }}
+                          style={{
+                            padding: '10px', borderRadius: '8px', border: '1px solid',
+                            borderColor: (settings.system_zoom || '100') == val ? 'var(--primary-500)' : 'var(--gray-200)',
+                            background: (settings.system_zoom || '100') == val ? 'var(--primary-50)' : 'white',
+                            color: (settings.system_zoom || '100') == val ? 'var(--primary-700)' : 'var(--gray-600)',
+                            fontSize: '13px', fontWeight: '500', cursor: 'pointer', transition: 'all 0.2s',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px'
+                          }}
+                        >
+                          <span style={{ fontSize: val == 80 ? '11px' : val == 150 ? '15px' : '13px' }}>Aa</span>
+                          {val}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '16px 20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px dashed var(--gray-300)', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <Info size={18} style={{ color: 'var(--gray-400)', flexShrink: 0 }} />
+                    <p style={{ fontSize: '13px', color: 'var(--gray-500)', margin: 0 }}>
+                      Scaling uses browser-native <strong>REM units</strong> for smooth transitions and crisp rendering.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Live Preview Side Panel */}
+                <div className="card" style={{ position: 'sticky', top: '24px' }}>
+                  <div className="card-header" style={{ padding: '14px 20px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--gray-700)' }}>Live Preview</span>
+                  </div>
+                  <div style={{ padding: '20px', background: 'var(--gray-50)' }}>
+                    <div style={{ 
+                      background: 'white', borderRadius: '12px', padding: '16px', boxShadow: 'var(--shadow-sm)',
+                      transform: 'scale(1)', transformOrigin: 'top center',
+                      display: 'flex', flexDirection: 'column', gap: '12px' 
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ height: '12px', width: '80px', background: 'var(--gray-200)', borderRadius: '6px' }} />
+                        <Check size={14} style={{ color: 'var(--success-500)' }} />
+                      </div>
+                      <div style={{ height: '32px', width: '100%', background: 'var(--primary-500)', borderRadius: '8px', display: 'flex', alignItems: 'center', padding: '0 12px' }}>
+                        <div style={{ height: '8px', width: '40%', background: 'rgba(255,255,255,0.3)', borderRadius: '4px' }} />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        <div style={{ height: '40px', background: 'var(--gray-100)', borderRadius: '8px' }} />
+                        <div style={{ height: '40px', background: 'var(--gray-100)', borderRadius: '8px' }} />
+                      </div>
+                      <p style={{ fontSize: '11px', color: 'var(--gray-400)', textAlign: 'center', margin: 0 }}>
+                        Current interface size example
+                      </p>
+                    </div>
+
+                    <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--gray-600)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Text Size</span>
+                        <span style={{ fontWeight: 600 }}>{Math.round((parseInt(settings.system_zoom || '100') / 100) * 16)}px</span>
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--gray-600)', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Button Height</span>
+                        <span style={{ fontWeight: 600 }}>{Math.round((parseInt(settings.system_zoom || '100') / 100) * 44)}px</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

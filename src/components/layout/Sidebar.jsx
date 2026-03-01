@@ -47,7 +47,7 @@ const Sidebar = () => {
       path: '/reports', 
       icon: BarChart3, 
       label: 'Reports', 
-      adminOnly: true,
+      adminOnly: false,
       children: [
         { path: '/reports?category=sales', label: 'Sales Reports' },
         { path: '/reports?category=inventory', label: 'Inventory Reports' },

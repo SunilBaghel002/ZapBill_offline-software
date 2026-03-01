@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 // Define valid channels for security
 const validInvokeChannels = [
@@ -181,6 +181,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeAllListeners(channel);
     }
   },
+
+  // Zoom factor
+  setZoomFactor: (factor) => {
+    if (typeof factor === 'number') {
+      webFrame.setZoomFactor(factor);
+    }
+  },
+  getZoomFactor: () => webFrame.getZoomFactor(),
 });
 
 // Expose platform info
