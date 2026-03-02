@@ -98,7 +98,8 @@ class Database {
       paid_from TEXT,
       date TEXT,
       created_at TEXT,
-      updated_at TEXT
+      updated_at TEXT,
+      is_deleted INTEGER DEFAULT 0
     )`);
 
     // Create shifts table
@@ -193,6 +194,13 @@ class Database {
         )
       `);
     } catch (error) { console.log('Migration note (order_payments):', error.message); }
+    
+    try {
+      // Add is_deleted to expenses if missing
+      this.db.run("ALTER TABLE expenses ADD COLUMN is_deleted INTEGER DEFAULT 0");
+    } catch (error) {
+      if (!error.message.includes("duplicate column name")) console.log('Migration note (expenses):', error.message);
+    }
 
     try {
       // Add is_deleted to order_items if missing
@@ -1874,7 +1882,7 @@ class Database {
         COALESCE(SUM(CASE WHEN reason = 'Cash Withdrawal' THEN amount ELSE 0 END), 0) as withdrawal_total,
         COALESCE(SUM(CASE WHEN reason = 'Staff Advance' THEN amount ELSE 0 END), 0) as staff_advance_total
       FROM expenses 
-      WHERE date = ?
+      WHERE date = ? AND is_deleted = 0
   `, [date]);
 
   // Day Opening Balance
@@ -1935,7 +1943,7 @@ class Database {
       COALESCE(SUM(CASE WHEN reason = 'Cash Withdrawal' THEN amount ELSE 0 END), 0) as withdrawal_total,
       COALESCE(SUM(CASE WHEN reason = 'Staff Advance' THEN amount ELSE 0 END), 0) as staff_advance_total
     FROM expenses 
-    WHERE date = ? AND employee_id = ?
+    WHERE date = ? AND employee_id = ? AND is_deleted = 0
   `, [date, userId]);
 
     const shifts = this.execute(`
@@ -2111,7 +2119,7 @@ class Database {
     const expenses = this.execute(`
       SELECT COALESCE(SUM(amount), 0) as total_expenses 
       FROM expenses 
-      WHERE date BETWEEN ? AND ?
+      WHERE date BETWEEN ? AND ? AND is_deleted = 0
     `, [startDate, endDate]);
 
     const totalExpenses = expenses[0]?.total_expenses || 0;
@@ -2260,6 +2268,7 @@ class Database {
       WHERE employee_id = ?
         AND created_at >= ?
         AND created_at <= ?
+        AND is_deleted = 0
     `, [shift.user_id, shift.start_time, endTime])[0];
 
     const totalRevenue = sales?.total_revenue || 0;
@@ -2504,7 +2513,7 @@ class Database {
   const weeklyExpenses = this.execute(`
     SELECT COALESCE(SUM(amount), 0) as total_expenses 
     FROM expenses 
-    WHERE date >= ? AND date < date(?, '+7 days')
+    WHERE date >= ? AND date < date(?, '+7 days') AND is_deleted = 0
   `, [startDate, startDate]);
 
   // Weekly Opening Balance
@@ -2614,7 +2623,7 @@ class Database {
   const monthlyExpenses = this.execute(`
     SELECT COALESCE(SUM(amount), 0) as total_expenses 
     FROM expenses 
-    WHERE strftime('%Y-%m', date) = ?
+    WHERE strftime('%Y-%m', date) = ? AND is_deleted = 0
   `, [monthStr]);
 
   // Monthly Opening Balance
@@ -2827,7 +2836,7 @@ class Database {
   }
 
   getExpensesByDate(date) {
-    return this.execute('SELECT * FROM expenses WHERE date = ? ORDER BY created_at ASC', [date]);
+    return this.execute('SELECT * FROM expenses WHERE date = ? AND is_deleted = 0 ORDER BY created_at ASC', [date]);
   }
 
   deleteExpense(id) {

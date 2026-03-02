@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { useCartStore } from '../stores/cartStore';
+import { useAlertStore } from '../stores/alertStore';
 import {
   ShoppingCart,
   Trash2,
@@ -229,6 +230,7 @@ const ConfirmOrderModal = ({ isOpen, onClose, onConfirm, total, itemsCount }) =>
 const POSPage = () => {
   const { user } = useAuthStore();
   const cart = useCartStore();
+  const { showAlert } = useAlertStore();
 
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
@@ -289,18 +291,8 @@ const POSPage = () => {
   const removeSplitPaymentMethod = (index) => setSplitPayments(splitPayments.filter((_, i) => i !== index));
 
   // Use global alert from window
-  const showAlert = (message, type = 'info', onConfirm = null) => {
-    if (window.showAlert) {
-      window.showAlert(message, type, onConfirm);
-    } else {
-      console.error('Global showAlert not initialized');
-      // fallback to native if really necessary, but we should avoid it
-      if (type === 'confirm') {
-        if (window.confirm(message)) onConfirm && onConfirm();
-      } else {
-        alert(message);
-      }
-    }
+  const triggerAlert = (message, type = 'info', onConfirm = null) => {
+    showAlert(message, type, onConfirm);
   };
 
   const checkCustomerDue = async (phone) => {
@@ -1704,13 +1696,6 @@ const POSPage = () => {
         itemsCount={cart.items.reduce((acc, item) => acc + item.quantity, 0)}
       />
 
-      <CustomAlert 
-        isOpen={alertState.isOpen}
-        message={alertState.message}
-        type={alertState.type}
-        onClose={closeAlert}
-        onConfirm={alertState.onConfirm}
-      />
 
     </div>
   );
@@ -2420,6 +2405,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   const cart = useCartStore();
+  const { showAlert } = useAlertStore(); // Destructure showAlert here
 
   // Lookup customer history when phone number changes
   const lookupCustomerHistory = async (phone) => {
@@ -2468,7 +2454,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
   const handleConfirmCashPayment = () => {
     const received = parseFloat(amountReceived) || 0;
     if (received < total) {
-      window.showAlert('Insufficient amount received');
+      showAlert('Insufficient amount received');
       return;
     }
     handlePayment('cash');
@@ -2512,7 +2498,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
       }
     } catch (error) {
       console.error('Payment error:', error);
-      window.showAlert('Payment failed: ' + error.message);
+      showAlert('Payment failed: ' + error.message);
     } finally {
       setIsProcessing(false);
     }
@@ -2526,7 +2512,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
       setShowBillPreview(true);
     } catch (error) {
       console.error('Failed to load order:', error);
-      window.showAlert('Failed to load bill: ' + error.message);
+      showAlert('Failed to load bill: ' + error.message);
     }
   };
 
@@ -2534,11 +2520,18 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
   const handleReprintBill = async () => {
     try {
       const order = await window.electronAPI.invoke('order:getById', { id: orderId });
-      await window.electronAPI.invoke('print:receipt', { order });
-      window.showAlert('Bill reprinted successfully!');
+      if (!order) {
+        showAlert('Failed to load bill: ' + 'Order not found');
+        return;
+      }
+      const result = await window.electronAPI.invoke('print:receipt', { order }); // Changed to print:receipt
+      if (result.success) {
+        showAlert('Bill reprinted successfully!');
+      } else {
+        showAlert('Failed to print: ' + result.error);
+      }
     } catch (error) {
-      console.error('Failed to print:', error);
-      window.showAlert('Failed to print: ' + error.message);
+      showAlert('Failed to print: ' + error.message);
     }
   };
 
