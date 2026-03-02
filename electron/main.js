@@ -253,6 +253,21 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('print:summaryReport', async (event, { date }) => {
+    try {
+      const reportData = db.getDailyReport(date);
+      const settingsResult = db.getSettings();
+      const settingsObj = {};
+      settingsResult.forEach(row => { settingsObj[row.key] = row.value; });
+      
+      const printerName = settingsObj.printer_bill || null;
+      return await printerService.printSummaryReport(reportData, date, printerName);
+    } catch (error) {
+      log.error('Print summary report error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // ============ MENU OPERATIONS ============
   ipcMain.handle('menu:getCategories', async () => {
     try {
@@ -1155,6 +1170,27 @@ function setupIpcHandlers() {
     catch (e) { log.error('Save category map error:', e); return { success: false, error: e.message }; }
   });
 
+  // ============ KOT ITEM EXCLUSION ============
+  ipcMain.handle('printer:getKotExcludedItems', async () => {
+    try { return db.getKotExcludedItems(); }
+    catch (e) { log.error('Get KOT excluded items error:', e); return []; }
+  });
+
+  ipcMain.handle('printer:toggleKotExcludedItem', async (event, { itemId, excluded }) => {
+    try { return db.toggleKotExcludedItem(itemId, excluded); }
+    catch (e) { log.error('Toggle KOT excluded item error:', e); return { success: false, error: e.message }; }
+  });
+
+  ipcMain.handle('printer:saveKotExcludedItems', async (event, { itemIds }) => {
+    try { return db.saveKotExcludedItems(itemIds); }
+    catch (e) { log.error('Save KOT excluded items error:', e); return { success: false, error: e.message }; }
+  });
+
+  ipcMain.handle('printer:getMenuItemsByCategory', async () => {
+    try { return db.getMenuItemsWithKotStatus(); }
+    catch (e) { log.error('Get menu items with KOT status error:', e); return []; }
+  });
+
   ipcMain.handle('kot:log', async (event, data) => {
     try { return db.logKOT(data); }
     catch (e) { log.error('Log KOT error:', e); return { success: false, error: e.message }; }
@@ -1179,8 +1215,8 @@ function setupIpcHandlers() {
     }
   });
 
-  // ============ ROUTED KOT + BILL SIMULTANEOUS PRINTING ============
-  // Sends bill to bill printer AND routes KOTs to kitchen station printers concurrently
+  // ============ ROUTED KOT + BILL SMART PRINTING ============
+  // Uses smartPrint to handle same-printer scenarios (bill first, then KOT with separation)
   ipcMain.handle('print:kotRouted', async (event, { order, items, printBill = false }) => {
     try {
       const settingsRows = db.execute('SELECT * FROM settings');
@@ -1206,36 +1242,31 @@ function setupIpcHandlers() {
         currencySymbol: settings.currency_symbol || '₹'
       };
 
-      // Get station mapping
+      // Get station mapping and excluded items
       const categoryMap = db.getCategoryStationMap();
       const defaultKotPrinter = settings.printer_kot;
+      const billPrinterName = settings.printer_bill;
       const attachBill = settings.kot_attach_bill !== 'false';
+      
+      // Get KOT-excluded item IDs
+      let excludedItemIds = [];
+      try {
+        excludedItemIds = db.getKotExcludedItems().map(r => r.item_id);
+      } catch (e) { /* table may not exist yet */ }
 
-      const printJobs = [];
-
-      // 1. Route KOTs to kitchen station printers
-      printJobs.push(
-        printerService.printStationKOTs(enrichedOrder, items, categoryMap, defaultKotPrinter, attachBill)
-          .catch(err => ({ success: false, error: err.message, type: 'kot' }))
+      // Use smartPrint which handles same-printer separation automatically
+      const result = await printerService.smartPrint(
+        enrichedOrder,
+        items,
+        categoryMap,
+        defaultKotPrinter,
+        attachBill,
+        billPrinterName,
+        printBill,
+        excludedItemIds
       );
 
-      // 2. Simultaneously print customer receipt if requested
-      if (printBill && settings.printer_bill) {
-        printJobs.push(
-          printerService.printReceipt(enrichedOrder, settings.printer_bill)
-            .catch(err => ({ success: false, error: err.message, type: 'receipt' }))
-        );
-      }
-
-      const results = await Promise.allSettled(printJobs);
-      const failures = results.filter(r => r.status === 'rejected' || (r.value && !r.value.success));
-
-      return {
-        success: true,
-        kotResult: results[0]?.value,
-        receiptResult: printBill ? results[1]?.value : null,
-        failures: failures.length
-      };
+      return result;
     } catch (e) {
       log.error('Print KOT routed error:', e);
       return { success: false, error: e.message };

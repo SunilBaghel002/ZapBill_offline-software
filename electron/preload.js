@@ -103,12 +103,17 @@ const validInvokeChannels = [
   'print:voidKOT',
   'print:reprint',
   'print:selectLogo',
+  'print:summaryReport',
   // Printer Stations & KOT
   'printer:getStations',
   'printer:saveStation',
   'printer:deleteStation',
   'printer:getCategoryMap',
   'printer:saveCategoryMap',
+  'printer:getKotExcludedItems',
+  'printer:toggleKotExcludedItem',
+  'printer:saveKotExcludedItems',
+  'printer:getMenuItemsByCategory',
   'kot:log',
   'kot:getLogs',
   // Settings

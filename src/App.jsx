@@ -20,6 +20,8 @@ import DiscountsPage from './pages/DiscountsPage';
 
 // Components
 import Layout from './components/common/Layout';
+import CustomAlert from './components/ui/CustomAlert';
+import { useAlertStore } from './stores/alertStore';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
@@ -85,8 +87,23 @@ function App() {
     applyZoom();
   }, []);
 
+  const { isOpen, message, type, onConfirm, hideAlert, showAlert } = useAlertStore();
+
+  // Expose showAlert globally to replace window.alert
+  React.useEffect(() => {
+    window.showAlert = showAlert;
+  }, [showAlert]);
+
   return (
-    <ShiftProvider>
+    <>
+      <CustomAlert 
+        isOpen={isOpen}
+        message={message}
+        type={type}
+        onClose={hideAlert}
+        onConfirm={onConfirm}
+      />
+      <ShiftProvider>
       <Router>
         <ShiftManager>
           <Routes>
@@ -152,6 +169,7 @@ function App() {
         </ShiftManager>
       </Router>
     </ShiftProvider>
+    </>
   );
 }
 

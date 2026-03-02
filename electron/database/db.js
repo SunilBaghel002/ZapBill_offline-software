@@ -1820,7 +1820,11 @@ class Database {
         COALESCE(SUM(CASE WHEN payment_method = 'mixed' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) as mixed_amount,
         
         COALESCE(SUM(CASE WHEN payment_method = 'due' AND status IN ('completed', 'active') THEN total_amount ELSE 0 END), 0) +
-        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'due' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') = ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as due_amount
+        COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'due' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') = ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as due_amount,
+        
+        COALESCE(SUM(CASE WHEN order_type = 'dine_in' AND status != 'cancelled' THEN total_amount ELSE 0 END), 0) as dine_in_amount,
+        COALESCE(SUM(CASE WHEN order_type = 'takeaway' AND status != 'cancelled' THEN total_amount ELSE 0 END), 0) as takeaway_amount,
+        COALESCE(SUM(CASE WHEN order_type = 'delivery' AND status != 'cancelled' THEN total_amount ELSE 0 END), 0) as delivery_amount
         
       FROM orders 
       WHERE DATE(created_at, 'localtime') = ? 
@@ -3219,6 +3223,59 @@ class Database {
     `, categoryIds);
   }
 
+  // --- KOT Item Exclusion ---
+  getKotExcludedItems() {
+    return this.execute(`SELECT item_id FROM kot_excluded_items`);
+  }
+
+  toggleKotExcludedItem(itemId, excluded) {
+    if (excluded) {
+      this.run(`INSERT OR IGNORE INTO kot_excluded_items (item_id) VALUES (?)`, [itemId]);
+    } else {
+      this.run(`DELETE FROM kot_excluded_items WHERE item_id = ?`, [itemId]);
+    }
+    this.save();
+    return { success: true };
+  }
+
+  saveKotExcludedItems(itemIds) {
+    this.run(`DELETE FROM kot_excluded_items`);
+    for (const itemId of itemIds) {
+      this.run(`INSERT INTO kot_excluded_items (item_id) VALUES (?)`, [itemId]);
+    }
+    this.save();
+    return { success: true };
+  }
+
+  getMenuItemsWithKotStatus() {
+    // Get categories with their items and KOT exclusion status
+    const categories = this.execute(`
+      SELECT id, name FROM categories WHERE is_deleted = 0 ORDER BY display_order, name
+    `);
+
+    const excludedIds = new Set(
+      this.execute(`SELECT item_id FROM kot_excluded_items`).map(r => r.item_id)
+    );
+
+    const result = [];
+    for (const cat of categories) {
+      const items = this.execute(`
+        SELECT id, name, price, is_vegetarian FROM menu_items 
+        WHERE category_id = ? AND is_deleted = 0 AND is_available = 1 
+        ORDER BY display_order, name
+      `, [cat.id]);
+
+      result.push({
+        ...cat,
+        items: items.map(item => ({
+          ...item,
+          kot_excluded: excludedIds.has(item.id)
+        }))
+      });
+    }
+    return result;
+  }
+
   // Ensure new tables exist (called during init for migration of existing databases)
   ensurePrintingTables() {
     this.run(`CREATE TABLE IF NOT EXISTS printer_stations (
@@ -3245,6 +3302,12 @@ class Database {
       printed_at TEXT DEFAULT CURRENT_TIMESTAMP,
       printed_by TEXT REFERENCES users(id),
       notes TEXT
+    )`);
+
+    // KOT excluded items table (items that should NOT be sent to kitchen)
+    this.run(`CREATE TABLE IF NOT EXISTS kot_excluded_items (
+      item_id TEXT PRIMARY KEY REFERENCES menu_items(id),
+      excluded_at TEXT DEFAULT CURRENT_TIMESTAMP
     )`);
 
     // Ensure KOT sequence exists

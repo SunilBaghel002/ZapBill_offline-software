@@ -121,7 +121,7 @@ const MenuPage = () => {
         loadData();
         if (selectedCategory === id) setSelectedCategory(null);
       } else {
-        alert(result.error);
+        window.showAlert(result.error);
       }
     }
   };
@@ -467,7 +467,7 @@ const CategoryModal = ({ category, onClose, onSave }) => {
       onSave();
     } catch (error) {
       console.error(error);
-      alert('Failed to save category');
+      window.showAlert('Failed to save category');
     } finally {
       setIsSaving(false);
     }
@@ -624,7 +624,7 @@ const ItemModal = ({ item, categories, onClose, onSave, globalAddons, onRefreshA
       onSave();
     } catch (error) {
       console.error('Save failed:', error);
-      alert('Failed to save item');
+      window.showAlert('Failed to save item');
     } finally {
       setIsSaving(false);
     }
@@ -633,7 +633,7 @@ const ItemModal = ({ item, categories, onClose, onSave, globalAddons, onRefreshA
   const addVariant = (name) => {
     // Check dupes
     if (formData.variants.some(v => v.name === name)) {
-      alert('Variant already exists');
+      window.showAlert('Variant already exists');
       return;
     }
 
@@ -647,7 +647,7 @@ const ItemModal = ({ item, categories, onClose, onSave, globalAddons, onRefreshA
     let nameToAdd = variantType;
     if (variantType === 'Custom') {
       if (!customVariantName.trim()) {
-        alert('Please enter a variant name');
+        window.showAlert('Please enter a variant name');
         return;
       }
       nameToAdd = customVariantName;
@@ -674,7 +674,7 @@ const ItemModal = ({ item, categories, onClose, onSave, globalAddons, onRefreshA
 
   const addGlobalAddon = (globalAddon) => {
     if (formData.addons.some(a => a.name === globalAddon.name)) {
-      alert('This add-on is already added');
+      window.showAlert('This add-on is already added');
       return;
     }
     setFormData({
@@ -1160,7 +1160,7 @@ const MenuManagerModal = ({ menus, activeMenu, onClose, onRefresh }) => {
       setNewMenuName('');
       onRefresh();
     } catch (error) {
-      alert('Failed to create menu profile');
+      window.showAlert('Failed to create menu profile');
     } finally {
       setIsCreating(false);
     }
@@ -1171,7 +1171,7 @@ const MenuManagerModal = ({ menus, activeMenu, onClose, onRefresh }) => {
       await window.electronAPI.invoke('menu:setActiveMenu', { id });
       onRefresh();
     } catch (error) {
-      alert('Failed to switch menu profile');
+      window.showAlert('Failed to switch menu profile');
     }
   };
 
@@ -1182,13 +1182,13 @@ const MenuManagerModal = ({ menus, activeMenu, onClose, onRefresh }) => {
       await window.electronAPI.invoke('menu:duplicateMenu', { id, name: newName });
       onRefresh();
     } catch (error) {
-      alert('Failed to duplicate menu profile');
+      window.showAlert('Failed to duplicate menu profile');
     }
   };
 
   const handleDelete = async (id, name, isActive) => {
     if (isActive) {
-      alert('Cannot delete the active menu profile.');
+      window.showAlert('Cannot delete the active menu profile.');
       return;
     }
     if (window.confirm(`Are you sure you want to delete the menu profile "${name}"? This will delete all its categories and items.`)) {
@@ -1196,7 +1196,7 @@ const MenuManagerModal = ({ menus, activeMenu, onClose, onRefresh }) => {
         await window.electronAPI.invoke('menu:deleteMenu', { id });
         onRefresh();
       } catch (error) {
-        alert('Failed to delete menu profile');
+        window.showAlert('Failed to delete menu profile');
       }
     }
   };
@@ -1329,7 +1329,7 @@ const AddonModal = ({ addon, onClose, onSave }) => {
       onSave();
     } catch (error) {
       console.error('Save failed:', error);
-      alert('Failed to save add-on');
+      window.showAlert('Failed to save add-on');
     } finally {
       setIsSaving(false);
     }
@@ -1574,7 +1574,7 @@ const MasterAddonEditModal = ({ masterAddon, globalAddons, onClose, onSave }) =>
   const handleSave = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      alert('Please enter a group name');
+      window.showAlert('Please enter a group name');
       return;
     }
     
@@ -1591,7 +1591,7 @@ const MasterAddonEditModal = ({ masterAddon, globalAddons, onClose, onSave }) =>
       });
       onSave();
     } catch (error) {
-      alert('Failed to save Master Add-on: ' + error.message);
+      window.showAlert('Failed to save Master Add-on: ' + error.message);
     } finally {
       setIsSaving(false);
     }

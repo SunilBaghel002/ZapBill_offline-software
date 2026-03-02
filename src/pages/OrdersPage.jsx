@@ -139,7 +139,7 @@ const OrdersPage = () => {
         loadOrders();
       } catch (error) {
         console.error('Failed to delete order:', error);
-        alert('Failed to delete order: ' + error.message);
+        window.showAlert('Failed to delete order: ' + error.message);
       }
     }
   };
@@ -148,10 +148,10 @@ const OrdersPage = () => {
     try {
       const fullOrder = await window.electronAPI.invoke('order:getById', { id: order.id });
       await window.electronAPI.invoke('print:receipt', { order: fullOrder });
-      alert('Bill printed successfully!');
+      window.showAlert('Bill printed successfully!');
     } catch (error) {
       console.error('Failed to print:', error);
-      alert('Failed to print: ' + error.message);
+      window.showAlert('Failed to print: ' + error.message);
     }
   };
 
@@ -483,7 +483,7 @@ const CompleteOrderModal = ({ order, onClose, onComplete }) => {
       onComplete();
     } catch (error) {
       console.error('Failed to complete order:', error);
-      alert('Failed to complete order: ' + error.message);
+      window.showAlert('Failed to complete order: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -648,7 +648,7 @@ const OrderEditModal = ({ order, onClose, onSave }) => {
     if (items.length > 1) {
       setItems(items.filter((_, i) => i !== index));
     } else {
-      alert('Order must have at least one item');
+      window.showAlert('Order must have at least one item');
     }
   };
 
@@ -672,7 +672,7 @@ const OrderEditModal = ({ order, onClose, onSave }) => {
       onSave();
     } catch (error) {
       console.error('Update failed:', error);
-      alert('Failed to update order: ' + error.message);
+      window.showAlert('Failed to update order: ' + error.message);
     } finally {
       setIsSaving(false);
     }

@@ -280,6 +280,12 @@ CREATE TABLE IF NOT EXISTS category_station_map (
     PRIMARY KEY (category_id, station_id)
 );
 
+-- KOT Excluded Items (items that should NOT be sent to kitchen, only appear on bill)
+CREATE TABLE IF NOT EXISTS kot_excluded_items (
+    item_id TEXT PRIMARY KEY REFERENCES menu_items(id),
+    excluded_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 -- KOT Log (track every KOT printed — supports reprint, void, numbering)
 CREATE TABLE IF NOT EXISTS kot_logs (
     id TEXT PRIMARY KEY,

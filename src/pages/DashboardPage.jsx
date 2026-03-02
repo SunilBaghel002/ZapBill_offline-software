@@ -16,7 +16,8 @@ import {
   BarChart3,
   ShoppingBag,
   ArrowUpRight,
-  Plus
+  Plus,
+  Printer
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -29,6 +30,7 @@ import {
 } from 'recharts';
 import { format, subDays } from 'date-fns';
 import { useAuthStore } from '../stores/authStore';
+import { useAlertStore } from '../stores/alertStore';
 import { Link } from 'react-router-dom';
 
 // StatCard Component
@@ -373,6 +375,7 @@ const AddBalanceModal = ({ isOpen, onClose, onAdd }) => {
 
 
 const DashboardPage = () => {
+  const { showAlert } = useAlertStore();
   const [stats, setStats] = useState({
     todayRevenue: 0,
     todayExpenses: 0,
@@ -408,11 +411,11 @@ const DashboardPage = () => {
         setShowAddBalanceModal(false);
         await loadDashboardData();
       } else {
-        alert(result.error || 'Failed to add balance');
+        showAlert(result.error || 'Failed to add balance', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to add balance');
+      showAlert('Failed to add balance', 'error');
     }
   };
 
@@ -602,6 +605,22 @@ const DashboardPage = () => {
         <div style={{ display: 'flex', gap: '12px' }}>
           <button className="btn btn-secondary" onClick={() => setShowAddBalanceModal(true)} style={{ borderRadius: '12px', padding: '10px 16px', background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}>
             <Wallet size={18} /> Add Cash
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={async () => {
+              try {
+                const today = format(new Date(), 'yyyy-MM-dd');
+                const result = await window.electronAPI.invoke('print:summaryReport', { date: today });
+                if (result.success) showAlert('Summary report sent to printer!', 'success');
+                else showAlert('Print failed: ' + (result.error || 'Unknown error'), 'error');
+              } catch (err) {
+                showAlert('Error: ' + err.message, 'error');
+              }
+            }} 
+            style={{ borderRadius: '12px', padding: '10px 16px', background: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }}
+          >
+            <Printer size={18} /> Print Summary
           </button>
           <button className="btn btn-secondary" onClick={loadDashboardData} style={{ borderRadius: '12px', padding: '10px 16px' }}>
             <Clock size={18} /> Refresh

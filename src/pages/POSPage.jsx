@@ -48,7 +48,6 @@ import {
   Star
 } from 'lucide-react';
 import MainSidebar from '../components/layout/MainSidebar';
-import CustomAlert from '../components/ui/CustomAlert';
 import logoImg from '../assets/logo.png';
 import '../styles/pos-sheet.css';
 
@@ -289,25 +288,19 @@ const POSPage = () => {
   const addSplitPaymentMethod = () => setSplitPayments([...splitPayments, { method: 'card', amount: '' }]);
   const removeSplitPaymentMethod = (index) => setSplitPayments(splitPayments.filter((_, i) => i !== index));
 
-  // Custom Alert State
-  const [alertState, setAlertState] = useState({
-    isOpen: false,
-    message: '',
-    type: 'info', // success, error, info, warning, confirm
-    onConfirm: null
-  });
-
+  // Use global alert from window
   const showAlert = (message, type = 'info', onConfirm = null) => {
-    setAlertState({
-      isOpen: true,
-      message,
-      type,
-      onConfirm
-    });
-  };
-
-  const closeAlert = () => {
-    setAlertState(prev => ({ ...prev, isOpen: false }));
+    if (window.showAlert) {
+      window.showAlert(message, type, onConfirm);
+    } else {
+      console.error('Global showAlert not initialized');
+      // fallback to native if really necessary, but we should avoid it
+      if (type === 'confirm') {
+        if (window.confirm(message)) onConfirm && onConfirm();
+      } else {
+        alert(message);
+      }
+    }
   };
 
   const checkCustomerDue = async (phone) => {
@@ -497,9 +490,9 @@ const POSPage = () => {
 
   const handleNewOrder = () => {
     if (cart.items.length > 0) {
-      if (window.confirm('Clear current order?')) {
+      showAlert('Clear current order?', 'confirm', () => {
         cart.clearCart();
-      }
+      });
     } else {
       cart.clearCart();
     }
@@ -2475,7 +2468,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
   const handleConfirmCashPayment = () => {
     const received = parseFloat(amountReceived) || 0;
     if (received < total) {
-      alert('Insufficient amount received');
+      window.showAlert('Insufficient amount received');
       return;
     }
     handlePayment('cash');
@@ -2519,7 +2512,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
       }
     } catch (error) {
       console.error('Payment error:', error);
-      alert('Payment failed: ' + error.message);
+      window.showAlert('Payment failed: ' + error.message);
     } finally {
       setIsProcessing(false);
     }
@@ -2533,7 +2526,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
       setShowBillPreview(true);
     } catch (error) {
       console.error('Failed to load order:', error);
-      alert('Failed to load bill: ' + error.message);
+      window.showAlert('Failed to load bill: ' + error.message);
     }
   };
 
@@ -2542,10 +2535,10 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
     try {
       const order = await window.electronAPI.invoke('order:getById', { id: orderId });
       await window.electronAPI.invoke('print:receipt', { order });
-      alert('Bill reprinted successfully!');
+      window.showAlert('Bill reprinted successfully!');
     } catch (error) {
       console.error('Failed to print:', error);
-      alert('Failed to print: ' + error.message);
+      window.showAlert('Failed to print: ' + error.message);
     }
   };
 

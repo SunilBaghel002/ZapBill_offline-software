@@ -15,10 +15,15 @@ import {
   RefreshCw,
   Info,
   Workflow,
-  X
+  X,
+  Package,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
+import { useAlertStore } from '../stores/alertStore';
 
 const PrintersPage = () => {
+  const { showAlert } = useAlertStore();
   const [settings, setSettings] = useState({});
   const [printers, setPrinters] = useState([]);
   const [stations, setStations] = useState([]);
@@ -28,12 +33,25 @@ const PrintersPage = () => {
   const [printerTab, setPrinterTab] = useState('bill');
   const [newStation, setNewStation] = useState({ station_name: '', printer_name: '' });
   const [showAddStation, setShowAddStation] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingStationId, setEditingStationId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [testingPrinter, setTestingPrinter] = useState(null);
+  
+  // KOT Items exclusion state
+  const [kotMenuData, setKotMenuData] = useState([]);
+  const [expandedCategories, setExpandedCategories] = useState(new Set());
+  const [kotItemsLoading, setKotItemsLoading] = useState(false);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (printerTab === 'kotitems' && kotMenuData.length === 0) {
+      loadKotMenuData();
+    }
+  }, [printerTab]);
 
   const loadData = async () => {
     try {
@@ -75,10 +93,10 @@ const PrintersPage = () => {
     setTestingPrinter(printerName);
     try {
       const result = await window.electronAPI.invoke('print:testPrint', { printerName });
-      if (result.success) alert('✅ Test print sent successfully!');
-      else alert('❌ Print failed: ' + (result.error || 'Unknown error'));
+      if (result.success) showAlert('Test print sent successfully!', 'success');
+      else showAlert('Print failed: ' + (result.error || 'Unknown error'), 'error');
     } catch (error) {
-      alert('❌ Print failed: ' + error.message);
+      showAlert('Print failed: ' + error.message, 'error');
     } finally {
       setTestingPrinter(null);
     }
@@ -86,27 +104,47 @@ const PrintersPage = () => {
 
   const handleAddStation = async () => {
     if (!newStation.station_name || !newStation.printer_name) {
-      alert('Please enter station name and select a printer');
+      showAlert('Please enter station name and select a printer', 'warning');
       return;
     }
     try {
-      await window.electronAPI.invoke('printer:saveStation', { station: newStation });
+      const stationData = isEditing 
+        ? { ...newStation, id: editingStationId }
+        : newStation;
+        
+      await window.electronAPI.invoke('printer:saveStation', { station: stationData });
       setNewStation({ station_name: '', printer_name: '' });
       setShowAddStation(false);
+      setIsEditing(false);
+      setEditingStationId(null);
       const updated = await window.electronAPI.invoke('printer:getStations');
       setStations(updated || []);
     } catch (e) { console.error(e); }
   };
 
+  const handleEditStation = (station) => {
+    setNewStation({ 
+      station_name: station.station_name, 
+      printer_name: station.printer_name 
+    });
+    setEditingStationId(station.id);
+    setIsEditing(true);
+    setShowAddStation(true);
+  };
+
   const handleDeleteStation = async (id) => {
-    if (!confirm('Delete this station? This will remove its category assignments.')) return;
-    try {
-      await window.electronAPI.invoke('printer:deleteStation', { id });
-      const updated = await window.electronAPI.invoke('printer:getStations');
-      setStations(updated || []);
-      const mapUpdated = await window.electronAPI.invoke('printer:getCategoryMap');
-      setCategoryMap(mapUpdated || []);
-    } catch (e) { console.error(e); }
+    showAlert('Delete this station? This will remove its category assignments.', 'confirm', async () => {
+      try {
+        await window.electronAPI.invoke('printer:deleteStation', { id });
+        const updated = await window.electronAPI.invoke('printer:getStations');
+        setStations(updated || []);
+        const mapUpdated = await window.electronAPI.invoke('printer:getCategoryMap');
+        setCategoryMap(mapUpdated || []);
+      } catch (e) {
+        console.error(e);
+        showAlert('Failed to delete station: ' + e.message, 'error');
+      }
+    });
   };
 
   const handleToggleCategoryStation = async (categoryId, stationId) => {
@@ -129,6 +167,58 @@ const PrintersPage = () => {
         updateSetting('bill_logo_path', result.base64);
       }
     } catch (e) { console.error(e); }
+  };
+
+  // KOT Items exclusion handlers
+  const loadKotMenuData = async () => {
+    setKotItemsLoading(true);
+    try {
+      const data = await window.electronAPI.invoke('printer:getMenuItemsByCategory');
+      setKotMenuData(data || []);
+    } catch (e) { console.error(e); }
+    finally { setKotItemsLoading(false); }
+  };
+
+  const handleToggleKotItem = async (itemId, currentExcluded) => {
+    // Optimistic update
+    setKotMenuData(prev => prev.map(cat => ({
+      ...cat,
+      items: cat.items.map(item => 
+        item.id === itemId ? { ...item, kot_excluded: !currentExcluded } : item
+      )
+    })));
+    try {
+      await window.electronAPI.invoke('printer:toggleKotExcludedItem', { itemId, excluded: !currentExcluded });
+    } catch (e) { 
+      console.error(e);
+      loadKotMenuData(); // revert on error
+    }
+  };
+
+  const handleToggleKotCategory = async (categoryId) => {
+    const cat = kotMenuData.find(c => c.id === categoryId);
+    if (!cat || cat.items.length === 0) return;
+    const allExcluded = cat.items.every(i => i.kot_excluded);
+    const newExcluded = !allExcluded;
+    
+    // Optimistic update
+    setKotMenuData(prev => prev.map(c => c.id === categoryId ? {
+      ...c,
+      items: c.items.map(item => ({ ...item, kot_excluded: newExcluded }))
+    } : c));
+
+    // Batch update via save
+    try {
+      const allData = kotMenuData.map(c => c.id === categoryId ? {
+        ...c,
+        items: c.items.map(item => ({ ...item, kot_excluded: newExcluded }))
+      } : c);
+      const excludedIds = allData.flatMap(c => c.items.filter(i => i.kot_excluded).map(i => i.id));
+      await window.electronAPI.invoke('printer:saveKotExcludedItems', { itemIds: excludedIds });
+    } catch (e) { 
+      console.error(e);
+      loadKotMenuData();
+    }
   };
 
   // Toggle Switch Component
@@ -165,6 +255,7 @@ const PrintersPage = () => {
     { id: 'kot', label: 'KOT Printer', icon: ChefHat, desc: 'Default kitchen printer', color: 'var(--warning-600)', bg: 'var(--warning-50)' },
     { id: 'stations', label: 'Kitchen Stations', icon: Store, desc: 'Station routing & printers', color: 'var(--info-500)', bg: 'var(--info-50)' },
     { id: 'format', label: 'Bill Format', icon: FileText, desc: 'Logo, QR & invoice options', color: 'var(--gray-600)', bg: 'var(--gray-100)' },
+    { id: 'kotitems', label: 'KOT Items', icon: Package, desc: 'Exclude items from KOT', color: '#D32F2F', bg: '#FFEBEE' },
     { id: 'flow', label: 'Print Flow', icon: Workflow, desc: 'How printing works', color: 'var(--primary-500)', bg: 'var(--primary-50)' }
   ];
 
@@ -574,7 +665,11 @@ const PrintersPage = () => {
                       Create stations (e.g., Bar, Tandoor, Chinese) and assign menu categories to route KOTs to separate kitchen printers.
                     </p>
                   </div>
-                  <button className="btn btn-primary" onClick={() => setShowAddStation(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-primary" onClick={() => {
+                    setNewStation({ station_name: '', printer_name: '' });
+                    setIsEditing(false);
+                    setShowAddStation(true);
+                  }} style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
                     <Plus size={16} /> Add Station
                   </button>
                 </div>
@@ -583,8 +678,13 @@ const PrintersPage = () => {
                 {showAddStation && (
                   <div style={{ padding: '20px', background: 'var(--primary-50)', borderRadius: '12px', border: '1px solid var(--primary-200)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h4 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--primary-700)', margin: 0 }}>New Kitchen Station</h4>
-                      <button onClick={() => setShowAddStation(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', padding: '4px' }}>
+                      <h4 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--primary-700)', margin: 0 }}>
+                        {isEditing ? 'Edit Kitchen Station' : 'New Kitchen Station'}
+                      </h4>
+                      <button onClick={() => {
+                        setShowAddStation(false);
+                        setIsEditing(false);
+                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', padding: '4px' }}>
                         <X size={18} />
                       </button>
                     </div>
@@ -607,8 +707,13 @@ const PrintersPage = () => {
                         </select>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn btn-primary" onClick={handleAddStation}>Save</button>
-                        <button className="btn btn-secondary" onClick={() => setShowAddStation(false)}>Cancel</button>
+                        <button className="btn btn-primary" onClick={handleAddStation}>
+                          {isEditing ? 'Update' : 'Save'}
+                        </button>
+                        <button className="btn btn-secondary" onClick={() => {
+                          setShowAddStation(false);
+                          setIsEditing(false);
+                        }}>Cancel</button>
                       </div>
                     </div>
                   </div>
@@ -640,12 +745,20 @@ const PrintersPage = () => {
                                 <Printer size={12} /> {station.printer_name}
                               </div>
                             </div>
-                            <button onClick={() => handleDeleteStation(station.id)}
-                              style={{ background: 'var(--danger-50)', border: '1px solid var(--danger-200)', borderRadius: '8px', padding: '6px 8px', cursor: 'pointer', color: 'var(--danger-500)', height: 'fit-content' }}
-                              title="Delete Station"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button onClick={() => handleEditStation(station)}
+                                style={{ background: 'var(--primary-50)', border: '1px solid var(--primary-200)', borderRadius: '8px', padding: '6px 8px', cursor: 'pointer', color: 'var(--primary-600)', height: 'fit-content' }}
+                                title="Edit Station"
+                              >
+                                <RefreshCw size={14} />
+                              </button>
+                              <button onClick={() => handleDeleteStation(station.id)}
+                                style={{ background: 'var(--danger-50)', border: '1px solid var(--danger-200)', borderRadius: '8px', padding: '6px 8px', cursor: 'pointer', color: 'var(--danger-500)', height: 'fit-content' }}
+                                title="Delete Station"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                           {assignedCats.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '14px' }}>
@@ -824,6 +937,132 @@ const PrintersPage = () => {
             )}
 
             {/* ═══════════ TAB: Print Flow ═══════════ */}
+            {printerTab === 'kotitems' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--gray-800)', margin: 0 }}>KOT Item Exclusion</h3>
+                    <p style={{ fontSize: '13px', color: 'var(--gray-500)', margin: '4px 0 0' }}>Uncheck items you don't want sent to the kitchen (e.g., water bottles, packed items)</p>
+                  </div>
+                  <button onClick={loadKotMenuData} style={{ padding: '8px 16px', background: 'var(--primary-500)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                    <RefreshCw size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />Refresh
+                  </button>
+                </div>
+
+                {/* Info Banner */}
+                <div style={{ padding: '14px 18px', background: '#FFF8E1', border: '1px solid #FFE082', borderRadius: '10px', marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <Info size={18} style={{ color: '#F57F17', flexShrink: 0, marginTop: '2px' }} />
+                  <div style={{ fontSize: '13px', color: '#5D4037', lineHeight: '1.5' }}>
+                    <strong>✅ Checked</strong> = Item will appear on KOT (sent to kitchen)<br/>
+                    <strong>❌ Unchecked</strong> = Item excluded from KOT (only appears on customer bill)
+                  </div>
+                </div>
+
+                {kotItemsLoading ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-400)' }}>
+                    <RefreshCw size={28} style={{ animation: 'spin 1s linear infinite' }} />
+                    <p style={{ marginTop: '10px' }}>Loading menu items...</p>
+                  </div>
+                ) : kotMenuData.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--gray-400)' }}>
+                    <Package size={32} />
+                    <p style={{ marginTop: '10px' }}>No menu items found. Click Refresh to load.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {kotMenuData.map(cat => {
+                      const isExpanded = expandedCategories.has(cat.id);
+                      const totalItems = cat.items.length;
+                      const excludedCount = cat.items.filter(i => i.kot_excluded).length;
+                      const allExcluded = totalItems > 0 && excludedCount === totalItems;
+                      const someExcluded = excludedCount > 0 && excludedCount < totalItems;
+                      
+                      return (
+                        <div key={cat.id} style={{ background: 'white', border: '1px solid var(--gray-200)', borderRadius: '12px', overflow: 'hidden' }}>
+                          {/* Category Header */}
+                          <div 
+                            style={{ 
+                              display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 18px', cursor: 'pointer',
+                              background: isExpanded ? 'var(--gray-50)' : 'white',
+                              borderBottom: isExpanded ? '1px solid var(--gray-200)' : 'none'
+                            }}
+                            onClick={() => {
+                              setExpandedCategories(prev => {
+                                const next = new Set(prev);
+                                if (next.has(cat.id)) next.delete(cat.id);
+                                else next.add(cat.id);
+                                return next;
+                              });
+                              if (!isExpanded && kotMenuData.length > 0) { /* already loaded */ }
+                            }}
+                          >
+                            {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                            
+                            {/* Category checkbox */}
+                            <input 
+                              type="checkbox" 
+                              checked={!allExcluded}
+                              ref={el => { if (el) el.indeterminate = someExcluded; }}
+                              onChange={(e) => { e.stopPropagation(); handleToggleKotCategory(cat.id); }}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#2E7D32' }}
+                            />
+                            
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--gray-800)' }}>{cat.name}</div>
+                              <div style={{ fontSize: '12px', color: 'var(--gray-400)' }}>{totalItems} items{excludedCount > 0 ? ` • ${excludedCount} excluded from KOT` : ''}</div>
+                            </div>
+                            
+                            {excludedCount > 0 && (
+                              <span style={{ fontSize: '11px', fontWeight: '600', padding: '3px 10px', borderRadius: '12px', background: '#FFEBEE', color: '#D32F2F' }}>
+                                {excludedCount} bill-only
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Items List */}
+                          {isExpanded && (
+                            <div style={{ padding: '8px 18px 12px' }}>
+                              {cat.items.length === 0 ? (
+                                <div style={{ padding: '12px', textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px' }}>No items in this category</div>
+                              ) : (
+                                cat.items.map(item => (
+                                  <div key={item.id} style={{ 
+                                    display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px',
+                                    borderRadius: '8px', marginBottom: '2px',
+                                    background: item.kot_excluded ? '#FFF8E1' : 'transparent',
+                                    transition: 'background 0.15s'
+                                  }}>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={!item.kot_excluded}
+                                      onChange={() => handleToggleKotItem(item.id, item.kot_excluded)}
+                                      style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#2E7D32' }}
+                                    />
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.is_vegetarian ? '#2E7D32' : '#C62828', flexShrink: 0 }} />
+                                    <div style={{ flex: 1, fontSize: '13px', fontWeight: '500', color: item.kot_excluded ? 'var(--gray-400)' : 'var(--gray-800)', textDecoration: item.kot_excluded ? 'line-through' : 'none' }}>
+                                      {item.name}
+                                    </div>
+                                    <span style={{ 
+                                      fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px',
+                                      background: item.kot_excluded ? '#FFEBEE' : '#E8F5E9',
+                                      color: item.kot_excluded ? '#D32F2F' : '#2E7D32'
+                                    }}>
+                                      {item.kot_excluded ? 'BILL ONLY' : 'KOT ✓'}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {printerTab === 'flow' && (
               <div style={{ display: 'grid', gap: '28px' }}>
                 <div style={{ 

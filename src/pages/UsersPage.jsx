@@ -22,6 +22,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { format, subDays, addDays } from 'date-fns';
+import { useAlertStore } from '../stores/alertStore';
 
 // ==================== Biller Performance Modal ====================
 const BillerPerformanceModal = ({ user, onClose }) => {
@@ -242,6 +243,7 @@ const BillerPerformanceModal = ({ user, onClose }) => {
 
 // ==================== Main UsersPage ====================
 const UsersPage = () => {
+  const { showAlert } = useAlertStore();
   const [users, setUsers] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -269,15 +271,16 @@ const UsersPage = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
+    showAlert('Are you sure you want to delete this user?', 'confirm', async () => {
       try {
         await window.electronAPI.invoke('users:delete', { id });
         loadUsers();
+        showAlert('User deleted successfully', 'success');
       } catch (error) {
         console.error('Delete failed:', error);
-        alert('Failed to delete user');
+        showAlert('Failed to delete user', 'error');
       }
-    }
+    });
   };
 
   const getRoleBadge = (role) => {

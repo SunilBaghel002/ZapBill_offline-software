@@ -129,7 +129,7 @@ const ExpensesPage = () => {
             await window.electronAPI.invoke('expenses:delete', { id: row.id });
         } catch (error) {
             console.error("Failed to delete expense", error);
-            alert("Failed to delete expense");
+            window.showAlert("Failed to delete expense");
             return;
         }
     }
@@ -142,7 +142,7 @@ const ExpensesPage = () => {
     const validRows = rows.filter(r => r.reason && r.amount);
     
     if (validRows.length === 0) {
-        alert("Please enter at least one expense with Reason and Amount.");
+        window.showAlert("Please enter at least one expense with Reason and Amount.");
         return;
     }
 
@@ -168,7 +168,7 @@ const ExpensesPage = () => {
         fetchCashBalance(); // Refresh balance after save
     } catch (error) {
         console.error("Failed to save expenses", error);
-        alert("Failed to save: " + error.message);
+        window.showAlert("Failed to save: " + error.message);
     } finally {
         setSaving(false);
     }
@@ -178,7 +178,7 @@ const ExpensesPage = () => {
     if (!withdrawalAmount || isNaN(withdrawalAmount) || withdrawalAmount <= 0) return;
     
     if (parseFloat(withdrawalAmount) > cashBalance) {
-      alert(`Insufficient Cash! Current Cash in Hand is ₹${cashBalance.toFixed(2)}. You cannot withdraw more than this.`);
+      window.showAlert(`Insufficient Cash! Current Cash in Hand is ₹${cashBalance.toFixed(2)}. You cannot withdraw more than this.`);
       return;
     }
 
@@ -199,7 +199,7 @@ const ExpensesPage = () => {
       fetchExistingExpenses(date);
       fetchCashBalance();
     } catch (error) {
-      alert("Failed to save withdrawal");
+      window.showAlert("Failed to save withdrawal");
     } finally {
       setSaving(false);
     }
@@ -207,12 +207,12 @@ const ExpensesPage = () => {
 
   const handleStaffAdvanceSave = async () => {
     if (!staffData.employee_name || !staffData.amount || isNaN(staffData.amount)) {
-      alert("Please fill all fields");
+      window.showAlert("Please fill all fields");
       return;
     }
 
     if (parseFloat(staffData.amount) > cashBalance) {
-      alert(`Insufficient Cash! Current Cash in Hand is ₹${cashBalance.toFixed(2)}. You cannot give advance more than this.`);
+      window.showAlert(`Insufficient Cash! Current Cash in Hand is ₹${cashBalance.toFixed(2)}. You cannot give advance more than this.`);
       return;
     }
 
@@ -238,7 +238,7 @@ const ExpensesPage = () => {
       fetchExistingExpenses(date);
       fetchCashBalance();
     } catch (error) {
-      alert("Failed to save staff advance");
+      window.showAlert("Failed to save staff advance");
     } finally {
       setSaving(false);
     }

@@ -17,8 +17,10 @@ import {
   Minus,
   Check
 } from 'lucide-react';
+import { useAlertStore } from '../stores/alertStore';
 
 const SettingsPage = () => {
+  const { showAlert } = useAlertStore();
   const [settings, setSettings] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -87,7 +89,7 @@ const SettingsPage = () => {
 
       if (!fileResult.success) {
         // User cancelled or error
-        if (fileResult.error) alert('Error: ' + fileResult.error);
+        if (fileResult.error) window.showAlert('Error: ' + fileResult.error);
         setImporting(null);
         return;
       }
@@ -108,33 +110,34 @@ const SettingsPage = () => {
         });
         if (type === 'menu') setImportMenuName(''); // Clear after success
       } else {
-        alert('Import failed: ' + result.error);
+        window.showAlert('Import failed: ' + result.error);
       }
     } catch (error) {
       console.error('Import error:', error);
-      alert('Error during import: ' + error.message);
+      window.showAlert('Error during import: ' + error.message);
     } finally {
       setImporting(null);
     }
   };
 
   const handleMoveDb = async () => {
-    if (!confirm('Are you sure you want to move the database? The application will need to restart.')) return;
-    setIsMovingDb(true);
-    try {
-      const result = await window.electronAPI.invoke('db:movePath');
-      if (result.success) {
-        alert('Database moved successfully! The application will now restart.');
-        window.location.reload();
-      } else if (!result.cancelled) {
-        alert('Failed to move database: ' + result.error);
+    showAlert('Are you sure you want to move the database? The application will need to restart.', 'confirm', async () => {
+      setIsMovingDb(true);
+      try {
+        const result = await window.electronAPI.invoke('db:movePath');
+        if (result.success) {
+          showAlert('Database moved successfully! The application will now restart.', 'success');
+          setTimeout(() => window.location.reload(), 2000);
+        } else if (!result.cancelled) {
+          showAlert('Failed to move database: ' + result.error, 'error');
+        }
+      } catch (error) {
+        console.error('Move DB error:', error);
+        showAlert('Error moving database: ' + error.message, 'error');
+      } finally {
+        setIsMovingDb(false);
       }
-    } catch (error) {
-      console.error('Move DB error:', error);
-      alert('Error moving database: ' + error.message);
-    } finally {
-      setIsMovingDb(false);
-    }
+    });
   };
 
   // Toggle Switch Component

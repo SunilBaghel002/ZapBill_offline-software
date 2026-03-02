@@ -307,10 +307,10 @@ const KOTPage = () => {
         order, 
         items: order.items 
       });
-      alert('KOT sent to printer!');
+      window.showAlert('KOT sent to printer!');
     } catch (error) {
       console.error('Print failed:', error);
-      alert('Print failed: ' + error.message);
+      window.showAlert('Print failed: ' + error.message);
     }
   };
 

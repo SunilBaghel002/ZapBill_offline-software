@@ -62,7 +62,7 @@ const InventoryPage = () => {
         loadInventory();
       } catch (error) {
         console.error('Delete failed:', error);
-        alert('Failed to delete item');
+        window.showAlert('Failed to delete item');
       }
     }
   };
@@ -384,7 +384,7 @@ const InventoryModal = ({ item, onClose, onSave, onDelete }) => {
       onSave();
     } catch (error) {
       console.error('Save failed:', error);
-      alert('Failed to save item');
+      window.showAlert('Failed to save item');
     } finally {
       setIsSaving(false);
     }
@@ -512,7 +512,7 @@ const StockUpdateModal = ({ item, onClose, onSave }) => {
       });
       onSave();
     } catch (error) {
-      alert('Failed to update stock');
+      window.showAlert('Failed to update stock');
     } finally {
       setIsSaving(false);
     }
