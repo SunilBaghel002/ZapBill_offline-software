@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
 import { Tag, Plus, Edit2, Trash2, CheckCircle, XCircle } from 'lucide-react';
-import CustomAlert from '../components/ui/CustomAlert';
 
 const DiscountsPage = () => {
   const { user } = useAuthStore();
@@ -23,9 +22,6 @@ const DiscountsPage = () => {
     end_date: '',
     is_active: true
   });
-
-  const [alert, setAlert] = useState({ show: false, message: '', type: 'info' });
-
   useEffect(() => {
     loadData();
   }, []);
@@ -40,17 +36,11 @@ const DiscountsPage = () => {
       setMenuItems(items || []);
     } catch (err) {
       console.error(err);
-      showAlert('Failed to load discounts', 'error');
+      window.showAlert('Failed to load discounts', 'error');
     } finally {
       setIsLoading(false);
     }
   };
-
-  const showAlert = (message, type = 'info', onConfirm = null) => {
-    setAlert({ show: true, message, type, onConfirm });
-  };
-
-  const closeAlert = () => setAlert({ ...alert, show: false });
 
   const handleOpenModal = (discount = null) => {
     if (discount) {
@@ -83,7 +73,7 @@ const DiscountsPage = () => {
     e.preventDefault();
     
     if (!formData.menu_item_id || !formData.discount_value) {
-      return showAlert('Please fill out required fields', 'error');
+      return window.showAlert('Please fill out required fields', 'error');
     }
 
     try {
@@ -99,27 +89,27 @@ const DiscountsPage = () => {
 
       if (editingDiscount) {
         await window.electronAPI.invoke('discounts:update', { id: editingDiscount.id, updates: payload });
-        showAlert('Discount Updated Successfully', 'success');
+        window.showAlert('Discount Updated Successfully', 'success');
       } else {
         await window.electronAPI.invoke('discounts:add', payload);
-        showAlert('Discount Added Successfully', 'success');
+        window.showAlert('Discount Added Successfully', 'success');
       }
       setShowModal(false);
       loadData();
     } catch (error) {
       console.error('Save error', error);
-      showAlert('Failed to save discount: ' + error.message, 'error');
+      window.showAlert('Failed to save discount: ' + error.message, 'error');
     }
   };
 
   const handleDelete = (id) => {
-    showAlert('Are you sure you want to delete this discount?', 'confirm', async () => {
+    window.showAlert('Are you sure you want to delete this discount?', 'confirm', async () => {
       try {
         await window.electronAPI.invoke('discounts:delete', { id });
-        showAlert('Discount Deleted', 'success');
+        window.showAlert('Discount Deleted Successfully', 'success');
         loadData();
       } catch (err) {
-        showAlert('Failed to delete', 'error');
+        window.showAlert('Failed to delete discount', 'error');
       }
     });
   };
@@ -316,14 +306,6 @@ const DiscountsPage = () => {
         </div>
       )}
 
-      {alert.show && (
-        <CustomAlert
-          message={alert.message}
-          type={alert.type}
-          onClose={closeAlert}
-          onConfirm={alert.onConfirm}
-        />
-      )}
     </div>
   );
 };

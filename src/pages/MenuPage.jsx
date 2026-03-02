@@ -77,10 +77,11 @@ const MenuPage = () => {
   };
 
   const handleDeleteItem = async (id) => {
-    if (window.confirm('Are you sure you want to delete this item?')) {
+    window.showAlert('Are you sure you want to delete this item?', 'confirm', async () => {
       await window.electronAPI.invoke('menu:deleteItem', { id });
       loadData();
-    }
+      window.showAlert('Item deleted successfully', 'success');
+    });
   };
 
   const handleEditCategory = (category) => {
@@ -95,10 +96,11 @@ const MenuPage = () => {
   };
 
   const handleDeleteAddon = async (id) => {
-    if (window.confirm('Are you sure you want to delete this add-on?')) {
+    window.showAlert('Are you sure you want to delete this add-on?', 'confirm', async () => {
       await window.electronAPI.invoke('menu:deleteAddon', { id });
       loadData();
-    }
+      window.showAlert('Add-on deleted successfully', 'success');
+    });
   };
 
   // Master Addon Handlers
@@ -108,22 +110,24 @@ const MenuPage = () => {
   };
 
   const handleDeleteMasterAddon = async (id) => {
-    if (window.confirm('Are you sure you want to delete this Master Add-on group?')) {
+    window.showAlert('Are you sure you want to delete this Master Add-on group?', 'confirm', async () => {
       await window.electronAPI.invoke('menu:deleteMasterAddon', { id });
       loadData();
-    }
+      window.showAlert('Master add-on group deleted successfully', 'success');
+    });
   };
 
   const handleDeleteCategory = async (id) => {
-    if (window.confirm('Are you sure you want to delete this category?')) {
+    window.showAlert('Are you sure you want to delete this category?', 'confirm', async () => {
       const result = await window.electronAPI.invoke('menu:deleteCategory', { id });
       if (result.success) {
         loadData();
         if (selectedCategory === id) setSelectedCategory(null);
+        window.showAlert('Category deleted successfully', 'success');
       } else {
-        window.showAlert(result.error);
+        window.showAlert(result.error, 'error');
       }
-    }
+    });
   };
 
   if (isLoading) {
@@ -1191,14 +1195,15 @@ const MenuManagerModal = ({ menus, activeMenu, onClose, onRefresh }) => {
       window.showAlert('Cannot delete the active menu profile.');
       return;
     }
-    if (window.confirm(`Are you sure you want to delete the menu profile "${name}"? This will delete all its categories and items.`)) {
+    window.showAlert(`Are you sure you want to delete the menu profile "${name}"? This will delete all its categories and items.`, 'confirm', async () => {
       try {
         await window.electronAPI.invoke('menu:deleteMenu', { id });
         onRefresh();
+        window.showAlert('Menu profile deleted successfully', 'success');
       } catch (error) {
-        window.showAlert('Failed to delete menu profile');
+        window.showAlert('Failed to delete menu profile', 'error');
       }
-    }
+    });
   };
 
   return (

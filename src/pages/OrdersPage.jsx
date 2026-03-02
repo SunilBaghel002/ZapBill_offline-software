@@ -133,15 +133,16 @@ const OrdersPage = () => {
   };
 
   const handleDeleteOrder = async (order) => {
-    if (window.confirm(`Are you sure you want to delete Order #${order.order_number}? This cannot be undone.`)) {
+    window.showAlert(`Are you sure you want to delete Order #${order.order_number}? This cannot be undone.`, 'confirm', async () => {
       try {
         await window.electronAPI.invoke('order:delete', { id: order.id });
         loadOrders();
+        window.showAlert('Order deleted successfully!', 'success');
       } catch (error) {
         console.error('Failed to delete order:', error);
-        window.showAlert('Failed to delete order: ' + error.message);
+        window.showAlert('Failed to delete order: ' + error.message, 'error');
       }
-    }
+    });
   };
 
   const handlePrintBill = async (order) => {

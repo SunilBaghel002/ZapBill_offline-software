@@ -58,7 +58,7 @@ const MainSidebar = ({ isOpen, onClose }) => {
     { path: '/pos', icon: ShoppingCart, label: 'POS / Billing', adminOnly: false },
     { path: '/orders', icon: ClipboardList, label: 'Orders', badge: activeOrdersCount > 0 ? activeOrdersCount : null, adminOnly: false },
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu', adminOnly: true },
-    { path: '/discounts', icon: Tag, label: 'Discounts', adminOnly: true },
+    
     { path: '/kot', icon: ChefHat, label: 'Kitchen (KOT)', adminOnly: false },
     { path: '/inventory', icon: Package, label: 'Inventory', adminOnly: false },
     { 
@@ -75,6 +75,7 @@ const MainSidebar = ({ isOpen, onClose }) => {
       ]
     },
     { path: '/expenses', icon: Wallet, label: 'Expenses', adminOnly: false },
+    { path: '/discounts', icon: Tag, label: 'Discounts', adminOnly: true },
     { path: '/users', icon: Users, label: 'Users', adminOnly: true },
     { path: '/printers', icon: Printer, label: 'Printers', adminOnly: false },
     { path: '/settings', icon: Settings, label: 'Settings', adminOnly: true },

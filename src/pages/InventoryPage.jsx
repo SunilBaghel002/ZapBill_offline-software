@@ -56,15 +56,16 @@ const InventoryPage = () => {
   };
 
   const handleDelete = async (item) => {
-    if (window.confirm(`Are you sure you want to delete "${item.name}"?`)) {
+    window.showAlert(`Are you sure you want to delete "${item.name}"?`, 'confirm', async () => {
       try {
         await window.electronAPI.invoke('inventory:delete', { id: item.id });
         loadInventory();
+        window.showAlert('Item deleted successfully', 'success');
       } catch (error) {
         console.error('Delete failed:', error);
-        window.showAlert('Failed to delete item');
+        window.showAlert('Failed to delete item', 'error');
       }
-    }
+    });
   };
 
   const handleStockUpdate = (item) => {

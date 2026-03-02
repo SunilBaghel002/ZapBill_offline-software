@@ -124,18 +124,21 @@ const ExpensesPage = () => {
   const handleDeleteRow = async (index) => {
     const row = rows[index];
     if (row.id) {
-        if (!window.confirm("Are you sure you want to delete this saved expense?")) return;
-        try {
-            await window.electronAPI.invoke('expenses:delete', { id: row.id });
-        } catch (error) {
-            console.error("Failed to delete expense", error);
-            window.showAlert("Failed to delete expense");
-            return;
-        }
+        window.showAlert("Are you sure you want to delete this saved expense?", 'confirm', async () => {
+            try {
+                await window.electronAPI.invoke('expenses:delete', { id: row.id });
+                const newRows = rows.filter((_, i) => i !== index);
+                setRows(newRows);
+                window.showAlert('Expense deleted successfully', 'success');
+            } catch (error) {
+                console.error("Failed to delete expense", error);
+                window.showAlert("Failed to delete expense", 'error');
+            }
+        });
+    } else {
+        const newRows = rows.filter((_, i) => i !== index);
+        setRows(newRows);
     }
-    
-    const newRows = rows.filter((_, i) => i !== index);
-    setRows(newRows);
   };
 
   const handleSave = async () => {
