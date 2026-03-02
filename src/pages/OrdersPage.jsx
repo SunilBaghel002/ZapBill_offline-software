@@ -32,6 +32,7 @@ const OrdersPage = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [selectedOrders, setSelectedOrders] = useState([]);
 
   // When location state changes (global search), update query and show all dates
   useEffect(() => {
@@ -136,6 +137,7 @@ const OrdersPage = () => {
     window.showAlert(`Are you sure you want to delete Order #${order.order_number}? This cannot be undone.`, 'confirm', async () => {
       try {
         await window.electronAPI.invoke('order:delete', { id: order.id });
+        setSelectedOrders(prev => prev.filter(id => id !== order.id));
         loadOrders();
         window.showAlert('Order deleted successfully!', 'success');
       } catch (error) {
@@ -143,6 +145,38 @@ const OrdersPage = () => {
         window.showAlert('Failed to delete order: ' + error.message, 'error');
       }
     });
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedOrders.length === 0) return;
+
+    window.showAlert(`Are you sure you want to delete ${selectedOrders.length} selected orders? This cannot be undone.`, 'confirm', async () => {
+      try {
+        await window.electronAPI.invoke('order:deleteMultiple', { ids: selectedOrders });
+        setSelectedOrders([]);
+        loadOrders();
+        window.showAlert(`${selectedOrders.length} orders deleted successfully!`, 'success');
+      } catch (error) {
+        console.error('Failed to delete orders:', error);
+        window.showAlert('Failed to delete orders: ' + error.message, 'error');
+      }
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedOrders.length === filteredOrders.length) {
+      setSelectedOrders([]);
+    } else {
+      setSelectedOrders(filteredOrders.map(o => o.id));
+    }
+  };
+
+  const toggleSelectOrder = (orderId) => {
+    setSelectedOrders(prev => 
+      prev.includes(orderId) 
+        ? prev.filter(id => id !== orderId)
+        : [...prev, orderId]
+    );
   };
 
   const handlePrintBill = async (order) => {
@@ -205,6 +239,18 @@ const OrdersPage = () => {
           <h1>Bills & Orders</h1>
           <p className="text-muted">View, edit, and manage all orders</p>
         </div>
+        {selectedOrders.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', animation: 'fadeIn 0.2s' }}>
+            <span style={{ fontWeight: 600, color: 'var(--gray-700)' }}>{selectedOrders.length} selected</span>
+            <button 
+              className="btn btn-error" 
+              onClick={handleDeleteSelected}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <Trash2 size={18} /> Delete Selected
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filters Row */}
@@ -314,6 +360,14 @@ const OrdersPage = () => {
         <table className="table">
           <thead>
             <tr>
+              <th style={{ width: '40px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={filteredOrders.length > 0 && selectedOrders.length === filteredOrders.length}
+                  onChange={toggleSelectAll}
+                  style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                />
+              </th>
               <th>Order #</th>
               <th>Date & Time</th>
               <th>Customer</th>
@@ -326,7 +380,15 @@ const OrdersPage = () => {
           </thead>
           <tbody>
             {filteredOrders.map(order => (
-              <tr key={order.id}>
+              <tr key={order.id} className={selectedOrders.includes(order.id) ? 'row-selected' : ''}>
+                <td>
+                  <input 
+                    type="checkbox" 
+                    checked={selectedOrders.includes(order.id)}
+                    onChange={() => toggleSelectOrder(order.id)}
+                    style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                  />
+                </td>
                 <td>
                   <strong>#{order.order_number}</strong>
                 </td>

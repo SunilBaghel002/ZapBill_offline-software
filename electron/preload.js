@@ -44,6 +44,7 @@ const validInvokeChannels = [
   'order:getActiveCount',
   'order:cancel',
   'order:delete',
+  'order:deleteMultiple',
   'order:getHeld',
   'order:resume',
   'order:getByPhone',

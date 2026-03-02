@@ -1072,16 +1072,16 @@ class Database {
             // Update
             this.db.run(`
               UPDATE menu_items SET 
-                category_id = ?, price = ?, tax_rate = ?, is_vegetarian = ?, description = ?, updated_at = ?
+                category_id = ?, price = ?, tax_rate = ?, is_vegetarian = ?, description = ?, variants = ?, addons = ?, updated_at = ?
               WHERE id = ?
-            `, [categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), existing[0].id]);
+            `, [categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, new Date().toISOString(), existing[0].id]);
           } else {
             // Insert
             const id = uuidv4();
             this.db.run(`
-              INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, is_available, created_at, updated_at, is_deleted, menu_id)
-              VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0, ?)
-            `, [id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, new Date().toISOString(), new Date().toISOString(), targetMenuId]);
+              INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, variants, addons, is_available, created_at, updated_at, is_deleted, menu_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0, ?)
+            `, [id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, new Date().toISOString(), new Date().toISOString(), targetMenuId]);
           }
           successCount++;
         } catch (err) {

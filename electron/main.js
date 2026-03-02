@@ -598,15 +598,16 @@ function setupIpcHandlers() {
 
   ipcMain.handle('order:delete', async (event, { id }) => {
     try {
+      db.db.run('BEGIN TRANSACTION');
       // First get the order details to subtract from daily_sales
       const order = db.execute('SELECT * FROM orders WHERE id = ?', [id])[0];
       
-      if (order && order.status === 'completed') {
+      if (order && order.status === 'completed' && order.created_at) {
         // Get the date of the order
         const orderDate = order.created_at.split('T')[0];
         
         // Subtract from daily_sales
-        db.run(`
+        db.db.run(`
           UPDATE daily_sales 
           SET total_orders = total_orders - 1,
               total_revenue = total_revenue - ?,
@@ -617,9 +618,7 @@ function setupIpcHandlers() {
               upi_amount = CASE WHEN ? = 'upi' THEN upi_amount - ? ELSE upi_amount END
           WHERE date = ?
         `, [
-          order.total_amount || 0,
-          order.tax_amount || 0,
-          order.discount_amount || 0,
+          order.total_amount || 0, order.tax_amount || 0, order.discount_amount || 0,
           order.payment_method, order.total_amount || 0,
           order.payment_method, order.total_amount || 0,
           order.payment_method, order.total_amount || 0,
@@ -628,12 +627,56 @@ function setupIpcHandlers() {
       }
       
       // Soft delete by marking as deleted
-      db.run(`UPDATE orders SET is_deleted = 1, updated_at = ? WHERE id = ?`, 
+      db.db.run(`UPDATE orders SET is_deleted = 1, updated_at = ? WHERE id = ?`, 
         [new Date().toISOString(), id]);
-      db.run(`UPDATE order_items SET is_deleted = 1 WHERE order_id = ?`, [id]);
+      db.db.run(`UPDATE order_items SET is_deleted = 1 WHERE order_id = ?`, [id]);
+      db.db.run('COMMIT');
+      db.save();
       return { success: true };
     } catch (error) {
+      try { db.db.run('ROLLBACK'); } catch (e) {}
       log.error('Delete order error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('order:deleteMultiple', async (event, { ids }) => {
+    try {
+      db.db.run('BEGIN TRANSACTION');
+      for (const id of ids) {
+        const order = db.execute('SELECT * FROM orders WHERE id = ?', [id])[0];
+        
+        if (order && order.status === 'completed' && order.created_at) {
+          const orderDate = order.created_at.split('T')[0];
+          db.db.run(`
+            UPDATE daily_sales 
+            SET total_orders = total_orders - 1,
+                total_revenue = total_revenue - ?,
+                total_tax = total_tax - ?,
+                total_discount = total_discount - ?,
+                cash_amount = CASE WHEN ? = 'cash' THEN cash_amount - ? ELSE cash_amount END,
+                card_amount = CASE WHEN ? = 'card' THEN card_amount - ? ELSE card_amount END,
+                upi_amount = CASE WHEN ? = 'upi' THEN upi_amount - ? ELSE upi_amount END
+            WHERE date = ?
+          `, [
+            order.total_amount || 0, order.tax_amount || 0, order.discount_amount || 0,
+            order.payment_method, order.total_amount || 0,
+            order.payment_method, order.total_amount || 0,
+            order.payment_method, order.total_amount || 0,
+            orderDate
+          ]);
+        }
+        
+        db.db.run(`UPDATE orders SET is_deleted = 1, updated_at = ? WHERE id = ?`, 
+          [new Date().toISOString(), id]);
+        db.db.run(`UPDATE order_items SET is_deleted = 1 WHERE order_id = ?`, [id]);
+      }
+      db.db.run('COMMIT');
+      db.save();
+      return { success: true };
+    } catch (error) {
+      try { db.db.run('ROLLBACK'); } catch (e) {}
+      log.error('Delete multiple orders error:', error);
       return { success: false, error: error.message };
     }
   });
