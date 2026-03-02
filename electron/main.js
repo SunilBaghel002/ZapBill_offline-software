@@ -855,7 +855,9 @@ function setupIpcHandlers() {
   ipcMain.handle('day:getStatus', async (event, { date }) => {
     try {
       const status = db.getDayStatus(date);
-      return { success: true, status };
+      // Also fetch previous day's closing cash if needed (for DayOpeningModal)
+      const previousDayCash = db.getPreviousDayClosingCash();
+      return { success: true, status, previousDayCash };
     } catch (error) {
       log.error('Get day status error:', error);
       return { success: false, error: error.message };

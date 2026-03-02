@@ -1909,6 +1909,26 @@ class Database {
     };
   }
 
+  getClosingCash(date) {
+    const report = this.getDailyReport(date);
+    if (!report || !report.sales) return 0;
+    const { opening_balance, cash_amount, total_expenses } = report.sales;
+    return (opening_balance || 0) + (cash_amount || 0) - (total_expenses || 0);
+  }
+
+  getPreviousDayClosingCash() {
+    // Get the most recent day log before today
+    const today = new Date().toLocaleDateString('en-CA');
+    const lastDay = this.execute(`
+      SELECT business_date FROM day_logs 
+      WHERE business_date < ? 
+      ORDER BY business_date DESC LIMIT 1
+    `, [today])[0];
+    
+    if (!lastDay) return 0;
+    return this.getClosingCash(lastDay.business_date);
+  }
+
   // Get report for a specific biller on a given date
   getBillerReport(userId, date) {
     const sales = this.execute(`

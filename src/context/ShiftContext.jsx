@@ -19,6 +19,7 @@ export const ShiftProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showDayModal, setShowDayModal] = useState(false);
+  const [previousDayCash, setPreviousDayCash] = useState(0);
 
   // Check for active shift when user logs in or mounts
   useEffect(() => {
@@ -61,6 +62,7 @@ export const ShiftProvider = ({ children }) => {
       const dayResult = await window.electronAPI.invoke('day:getStatus', {});
       if (dayResult.success) {
         setDayStatus(dayResult.status);
+        setPreviousDayCash(dayResult.previousDayCash || 0);
         if (!dayResult.status) {
           // If day not opened for today, show Day Modal and wait
           setShowDayModal(true);
@@ -173,6 +175,7 @@ export const ShiftProvider = ({ children }) => {
     error,
     showStartModal,
     showDayModal,
+    previousDayCash,
     setShowStartModal,
     setShowDayModal,
     checkActiveShift,

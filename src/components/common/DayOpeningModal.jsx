@@ -4,7 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { Sun, AlertCircle, Calendar, ArrowRight, Wallet } from 'lucide-react';
 
 const DayOpeningModal = ({ isOpen, onClose }) => {
-  const { openDay, error } = useShift();
+  const { openDay, previousDayCash, error } = useShift();
   const { user } = useAuthStore();
   const [openingBalance, setOpeningBalance] = useState('');
   const [loading, setLoading] = useState(false);
@@ -132,6 +132,26 @@ const DayOpeningModal = ({ isOpen, onClose }) => {
               <p style={{ color: 'var(--gray-500)', fontSize: '0.925rem', lineHeight: '1.5' }}>
                 Initializing the system for a fresh day of operations. Please confirm the opening outlet balance.
               </p>
+              
+              {previousDayCash > 0 && (
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '12px 16px', 
+                  background: 'rgba(14, 165, 233, 0.1)', 
+                  color: '#0369a1', 
+                  borderRadius: '16px', 
+                  border: '1px solid rgba(14, 165, 233, 0.2)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  animation: 'fadeInUp 0.5s ease-out'
+                }}>
+                  <span style={{ fontWeight: '600', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     <Wallet size={16} /> Previous Day Cash:
+                  </span>
+                  <span style={{ fontWeight: '800', fontSize: '1.125rem' }}>₹{previousDayCash.toLocaleString()}</span>
+                </div>
+              )}
             </div>
 
             {error && (
@@ -270,6 +290,10 @@ const DayOpeningModal = ({ isOpen, onClose }) => {
           0% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.05); opacity: 0.9; }
           100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
