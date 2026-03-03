@@ -2,22 +2,103 @@ const log = require('electron-log');
 const { BrowserWindow } = require('electron');
 
 /**
- * PrinterService — Comprehensive printing for receipts, KOTs, void KOTs, reprints.
- * Supports station-wise KOT routing, customizable bill format, print pool, and 58/80mm paper.
- * Handles same-printer bill/KOT separation with sequential queuing.
+ * PrinterQueue — Per-printer sequential job queue.
+ * Each physical printer gets its own queue to prevent job overlap/merge.
+ * Jobs are processed one at a time with configurable delay between them.
+ */
+class PrinterQueue {
+  constructor(printerName, delayMs = 800) {
+    this.printerName = printerName;
+    this.delayMs = delayMs;
+    this.queue = [];
+    this.processing = false;
+  }
+
+  /**
+   * Enqueue a print job. Returns a Promise that resolves when the job completes.
+   * @param {Object} job - { id, type, htmlContent, paperWidth, orderId, orderNumber }
+   * @param {Function} printFn - async function(htmlContent, printerName, paperWidth) => result
+   */
+  enqueue(job, printFn) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ job, printFn, resolve, reject });
+      log.info(`[PrinterQueue:${this.printerName}] Job QUEUED: type=${job.type} order=#${job.orderNumber || 'N/A'} | Queue depth: ${this.queue.length}`);
+      this._processNext();
+    });
+  }
+
+  async _processNext() {
+    if (this.processing || this.queue.length === 0) return;
+    this.processing = true;
+
+    const { job, printFn, resolve } = this.queue.shift();
+    const startTime = Date.now();
+
+    log.info(`[PrinterQueue:${this.printerName}] Job START: type=${job.type} order=#${job.orderNumber || 'N/A'}`);
+
+    try {
+      const result = await printFn(job.htmlContent, this.printerName, job.paperWidth);
+      const elapsed = Date.now() - startTime;
+
+      if (result.success) {
+        log.info(`[PrinterQueue:${this.printerName}] Job SUCCESS: type=${job.type} order=#${job.orderNumber || 'N/A'} (${elapsed}ms)`);
+      } else {
+        log.error(`[PrinterQueue:${this.printerName}] Job FAILED: type=${job.type} order=#${job.orderNumber || 'N/A'} error=${result.error} (${elapsed}ms)`);
+      }
+
+      resolve(result);
+    } catch (error) {
+      log.error(`[PrinterQueue:${this.printerName}] Job ERROR: type=${job.type} order=#${job.orderNumber || 'N/A'} error=${error.message}`);
+      resolve({ success: false, error: error.message, type: job.type });
+    }
+
+    // Delay before processing next job (allows paper feed + cutter)
+    if (this.queue.length > 0) {
+      await new Promise(r => setTimeout(r, this.delayMs));
+    }
+
+    this.processing = false;
+    this._processNext();
+  }
+
+  get pendingCount() {
+    return this.queue.length + (this.processing ? 1 : 0);
+  }
+}
+
+
+/**
+ * PrinterService — Queue-based printing for receipts, KOTs, kitchen copies, void KOTs, reprints.
  * 
- * Bill design matches the OrdersPage BillViewModal format exactly.
- * Kitchen gets one copy of the same bill (not a separate KOT format).
+ * Architecture:
+ * - Each physical printer gets its own PrinterQueue (created lazily, cached by name)
+ * - Jobs on different printers execute in parallel (independent queues)
+ * - Jobs on the same printer execute sequentially with delay + paper cut
+ * - HTML generators remain unchanged from the original implementation
  */
 class PrinterService {
   constructor() {
-    this.printPool = []; // Reusable hidden windows for faster printing
+    this.queues = new Map();        // printerName → PrinterQueue
+    this.printPool = [];            // Reusable hidden windows for faster printing
     this.maxPoolSize = 3;
     this.activePrints = new Set();
-    this.SAME_PRINTER_DELAY = 1500; // ms delay between prints on same printer
+    this.JOB_DELAY_MS = 800;       // Delay between sequential jobs on same printer
   }
 
-  // ─── Print Pool (High-Speed) ─────────────────────────────
+  // ─── Queue Management ──────────────────────────────────────
+  _getQueue(printerName) {
+    if (!printerName) {
+      log.warn('[PrinterService] _getQueue called with no printerName');
+      return null;
+    }
+    if (!this.queues.has(printerName)) {
+      this.queues.set(printerName, new PrinterQueue(printerName, this.JOB_DELAY_MS));
+      log.info(`[PrinterService] Created new queue for printer: "${printerName}"`);
+    }
+    return this.queues.get(printerName);
+  }
+
+  // ─── Print Pool (High-Speed Window Reuse) ──────────────────
   _getOrCreatePrintWindow() {
     if (this.printPool.length > 0) {
       const win = this.printPool.pop();
@@ -41,7 +122,7 @@ class PrinterService {
     }
   }
 
-  // ─── Core Print Method ────────────────────────────────────
+  // ─── Core Print Method (called by queue) ───────────────────
   async printHtml(htmlContent, printerName, paperWidth = '80') {
     return new Promise((resolve) => {
       const printWindow = this._getOrCreatePrintWindow();
@@ -92,9 +173,11 @@ class PrinterService {
       .kot-item { font-size: 15px; font-weight: 900; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dotted #000; }
       .kot-note { font-size: 13px; background: #000; color: #fff; font-weight: 700; padding: 4px 8px; margin-top: 3px; }
       .void-badge { text-align: center; border: 3px solid #000; font-weight: 900; padding: 8px; font-size: 20px; letter-spacing: 3px; margin-bottom: 8px; }
+      /* Paper cut trigger - forces page break which triggers thermal cutter */
+      .paper-cut { page-break-after: always; height: 0; visibility: hidden; }
     </style>
   </head>
-  <body>${htmlContent}</body>
+  <body>${htmlContent}<div class="paper-cut"></div></body>
 </html>`;
 
       printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -111,7 +194,7 @@ class PrinterService {
 
         printWindow.webContents.print(options, (success, errorType) => {
           if (!success) {
-            log.error('Print failed:', errorType);
+            log.error(`[PrinterService] printHtml FAILED on "${printerName}": ${errorType}`);
             resolve({ success: false, error: errorType });
           } else {
             resolve({ success: true });
@@ -120,7 +203,7 @@ class PrinterService {
           setTimeout(() => {
             this.activePrints.delete(printWindow);
             this._returnToPool(printWindow);
-          }, 1500);
+          }, 1000);
         });
       });
     });
@@ -144,33 +227,218 @@ class PrinterService {
     }
   }
 
-  // ─── Print Receipt ────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  //  MAIN DISPATCH METHOD — Replaces smartPrint
+  //  Creates structured print jobs and routes to per-printer queues
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Dispatch all print jobs for an order.
+   * 
+   * @param {Object} enrichedOrder - Order enriched with restaurant settings
+   * @param {Array} items - Order items
+   * @param {Array} categoryMap - Category→Station mappings
+   * @param {string} defaultKotPrinter - Fallback KOT printer name
+   * @param {boolean} attachBill - Whether to attach bill copy to kitchen
+   * @param {string} billPrinterName - Bill printer name
+   * @param {boolean} printBill - Whether to print the customer bill
+   * @param {Array} excludedItemIds - Item IDs excluded from KOT
+   * @returns {Promise<Object>} Combined results
+   */
+  async dispatchOrder(enrichedOrder, items, categoryMap, defaultKotPrinter, attachBill, billPrinterName, printBill = false, excludedItemIds = []) {
+    const orderNumber = enrichedOrder.order_number || 'N/A';
+    const paperWidth = enrichedOrder.paperWidth || '80';
+    
+    log.info(`\n${'═'.repeat(60)}`);
+    log.info(`[DISPATCH] Order #${orderNumber} | printBill=${printBill}`);
+    log.info(`[DISPATCH] billPrinter="${billPrinterName || 'NOT SET'}" | defaultKotPrinter="${defaultKotPrinter || 'NOT SET'}"`);
+    log.info(`[DISPATCH] Items: ${items.length} | Excluded: ${excludedItemIds.length}`);
+
+    // 1. Filter items for kitchen (remove excluded items)
+    const kitchenItems = items.filter(item => {
+      const itemId = item.menu_item_id || item.id;
+      return !excludedItemIds.includes(itemId);
+    });
+
+    // 2. Determine kitchen printer(s) from station map
+    const kitchenPrinters = new Set();
+    for (const item of kitchenItems) {
+      const mapping = categoryMap.find(m => m.category_id === item.category_id);
+      if (mapping) {
+        kitchenPrinters.add(mapping.printer_name);
+      } else if (defaultKotPrinter) {
+        kitchenPrinters.add(defaultKotPrinter);
+      }
+    }
+    if (kitchenPrinters.size === 0 && defaultKotPrinter && kitchenItems.length > 0) {
+      kitchenPrinters.add(defaultKotPrinter);
+    }
+
+    log.info(`[DISPATCH] Kitchen printers resolved: [${[...kitchenPrinters].join(', ')}]`);
+
+    // 3. Build print jobs
+    const allJobPromises = [];
+    const results = { bill: null, kitchenCopies: [], kots: [], errors: [] };
+
+    // ── BILL PRINT JOB ──
+    if (printBill && billPrinterName) {
+      const billHtml = this.generateReceiptHtml(enrichedOrder);
+      const billQueue = this._getQueue(billPrinterName);
+      
+      if (billQueue) {
+        const billJob = {
+          type: 'BILL',
+          htmlContent: billHtml,
+          paperWidth: paperWidth,
+          orderNumber: orderNumber,
+          orderId: enrichedOrder.id
+        };
+
+        const billPromise = billQueue.enqueue(billJob, this.printHtml.bind(this))
+          .then(r => { results.bill = { ...r, type: 'BILL', printer: billPrinterName }; })
+          .catch(e => { 
+            results.bill = { success: false, error: e.message, type: 'BILL', printer: billPrinterName };
+            results.errors.push({ type: 'BILL', printer: billPrinterName, error: e.message });
+          });
+        allJobPromises.push(billPromise);
+      }
+    }
+
+    // ── KITCHEN BILL COPY + KOT JOBS ──
+    // For each kitchen printer, send a kitchen copy of the bill, then the KOT
+    const kitchenOrder = { ...enrichedOrder, items: kitchenItems };
+
+    for (const kitchenPrinterName of kitchenPrinters) {
+      const kitchenQueue = this._getQueue(kitchenPrinterName);
+      if (!kitchenQueue) continue;
+
+      // Kitchen Bill Copy (same bill format, marked as "Kitchen Copy")
+      if (attachBill) {
+        const kitchenBillHtml = this.generateReceiptHtml(kitchenOrder, true); // isKitchenCopy = true
+        const kitchenBillJob = {
+          type: 'KITCHEN_BILL_COPY',
+          htmlContent: kitchenBillHtml,
+          paperWidth: paperWidth,
+          orderNumber: orderNumber,
+          orderId: enrichedOrder.id
+        };
+
+        const kitchenBillPromise = kitchenQueue.enqueue(kitchenBillJob, this.printHtml.bind(this))
+          .then(r => { results.kitchenCopies.push({ ...r, type: 'KITCHEN_BILL_COPY', printer: kitchenPrinterName }); })
+          .catch(e => { 
+            results.kitchenCopies.push({ success: false, error: e.message, type: 'KITCHEN_BILL_COPY', printer: kitchenPrinterName });
+            results.errors.push({ type: 'KITCHEN_BILL_COPY', printer: kitchenPrinterName, error: e.message });
+          });
+        allJobPromises.push(kitchenBillPromise);
+      }
+
+      // KOT print (kitchen order ticket format)
+      if (kitchenItems.length > 0) {
+        // Filter items for this specific printer's station
+        let stationItems = kitchenItems;
+        let stationName = null;
+
+        // Find items mapped to this printer's station
+        const stationsForPrinter = categoryMap.filter(m => m.printer_name === kitchenPrinterName);
+        if (stationsForPrinter.length > 0) {
+          const mappedCategoryIds = stationsForPrinter.map(m => m.category_id);
+          const filteredItems = kitchenItems.filter(item => mappedCategoryIds.includes(item.category_id));
+          if (filteredItems.length > 0) {
+            stationItems = filteredItems;
+            stationName = stationsForPrinter[0].station_name;
+          }
+        }
+
+        const kotHtml = this.generateKOTHtml(kitchenOrder, stationItems, null, stationName);
+        const kotJob = {
+          type: 'KOT',
+          htmlContent: kotHtml,
+          paperWidth: '80', // KOT always 80mm
+          orderNumber: orderNumber,
+          orderId: enrichedOrder.id
+        };
+
+        const kotPromise = kitchenQueue.enqueue(kotJob, this.printHtml.bind(this))
+          .then(r => { results.kots.push({ ...r, type: 'KOT', printer: kitchenPrinterName }); })
+          .catch(e => { 
+            results.kots.push({ success: false, error: e.message, type: 'KOT', printer: kitchenPrinterName });
+            results.errors.push({ type: 'KOT', printer: kitchenPrinterName, error: e.message });
+          });
+        allJobPromises.push(kotPromise);
+      }
+    }
+
+    // 4. Wait for all queues to process (they run independently per printer)
+    await Promise.allSettled(allJobPromises);
+
+    // 5. Log summary
+    const totalJobs = (results.bill ? 1 : 0) + results.kitchenCopies.length + results.kots.length;
+    const failedJobs = results.errors.length;
+    log.info(`[DISPATCH] Order #${orderNumber} COMPLETE: ${totalJobs} jobs dispatched, ${failedJobs} failed`);
+    if (failedJobs > 0) {
+      log.error(`[DISPATCH] Failed jobs:`, results.errors);
+    }
+    log.info(`${'═'.repeat(60)}\n`);
+
+    return { success: true, ...results };
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  DIRECT PRINT METHODS (for standalone operations)
+  //  These use the queue system for individual prints
+  // ═══════════════════════════════════════════════════════════
+
+  // ─── Print Receipt (standalone, e.g. reprint) ──────────────
   async printReceipt(order, printerName = null) {
     try {
+      if (!printerName) {
+        log.warn('[PrinterService] printReceipt called with no printerName');
+        return { success: false, error: 'No printer configured' };
+      }
       const html = this.generateReceiptHtml(order);
-      return await this.printHtml(html, printerName, order.paperWidth || '80');
+      const queue = this._getQueue(printerName);
+      if (!queue) return { success: false, error: 'Could not create printer queue' };
+
+      return await queue.enqueue(
+        { type: 'BILL', htmlContent: html, paperWidth: order.paperWidth || '80', orderNumber: order.order_number || 'N/A' },
+        this.printHtml.bind(this)
+      );
     } catch (error) {
       log.error('Print receipt error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // ─── Print Kitchen Bill Copy (same design as customer bill, marked as Kitchen Copy) ──
+  // ─── Print Kitchen Bill Copy ───────────────────────────────
   async printKitchenBillCopy(order, printerName = null) {
     try {
-      const html = this.generateReceiptHtml(order, true); // isKitchenCopy = true
-      return await this.printHtml(html, printerName, order.paperWidth || '80');
+      if (!printerName) return { success: false, error: 'No printer configured' };
+      const html = this.generateReceiptHtml(order, true);
+      const queue = this._getQueue(printerName);
+      if (!queue) return { success: false, error: 'Could not create printer queue' };
+
+      return await queue.enqueue(
+        { type: 'KITCHEN_BILL_COPY', htmlContent: html, paperWidth: order.paperWidth || '80', orderNumber: order.order_number || 'N/A' },
+        this.printHtml.bind(this)
+      );
     } catch (error) {
       log.error('Print kitchen bill copy error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // ─── Print KOT (kept for backward compatibility / void KOTs) ──
+  // ─── Print KOT ─────────────────────────────────────────────
   async printKOT(order, items, printerName = null, kotNumber = null, stationName = null, isReprint = false) {
     try {
+      if (!printerName) return { success: false, error: 'No printer configured' };
       const html = this.generateKOTHtml(order, items, kotNumber, stationName, isReprint);
-      return await this.printHtml(html, printerName, '80');
+      const queue = this._getQueue(printerName);
+      if (!queue) return { success: false, error: 'Could not create printer queue' };
+
+      return await queue.enqueue(
+        { type: 'KOT', htmlContent: html, paperWidth: '80', orderNumber: order.order_number || 'N/A' },
+        this.printHtml.bind(this)
+      );
     } catch (error) {
       log.error('Print KOT error:', error);
       return { success: false, error: error.message };
@@ -180,8 +448,15 @@ class PrinterService {
   // ─── Print Void KOT ───────────────────────────────────────
   async printVoidKOT(order, items, reason, printerName = null, kotNumber = null) {
     try {
+      if (!printerName) return { success: false, error: 'No printer configured' };
       const html = this.generateVoidKOTHtml(order, items, reason, kotNumber);
-      return await this.printHtml(html, printerName, '80');
+      const queue = this._getQueue(printerName);
+      if (!queue) return { success: false, error: 'Could not create printer queue' };
+
+      return await queue.enqueue(
+        { type: 'VOID_KOT', htmlContent: html, paperWidth: '80', orderNumber: order.order_number || 'N/A' },
+        this.printHtml.bind(this)
+      );
     } catch (error) {
       log.error('Print Void KOT error:', error);
       return { success: false, error: error.message };
@@ -197,10 +472,22 @@ class PrinterService {
           <div class="divider-solid"></div>
           <p style="font-size: 14px; margin: 10px 0; font-weight: 700;">Printer is working correctly!</p>
           <p style="font-size: 12px; color: #000;">${new Date().toLocaleString()}</p>
+          <p style="font-size: 11px; color: #000; margin-top: 4px;">Printer: ${printerName || 'default'}</p>
           <div class="divider-solid"></div>
           <p style="font-size: 11px; color: #000; margin-top: 8px;">ZapBill POS System</p>
         </div>
       `;
+
+      if (printerName) {
+        const queue = this._getQueue(printerName);
+        if (queue) {
+          return await queue.enqueue(
+            { type: 'TEST', htmlContent: html, paperWidth: '80', orderNumber: 'TEST' },
+            this.printHtml.bind(this)
+          );
+        }
+      }
+      // Fallback: direct print without queue
       return await this.printHtml(html, printerName);
     } catch (error) {
       log.error('Test print error:', error);
@@ -216,9 +503,6 @@ class PrinterService {
   /**
    * Generate receipt HTML — mirrors the BillViewModal from OrdersPage.
    * Same format is used for customer bill and kitchen copy.
-   * 
-   * @param {Object} order - Enriched order object
-   * @param {boolean} isKitchenCopy - If true, adds "KITCHEN COPY" badge at top
    */
   generateReceiptHtml(order, isKitchenCopy = false) {
     const items = order.items || [];
@@ -234,14 +518,14 @@ class PrinterService {
     const logoHtml = order.showLogo && order.logoPath
       ? `<div class="logo"><img src="${order.logoPath}" alt="Logo"></div>` : '';
 
-    // Restaurant header — matches BillViewModal style
+    // Restaurant header
     const restaurantName = order.restaurantName || 'Restaurant POS';
     const address = order.restaurantAddress ? `<div class="subheader">${order.restaurantAddress}</div>` : '';
     const phone = order.restaurantPhone ? `<div class="subheader">Tel: ${order.restaurantPhone}</div>` : '';
     const gst = order.gstNumber ? `<div class="subheader" style="font-weight:700;">GSTIN: ${order.gstNumber}</div>` : '';
     const fssai = order.fssaiNumber ? `<div class="subheader">FSSAI: ${order.fssaiNumber}</div>` : '';
 
-    // Format date like BillViewModal
+    // Format date
     const formatDate = (dateStr) => {
       try {
         return new Date(dateStr).toLocaleString('en-IN', {
@@ -251,7 +535,7 @@ class PrinterService {
       } catch (e) { return ''; }
     };
 
-    // Order details — key:value pairs like BillViewModal
+    // Order details
     let orderDetails = '';
     orderDetails += `<div class="row"><span class="label">Bill No:</span><strong>#${order.order_number || ''}</strong></div>`;
     orderDetails += `<div class="row"><span class="label">Date:</span><span>${formatDate(order.created_at || new Date().toISOString())}</span></div>`;
@@ -270,7 +554,7 @@ class PrinterService {
       }
     }
 
-    // Items — matches BillViewModal format: "Item Name × Qty  ₹Amount"
+    // Items
     const itemsHtml = items.map(item => {
       let details = '';
       if (item.variant) {
@@ -307,7 +591,7 @@ class PrinterService {
         ${details}${taxInfo}`;
     }).join('');
 
-    // Totals — matches BillViewModal format
+    // Totals
     let totalsHtml = '';
     totalsHtml += `<div class="row"><span class="label">Subtotal:</span><span>${cs}${(order.subtotal || 0).toFixed(2)}</span></div>`;
     
@@ -382,7 +666,7 @@ class PrinterService {
     `;
   }
 
-  // ─── KOT HTML (kept for void KOTs and backward compat) ────
+  // ─── KOT HTML ──────────────────────────────────────────────
   generateKOTHtml(order, items, kotNumber = null, stationName = null, isReprint = false) {
     const reprintBadge = isReprint
       ? '<div class="reprint-badge">*** REPRINT KOT ***</div>' : '';
@@ -496,186 +780,7 @@ class PrinterService {
     `;
   }
 
-  // ─── Print KOT with attached mini-bill (backward compat) ──
-  async printKOTWithBill(order, kotItems, allItems, printerName, stationName = null) {
-    try {
-      const kotHtml = this.generateKOTHtml(order, kotItems, null, stationName);
-      return await this.printHtml(kotHtml, printerName, '80');
-    } catch (error) {
-      log.error('Print KOT with bill error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // ─── Station-Wise KOT Routing (backward compat) ──────────
-  async printStationKOTs(order, items, stationMap, defaultPrinterName, attachBill = false, billPrinterName = null) {
-    // Group items by station
-    const stationGroups = {};
-    const unmappedItems = [];
-
-    for (const item of items) {
-      const mapping = stationMap.find(m => m.category_id === item.category_id);
-      if (mapping) {
-        const key = mapping.station_id;
-        if (!stationGroups[key]) {
-          stationGroups[key] = {
-            stationId: mapping.station_id,
-            stationName: mapping.station_name,
-            printerName: mapping.printer_name,
-            items: []
-          };
-        }
-        stationGroups[key].items.push(item);
-      } else {
-        unmappedItems.push(item);
-      }
-    }
-
-    // Collect unique printer names we need to send the kitchen bill copy to
-    const kitchenPrinters = new Set();
-    for (const [, group] of Object.entries(stationGroups)) {
-      kitchenPrinters.add(group.printerName);
-    }
-    if (unmappedItems.length > 0 && defaultPrinterName) {
-      kitchenPrinters.add(defaultPrinterName);
-    }
-
-    // Send ONE bill copy to each unique kitchen printer
-    const printJobs = [];
-    for (const printerName of kitchenPrinters) {
-      // If this printer is the same as bill printer, it will be handled sequentially by smartPrint
-      if (billPrinterName && printerName === billPrinterName) {
-        // Sequential — print after delay (handled by smartPrint caller)
-        printJobs.push(
-          this.printKitchenBillCopy(order, printerName)
-            .catch(err => ({ success: false, error: err.message, printer: printerName }))
-        );
-      } else {
-        // Different printer — fire immediately
-        printJobs.push(
-          this.printKitchenBillCopy(order, printerName)
-            .catch(err => ({ success: false, error: err.message, printer: printerName }))
-        );
-      }
-    }
-
-    const results = await Promise.allSettled(printJobs);
-    const failures = results.filter(r => r.status === 'rejected' || (r.value && !r.value.success));
-    if (failures.length > 0) {
-      log.warn('Some kitchen bill copies failed:', failures);
-    }
-
-    return {
-      success: true,
-      printerCount: kitchenPrinters.size
-    };
-  }
-
-  /**
-   * Smart print: Customer bill + one kitchen bill copy.
-   * When same printer: bill first → delay → kitchen copy.
-   * When different printers: both fire in parallel.
-   *
-   * @param {Object} order - Enriched order object
-   * @param {Array} items - Order items (used only for excluded items filtering on the kitchen copy order)
-   * @param {Array} stationMap - Category-station mappings (used to find kitchen printers)
-   * @param {string} defaultKotPrinter - Fallback kitchen printer
-   * @param {boolean} attachBill - (unused, kept for API compatibility)
-   * @param {string} billPrinterName - Bill printer name
-   * @param {boolean} printBill - Whether to print the customer bill
-   * @param {Array} excludedItemIds - Item IDs excluded from kitchen copy
-   * @returns {Promise}
-   */
-  async smartPrint(order, items, stationMap, defaultKotPrinter, attachBill, billPrinterName, printBill = false, excludedItemIds = []) {
-    // 1. Build a kitchen-specific order with excluded items filtered out
-    const kitchenItems = items.filter(item => {
-      const itemId = item.menu_item_id || item.id;
-      return !excludedItemIds.includes(itemId);
-    });
-    const kitchenOrder = { ...order, items: kitchenItems };
-
-    // 2. Determine kitchen printer(s) from station map
-    const kitchenPrinters = new Set();
-    for (const item of kitchenItems) {
-      const mapping = stationMap.find(m => m.category_id === item.category_id);
-      if (mapping) {
-        kitchenPrinters.add(mapping.printer_name);
-      } else if (defaultKotPrinter) {
-        kitchenPrinters.add(defaultKotPrinter);
-      }
-    }
-
-    // If no kitchen printers identified but we have a default, use it
-    if (kitchenPrinters.size === 0 && defaultKotPrinter && kitchenItems.length > 0) {
-      kitchenPrinters.add(defaultKotPrinter);
-    }
-
-    // 3. Check if any kitchen printer is the same as the bill printer
-    const hasSamePrinterConflict = billPrinterName && kitchenPrinters.has(billPrinterName);
-
-    if (printBill && billPrinterName && hasSamePrinterConflict) {
-      // SEQUENTIAL: Bill first → wait → kitchen copy on same printer
-      log.info('Same printer detected for bill and kitchen — printing sequentially');
-
-      // Print customer bill first
-      const billResult = await this.printReceipt(order, billPrinterName)
-        .catch(err => ({ success: false, error: err.message, type: 'receipt' }));
-
-      // Wait for bill to complete and eject paper
-      await this._delay(this.SAME_PRINTER_DELAY);
-
-      // Print kitchen copy on same printer
-      const samePrinterKitchenResult = await this.printKitchenBillCopy(kitchenOrder, billPrinterName)
-        .catch(err => ({ success: false, error: err.message, type: 'kitchen' }));
-
-      // Print kitchen copies on other printers (parallel)
-      const otherPrinterJobs = [];
-      for (const printerName of kitchenPrinters) {
-        if (printerName !== billPrinterName) {
-          otherPrinterJobs.push(
-            this.printKitchenBillCopy(kitchenOrder, printerName)
-              .catch(err => ({ success: false, error: err.message, type: 'kitchen' }))
-          );
-        }
-      }
-      if (otherPrinterJobs.length > 0) {
-        await Promise.allSettled(otherPrinterJobs);
-      }
-
-      return { success: true, billResult, kitchenResult: samePrinterKitchenResult, sequential: true };
-
-    } else {
-      // PARALLEL: Different printers — fire all at once
-      log.info('Different printers for bill and kitchen — printing in parallel');
-
-      const printJobs = [];
-
-      // Kitchen copies
-      for (const printerName of kitchenPrinters) {
-        printJobs.push(
-          this.printKitchenBillCopy(kitchenOrder, printerName)
-            .catch(err => ({ success: false, error: err.message, type: 'kitchen' }))
-        );
-      }
-
-      // Customer bill
-      if (printBill && billPrinterName) {
-        printJobs.push(
-          this.printReceipt(order, billPrinterName)
-            .catch(err => ({ success: false, error: err.message, type: 'receipt' }))
-        );
-      }
-
-      const results = await Promise.allSettled(printJobs);
-      return {
-        success: true,
-        kitchenResult: results[0]?.value,
-        billResult: printBill ? results[results.length - 1]?.value : null,
-        sequential: false
-      };
-    }
-  }
-
+  // ─── Summary Report HTML ──────────────────────────────────
   generateSummaryReportHtml(reportData, date) {
     const { sales } = reportData;
     const formattedDate = new Date(date).toLocaleDateString('en-IN', { 
@@ -726,11 +831,42 @@ class PrinterService {
   async printSummaryReport(reportData, date, printerName) {
     try {
       const html = this.generateSummaryReportHtml(reportData, date);
+      if (printerName) {
+        const queue = this._getQueue(printerName);
+        if (queue) {
+          return await queue.enqueue(
+            { type: 'REPORT', htmlContent: html, paperWidth: '80', orderNumber: 'REPORT' },
+            this.printHtml.bind(this)
+          );
+        }
+      }
       return await this.printHtml(html, printerName, '80');
     } catch (error) {
       log.error('Print summary report error:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  // ─── Legacy Compatibility Methods ─────────────────────────
+  // These are kept for backward compatibility with any callers
+
+  async printKOTWithBill(order, kotItems, allItems, printerName, stationName = null) {
+    try {
+      return await this.printKOT(order, kotItems, printerName, null, stationName);
+    } catch (error) {
+      log.error('Print KOT with bill error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async printStationKOTs(order, items, stationMap, defaultPrinterName, attachBill = false, billPrinterName = null) {
+    // Redirect to dispatchOrder for proper queue handling
+    return await this.dispatchOrder(order, items, stationMap, defaultPrinterName, attachBill, billPrinterName, false, []);
+  }
+
+  // smartPrint — backward compat, redirects to dispatchOrder
+  async smartPrint(order, items, stationMap, defaultKotPrinter, attachBill, billPrinterName, printBill = false, excludedItemIds = []) {
+    return await this.dispatchOrder(order, items, stationMap, defaultKotPrinter, attachBill, billPrinterName, printBill, excludedItemIds);
   }
 
   // ─── Cleanup ──────────────────────────────────────────────
@@ -743,6 +879,7 @@ class PrinterService {
       if (!win.isDestroyed()) win.close();
     }
     this.activePrints.clear();
+    this.queues.clear();
   }
 }
 

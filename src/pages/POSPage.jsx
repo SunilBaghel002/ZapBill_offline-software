@@ -468,7 +468,7 @@ const POSPage = () => {
         // 3. Clear Cart (done in createOrder)
         // 4. Alert/Notify
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
-        await window.electronAPI.invoke('print:kotRouted', { order: order, items: order.items });
+        await window.electronAPI.invoke('print:kotRouted', { order: order, items: order.items, printBill: true });
         showAlert(`Order #${result.orderNumber} Placed Successfully!`, "success");
         loadData();
       } else {
@@ -595,10 +595,11 @@ const POSPage = () => {
       if (result.success) {
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
 
-        // Print KOT routed to kitchen stations
+        // Print KOT routed to kitchen stations + Bill to counter
         await window.electronAPI.invoke('print:kotRouted', {
           order: order,
-          items: order.items
+          items: order.items,
+          printBill: true
         });
 
         const isFullyPaid = ['cash', 'card', 'upi'].includes(pm) || 
@@ -683,8 +684,12 @@ const POSPage = () => {
           paymentDetails: cart.paymentDetails,
         });
 
-        // Print Receipt
-        await window.electronAPI.invoke('print:receipt', { order: order });
+        // Print KOT to kitchen + Bill to counter
+        await window.electronAPI.invoke('print:kotRouted', {
+          order: order,
+          items: order.items,
+          printBill: true
+        }).catch(err => console.error('KOT+Bill Print Failed', err));
 
         showAlert(`Order #${result.orderNumber} completed! Receipt printed.`, "success");
       } else {
@@ -2472,11 +2477,12 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
         // Get the full order details
         const order = await window.electronAPI.invoke('order:getById', { id: result.id });
 
-        // 1. Print KOT to Kitchen stations immediately when order is placed
-        console.log('Printing KOT to kitchen stations...');
+        // 1. Print KOT to Kitchen stations + Bill to counter simultaneously
+        console.log('Printing KOT to kitchen + Bill to counter...');
         await window.electronAPI.invoke('print:kotRouted', {
           order: order,
-          items: order.items
+          items: order.items,
+          printBill: true
         });
 
         // 2. Complete the order with payment method
@@ -2484,11 +2490,6 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
           id: result.id,
           paymentMethod: method,
         });
-
-        // 3. Refresh order with payment info and print Receipt to customer
-        const completedOrder = await window.electronAPI.invoke('order:getById', { id: result.id });
-        console.log('Printing receipt to customer...');
-        await window.electronAPI.invoke('print:receipt', { order: completedOrder });
 
         setOrderId(result.id);
         setOrderNumber(result.orderNumber);

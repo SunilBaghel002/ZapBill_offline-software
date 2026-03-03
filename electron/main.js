@@ -1268,6 +1268,8 @@ function setupIpcHandlers() {
       const settings = {};
       settingsRows.forEach(row => { settings[row.key] = row.value; });
 
+      log.info(`[print:kotRouted] Order #${order.order_number || 'N/A'} | printBill=${printBill} | billPrinter="${settings.printer_bill || 'NOT SET'}" | kotPrinter="${settings.printer_kot || 'NOT SET'}"`);
+
       // Enrich order with restaurant info (needed for receipt + mini-bill)
       const enrichedOrder = {
         ...order,
@@ -1299,8 +1301,10 @@ function setupIpcHandlers() {
         excludedItemIds = db.getKotExcludedItems().map(r => r.item_id);
       } catch (e) { /* table may not exist yet */ }
 
-      // Use smartPrint which handles same-printer separation automatically
-      const result = await printerService.smartPrint(
+      // Use dispatchOrder which handles per-printer queuing automatically
+      // - Different printers: jobs run in parallel (independent queues)
+      // - Same printer: jobs run sequentially with delay + paper cut
+      const result = await printerService.dispatchOrder(
         enrichedOrder,
         items,
         categoryMap,
