@@ -963,6 +963,16 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('data:importAddonGroups', async (event, { filePath }) => {
+    try {
+      const groups = dataImporter.parseAddonGroups(filePath);
+      return db.importAddonGroups(groups);
+    } catch (error) {
+      log.error('Import addon groups error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // ============ REPORTS ============
   ipcMain.handle('reports:daily', async (event, { date }) => {
     try {

@@ -46,6 +46,7 @@ const dataImporter = {
       return data.map(row => {
         const variants = dataImporter._parseVariants(row['Variants']);
         const addons = dataImporter._parseAddons(row['Addons']);
+        const masterAddons = row['Master Addons'] ? row['Master Addons'].split(',').map(s => s.trim()).filter(Boolean) : null;
 
         return {
           name: row['Item Name'] || row['Name'],
@@ -56,7 +57,8 @@ const dataImporter = {
           description: row['Description'] || '',
           is_vegetarian: (row['Type'] || row['Veg/Non-Veg'] || 'veg').toLowerCase() === 'veg' ? 1 : 0,
           variants: variants ? JSON.stringify(variants) : null,
-          addons: addons ? JSON.stringify(addons) : null
+          addons: addons ? JSON.stringify(addons) : null,
+          master_addons_list: masterAddons // New field for master addon group names
         };
       }).filter(item => item.name); // Filter empty rows
     } catch (error) {
@@ -82,6 +84,42 @@ const dataImporter = {
       })).filter(item => item.name);
     } catch (error) {
       console.error('Error parsing inventory file:', error);
+      throw error;
+    }
+  },
+
+  parseAddonGroups: (filePath) => {
+    try {
+      const workbook = XLSX.readFile(filePath);
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      // Note: Data starts from row 2 (index 1) because row 1 is "Can not change"
+      const data = XLSX.utils.sheet_to_json(sheet, { range: 1 });
+
+      const groups = {};
+      data.forEach(row => {
+        const groupName = row['Addon_Group_Name'];
+        if (!groupName) return;
+
+        if (!groups[groupName]) {
+          groups[groupName] = {
+            name: groupName,
+            is_mandatory: (row['Addon_Min'] > 0) ? 1 : 0,
+            selection_type: (row['Addon_Max'] === 1) ? 'single' : 'multi',
+            items: []
+          };
+        }
+
+        groups[groupName].items.push({
+          name: row['Addon_Item_Name'],
+          price: parseFloat(row['Addon_Item_Price'] || 0),
+          type: (row['Attribute'] || 'veg').toLowerCase()
+        });
+      });
+
+      return Object.values(groups);
+    } catch (error) {
+      console.error('Error parsing addon groups file:', error);
       throw error;
     }
   }

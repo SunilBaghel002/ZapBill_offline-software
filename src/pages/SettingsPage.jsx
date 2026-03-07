@@ -94,7 +94,7 @@ const SettingsPage = () => {
         return;
       }
 
-      const channel = type === 'menu' ? 'data:importMenu' : 'data:importInventory';
+      const channel = type === 'menu' ? 'data:importMenu' : (type === 'inventory' ? 'data:importInventory' : 'data:importAddonGroups');
       const result = await window.electronAPI.invoke(channel, { 
         filePath: fileResult.filePath,
         menuName: type === 'menu' ? importMenuName : null
@@ -105,7 +105,7 @@ const SettingsPage = () => {
           type,
           success: result.successCount,
           error: result.errorCount,
-          menuName: type === 'menu' ? (importMenuName || 'Default Menu') : null,
+          menuName: type === 'menu' ? (importMenuName || 'Default Menu') : (type === 'addonGroups' ? 'Addon Groups' : null),
           details: result.errors || []
         });
         if (type === 'menu') setImportMenuName(''); // Clear after success
@@ -399,20 +399,20 @@ const SettingsPage = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
                   {/* Menu Import Card */}
-                  <div style={{ padding: '24px', border: '1px solid var(--gray-200)', borderRadius: '12px', background: 'white' }}>
+                  <div style={{ padding: '24px', border: '1px solid var(--gray-200)', borderRadius: '12px', background: 'white', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                       <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--primary-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Receipt size={20} style={{ color: 'var(--primary-500)' }} />
                       </div>
                       <h4 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--gray-800)', margin: 0 }}>Import Menu Items</h4>
                     </div>
-                    <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5' }}>
-                      Updates existing items by Name, creates new Categories if needed. Supports <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong> formats.
+                    <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5', flex: 1 }}>
+                      Updates existing items by Name, creates new Categories. Supports <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong>.
                     </p>
                     <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginBottom: '16px', padding: '12px', background: 'var(--gray-50)', borderRadius: '8px' }}>
-                      <strong style={{ color: 'var(--gray-600)' }}>Expected columns:</strong> Name, Category, Price, Tax Rate, Description
+                      <strong style={{ color: 'var(--gray-600)' }}>Expected columns:</strong> Name, Category, Price, Tax Rate, Variants, Master Addons
                     </div>
                     
                     <div style={{ marginBottom: '16px' }}>
@@ -425,9 +425,6 @@ const SettingsPage = () => {
                         onChange={(e) => setImportMenuName(e.target.value)}
                         style={{ fontSize: '12px', padding: '8px 12px' }}
                       />
-                      <p style={{ fontSize: '10px', color: 'var(--gray-400)', marginTop: '4px' }}>
-                        If blank, items will be imported into the currently active menu.
-                      </p>
                     </div>
 
                     <button className="btn btn-primary" onClick={() => handleImport('menu')} disabled={importing !== null}
@@ -437,22 +434,48 @@ const SettingsPage = () => {
                     </button>
                   </div>
 
+                  {/* Addon Groups Import Card */}
+                  <div style={{ padding: '24px', border: '1px solid var(--gray-200)', borderRadius: '12px', background: 'white', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--success-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <RefreshCw size={20} style={{ color: 'var(--success-500)' }} />
+                      </div>
+                      <h4 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--gray-800)', margin: 0 }}>Import Add-on Groups</h4>
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5', flex: 1 }}>
+                      Import Master Add-on groups and their constituent sub-addons (global add-ons).
+                    </p>
+                    <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginBottom: '16px', padding: '12px', background: 'var(--gray-50)', borderRadius: '8px' }}>
+                      <strong style={{ color: 'var(--gray-600)' }}>Expected columns:</strong> Addon_Group_Name, Addon_Item_Name, Addon_Item_Price
+                    </div>
+
+                    <p style={{ fontSize: '11px', color: 'var(--gray-400)', marginBottom: '16px' }}>
+                      Use this for the <strong>client_add_ons.csv</strong> file.
+                    </p>
+
+                    <button className="btn btn-primary" onClick={() => handleImport('addonGroups')} disabled={importing !== null}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center', background: 'var(--success-600)', borderColor: 'var(--success-600)' }}>
+                      <Upload size={16} />
+                      {importing === 'addonGroups' ? 'Importing...' : 'Select Add-ons File'}
+                    </button>
+                  </div>
+
                   {/* Inventory Import Card */}
-                  <div style={{ padding: '24px', border: '1px solid var(--gray-200)', borderRadius: '12px', background: 'white' }}>
+                  <div style={{ padding: '24px', border: '1px solid var(--gray-200)', borderRadius: '12px', background: 'white', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                       <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--info-50)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Database size={20} style={{ color: 'var(--info-500)' }} />
                       </div>
                       <h4 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--gray-800)', margin: 0 }}>Import Inventory</h4>
                     </div>
-                    <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5' }}>
-                      Updates Stock and Unit details for existing inventory items. Supports <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong> formats.
+                    <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5', flex: 1 }}>
+                      Updates Stock and Unit details for existing inventory items.
                     </p>
                     <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginBottom: '16px', padding: '12px', background: 'var(--gray-50)', borderRadius: '8px' }}>
                       <strong style={{ color: 'var(--gray-600)' }}>Expected columns:</strong> Item Name, Stock, Unit, Min Stock
                     </div>
                     <button className="btn btn-primary" onClick={() => handleImport('inventory')} disabled={importing !== null}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center', background: 'var(--info-600)', borderColor: 'var(--info-600)' }}>
                       <Upload size={16} />
                       {importing === 'inventory' ? 'Importing...' : 'Select Inventory File'}
                     </button>

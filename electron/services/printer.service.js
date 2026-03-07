@@ -79,8 +79,6 @@ class PrinterQueue {
 class PrinterService {
   constructor() {
     this.queues = new Map();        // printerName → PrinterQueue
-    this.printPool = [];            // Reusable hidden windows for faster printing
-    this.maxPoolSize = 3;
     this.activePrints = new Set();
     this.JOB_DELAY_MS = 800;       // Delay between sequential jobs on same printer
   }
@@ -98,114 +96,134 @@ class PrinterService {
     return this.queues.get(printerName);
   }
 
-  // ─── Print Pool (High-Speed Window Reuse) ──────────────────
-  _getOrCreatePrintWindow() {
-    if (this.printPool.length > 0) {
-      const win = this.printPool.pop();
-      if (!win.isDestroyed()) return win;
-    }
-    const win = new BrowserWindow({
-      show: false,
-      width: 350,
-      height: 800,
-      webPreferences: { nodeIntegration: false, contextIsolation: true }
-    });
-    return win;
-  }
-
-  _returnToPool(win) {
-    if (!win || win.isDestroyed()) return;
-    if (this.printPool.length < this.maxPoolSize) {
-      this.printPool.push(win);
-    } else {
-      win.close();
-    }
-  }
-
   // ─── Core Print Method (called by queue) ───────────────────
+  // REMOVED POOLING to ensure clean state for every print job.
+  // This prevents Electron from 'remembering' the last used printer in a reused window.
   async printHtml(htmlContent, printerName, paperWidth = '80') {
-    return new Promise((resolve) => {
-      const printWindow = this._getOrCreatePrintWindow();
-      this.activePrints.add(printWindow);
+    return new Promise(async (resolve) => {
+      let printWindow = null;
+      try {
+        // Create a FRESH window for every print to avoid state leakage
+        printWindow = new BrowserWindow({
+          show: false,
+          width: 350,
+          height: 800,
+          webPreferences: { nodeIntegration: false, contextIsolation: true }
+        });
+        this.activePrints.add(printWindow);
 
-      const contentWidth = paperWidth === '58' ? 190 : 272;
-      const pageSize = paperWidth === '58' ? '58mm' : '72mm';
+        const contentWidth = paperWidth === '58' ? 190 : 272;
+        const pageSize = paperWidth === '58' ? '58mm' : '72mm';
 
-      const html = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <style>
-      @page { margin: 0; size: ${pageSize} auto; }
-      body { 
-        margin: 0; padding: 6px 8px; 
-        font-family: 'Courier New', 'Consolas', monospace;
-        font-size: 13px; color: #000; background: #fff;
-        width: ${contentWidth}px; line-height: 1.2;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-        font-weight: 700;
-      }
-      *, *::before, *::after { box-sizing: border-box; }
-      h1,h2,h3,h4,h5,h6,p { margin: 0; padding: 0; }
-      .divider { border-top: 1px dashed #000; margin: 10px 0; }
-      .divider-dark { border-top: 1px dashed #000; margin: 10px 0; }
-      .divider-solid { border-top: 2px solid #000; margin: 8px 0; }
-      .text-center { text-align: center; }
-      .text-right { text-align: right; }
-      .bold { font-weight: 700; }
-      .row { display: flex; justify-content: space-between; line-height: 1.8; }
-      .row .label { color: #000; }
-      .item-row { display: flex; justify-content: space-between; padding: 5px 0; line-height: 1.4; }
-      .item-row .amount { font-weight: 800; }
-      .total-row { display: flex; justify-content: space-between; font-weight: 900; font-size: 18px; margin-top: 8px; padding-top: 10px; border-top: 2px solid #000; }
-      .header { font-weight: 700; font-size: 16px; letter-spacing: 1px; text-align: center; }
-      .subheader { font-size: 11px; text-align: center; color: #000; margin-top: 4px; }
-      .reprint-badge { text-align: center; background: #000; color: #fff; font-weight: 900; padding: 4px; font-size: 14px; letter-spacing: 3px; margin-bottom: 6px; }
-      .kitchen-badge { text-align: center; font-weight: 700; font-size: 12px; letter-spacing: 1px; padding: 4px; border: 2px solid #000; margin-bottom: 6px; }
-      .logo { text-align: center; margin-bottom: 6px; }
-      .logo img { max-width: ${contentWidth - 40}px; max-height: 80px; object-fit: contain; }
-      .qr-section { text-align: center; margin-top: 8px; }
-      .item-detail { font-size: 11px; padding-left: 12px; color: #000; }
-      .tax-detail { font-size: 10px; color: #000; padding-left: 12px; }
-      .kot-header { font-size: 22px; font-weight: 900; text-align: center; letter-spacing: 2px; }
-      .station-name { text-align: center; background: #000; color: #fff; font-weight: 900; padding: 6px; font-size: 16px; margin-bottom: 6px; letter-spacing: 1px; }
-      .kot-item { font-size: 15px; font-weight: 900; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dotted #000; }
-      .kot-note { font-size: 13px; background: #000; color: #fff; font-weight: 700; padding: 4px 8px; margin-top: 3px; }
-      .void-badge { text-align: center; border: 3px solid #000; font-weight: 900; padding: 8px; font-size: 20px; letter-spacing: 3px; margin-bottom: 8px; }
-      /* Paper cut trigger - forces page break which triggers thermal cutter */
-      .paper-cut { page-break-after: always; height: 0; visibility: hidden; }
-    </style>
-  </head>
-  <body>${htmlContent}<div class="paper-cut"></div></body>
-</html>`;
+        // 1. Get system printers to validate name and find default if needed
+        const systemPrinters = await printWindow.webContents.getPrintersAsync();
+        let targetPrinter = null;
 
-      printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+        if (printerName) {
+          // Check if the requested printer exists in system
+          const found = systemPrinters.find(p => p.name === printerName || p.displayName === printerName);
+          if (found) {
+            targetPrinter = found.name;
+          } else {
+            log.warn(`[PrinterService] Printer "${printerName}" not found in system! Falling back to default.`);
+            const defaultPrinter = systemPrinters.find(p => p.isDefault);
+            targetPrinter = defaultPrinter ? defaultPrinter.name : systemPrinters[0]?.name;
+          }
+        } else {
+          // No printer specified, use default
+          const defaultPrinter = systemPrinters.find(p => p.isDefault);
+          targetPrinter = defaultPrinter ? defaultPrinter.name : systemPrinters[0]?.name;
+          log.info(`[PrinterService] No printer specified, using system default: "${targetPrinter}"`);
+        }
 
-      printWindow.webContents.on('did-finish-load', () => {
+        log.info(`[PrinterService] Finalizing routing: Requested="${printerName || 'DEFAULT'}" -> Actual="${targetPrinter}"`);
+
+        const html = `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        @page { margin: 0; size: ${pageSize} auto; }
+        body { 
+          margin: 0; padding: 6px 8px; 
+          font-family: 'Courier New', 'Consolas', monospace;
+          font-size: 13px; color: #000; background: #fff;
+          width: ${contentWidth}px; line-height: 1.2;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+          font-weight: 700;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        h1,h2,h3,h4,h5,h6,p { margin: 0; padding: 0; }
+        .divider { border-top: 1px dashed #000; margin: 10px 0; }
+        .divider-dark { border-top: 1px dashed #000; margin: 10px 0; }
+        .divider-solid { border-top: 2px solid #000; margin: 8px 0; }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .bold { font-weight: 700; }
+        .row { display: flex; justify-content: space-between; line-height: 1.8; }
+        .row .label { color: #000; }
+        .item-row { display: flex; justify-content: space-between; padding: 5px 0; line-height: 1.4; }
+        .item-row .amount { font-weight: 800; }
+        .total-row { display: flex; justify-content: space-between; font-weight: 900; font-size: 18px; margin-top: 8px; padding-top: 10px; border-top: 2px solid #000; }
+        .header { font-weight: 700; font-size: 16px; letter-spacing: 1px; text-align: center; }
+        .subheader { font-size: 11px; text-align: center; color: #000; margin-top: 4px; }
+        .reprint-badge { text-align: center; background: #000; color: #fff; font-weight: 900; padding: 4px; font-size: 14px; letter-spacing: 3px; margin-bottom: 6px; }
+        .kitchen-badge { text-align: center; font-weight: 700; font-size: 12px; letter-spacing: 1px; padding: 4px; border: 2px solid #000; margin-bottom: 6px; }
+        .logo { text-align: center; margin-bottom: 6px; }
+        .logo img { max-width: ${contentWidth - 40}px; max-height: 80px; object-fit: contain; }
+        .qr-section { text-align: center; margin-top: 8px; }
+        .item-detail { font-size: 11px; padding-left: 12px; color: #000; }
+        .tax-detail { font-size: 10px; color: #000; padding-left: 12px; }
+        .kot-header { font-size: 22px; font-weight: 900; text-align: center; letter-spacing: 2px; }
+        .station-name { text-align: center; background: #000; color: #fff; font-weight: 900; padding: 6px; font-size: 16px; margin-bottom: 6px; letter-spacing: 1px; }
+        .kot-item { font-size: 15px; font-weight: 900; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dotted #000; }
+        .kot-note { font-size: 13px; background: #000; color: #fff; font-weight: 700; padding: 4px 8px; margin-top: 3px; }
+        .void-badge { text-align: center; border: 3px solid #000; font-weight: 900; padding: 8px; font-size: 20px; letter-spacing: 3px; margin-bottom: 8px; }
+        /* Paper cut trigger - forces page break which triggers thermal cutter */
+        .paper-cut { page-break-after: always; height: 0; visibility: hidden; }
+      </style>
+    </head>
+    <body>${htmlContent}<div class="paper-cut"></div></body>
+  </html>`;
+
+        await printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+
         const options = {
           silent: true,
+          deviceName: targetPrinter, // ALWAYS provide a deviceName to prevent implicit 'last used' fallback
           printBackground: true,
           color: false,
           margin: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
           scaleFactor: 100
         };
-        if (printerName) options.deviceName = printerName;
+
+        log.info(`[PrinterService] Executing webContents.print to: "${targetPrinter}" (silent=true)`);
 
         printWindow.webContents.print(options, (success, errorType) => {
           if (!success) {
-            log.error(`[PrinterService] printHtml FAILED on "${printerName}": ${errorType}`);
+            log.error(`[PrinterService] printHtml FAILED on "${targetPrinter}": ${errorType}`);
             resolve({ success: false, error: errorType });
           } else {
             resolve({ success: true });
           }
           
+          // Clean up the window immediately after printing
           setTimeout(() => {
-            this.activePrints.delete(printWindow);
-            this._returnToPool(printWindow);
-          }, 1000);
+            if (printWindow && !printWindow.isDestroyed()) {
+              this.activePrints.delete(printWindow);
+              printWindow.close();
+            }
+          }, 1500);
         });
-      });
+      } catch (error) {
+        log.error(`[PrinterService] Core print error: ${error.message}`);
+        if (printWindow && !printWindow.isDestroyed()) {
+          this.activePrints.delete(printWindow);
+          printWindow.close();
+        }
+        resolve({ success: false, error: error.message });
+      }
     });
   }
 

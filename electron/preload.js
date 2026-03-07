@@ -94,6 +94,7 @@ const validInvokeChannels = [
   // Data Import
   'data:importMenu',
   'data:importInventory',
+  'data:importAddonGroups',
   // Printing
   'print:receipt',
   'print:kot',

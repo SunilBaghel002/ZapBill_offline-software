@@ -1065,6 +1065,19 @@ class Database {
               [categoryId, item.category, 99, 1, targetMenuId]);
           }
 
+          // 1.5 Resolve Master Addon IDs from names
+          let masterAddonIds = null;
+          if (item.master_addons_list && item.master_addons_list.length > 0) {
+            const ids = [];
+            for (const maName of item.master_addons_list) {
+              const maResult = this._rawQuery('SELECT id FROM master_addons WHERE name = ? AND is_deleted = 0 COLLATE NOCASE', [maName]);
+              if (maResult && maResult.length > 0) {
+                ids.push(maResult[0].id);
+              }
+            }
+            if (ids.length > 0) masterAddonIds = JSON.stringify(ids);
+          }
+
           // 2. Insert or Update Menu Item within THIS menu and THIS category
           const existing = this._rawQuery('SELECT id FROM menu_items WHERE name = ? AND menu_id = ? AND is_deleted = 0 COLLATE NOCASE', [item.name, targetMenuId]);
           
@@ -1072,16 +1085,16 @@ class Database {
             // Update
             this.db.run(`
               UPDATE menu_items SET 
-                category_id = ?, price = ?, tax_rate = ?, is_vegetarian = ?, description = ?, variants = ?, addons = ?, updated_at = ?
+                category_id = ?, price = ?, tax_rate = ?, is_vegetarian = ?, description = ?, variants = ?, addons = ?, master_addon_ids = ?, updated_at = ?
               WHERE id = ?
-            `, [categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, new Date().toISOString(), existing[0].id]);
+            `, [categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, masterAddonIds, new Date().toISOString(), existing[0].id]);
           } else {
             // Insert
             const id = uuidv4();
             this.db.run(`
-              INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, variants, addons, is_available, created_at, updated_at, is_deleted, menu_id)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0, ?)
-            `, [id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, new Date().toISOString(), new Date().toISOString(), targetMenuId]);
+              INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, variants, addons, master_addon_ids, is_available, created_at, updated_at, is_deleted, menu_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0, ?)
+            `, [id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, masterAddonIds, new Date().toISOString(), new Date().toISOString(), targetMenuId]);
           }
           successCount++;
         } catch (err) {
@@ -1146,6 +1159,60 @@ class Database {
       return { success: false, error: 'Transaction failed: ' + e.message };
     }
     
+    this.save();
+    return { success: true, successCount, errorCount, errors };
+  }
+
+  importAddonGroups(groups) {
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    this.db.run('BEGIN TRANSACTION');
+    try {
+      for (const group of groups) {
+        try {
+          // 1. Ensure all items in the group exist as global addons
+          const addonIds = [];
+          for (const item of group.items) {
+            const existingAddon = this._rawQuery('SELECT id FROM addons WHERE name = ? AND is_deleted = 0 COLLATE NOCASE', [item.name]);
+            let addonId;
+            if (existingAddon && existingAddon.length > 0) {
+              addonId = existingAddon[0].id;
+              // Update price/type if different
+              this.db.run('UPDATE addons SET price = ?, type = ?, updated_at = ? WHERE id = ?', 
+                [item.price, item.type, new Date().toISOString(), addonId]);
+            } else {
+              addonId = uuidv4();
+              this.db.run('INSERT INTO addons (id, name, price, type, is_available, created_at, updated_at, is_deleted) VALUES (?, ?, ?, ?, 1, ?, ?, 0)',
+                [addonId, item.name, item.price, item.type, new Date().toISOString(), new Date().toISOString()]);
+            }
+            addonIds.push(addonId);
+          }
+
+          // 2. Create or Update Master Addon Group
+          const existingGroup = this._rawQuery('SELECT id FROM master_addons WHERE name = ? AND is_deleted = 0 COLLATE NOCASE', [group.name]);
+          if (existingGroup && existingGroup.length > 0) {
+            this.db.run('UPDATE master_addons SET addon_ids = ?, is_mandatory = ?, selection_type = ?, updated_at = ? WHERE id = ?',
+              [JSON.stringify(addonIds), group.is_mandatory, group.selection_type, new Date().toISOString(), existingGroup[0].id]);
+          } else {
+            const groupId = uuidv4();
+            this.db.run('INSERT INTO master_addons (id, name, addon_ids, is_mandatory, selection_type, created_at, updated_at, is_deleted) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+              [groupId, group.name, JSON.stringify(addonIds), group.is_mandatory, group.selection_type, new Date().toISOString(), new Date().toISOString()]);
+          }
+          successCount++;
+        } catch (err) {
+          console.error(`Addon group import error (${group.name}):`, err);
+          errorCount++;
+          errors.push(`${group.name}: ${err.message}`);
+        }
+      }
+      this.db.run('COMMIT');
+    } catch (e) {
+      console.error('Addon group import transaction failed:', e);
+      try { this.db.run('ROLLBACK'); } catch (rollbackErr) {}
+      return { success: false, error: 'Transaction failed: ' + e.message };
+    }
     this.save();
     return { success: true, successCount, errorCount, errors };
   }
