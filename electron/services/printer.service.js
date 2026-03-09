@@ -278,21 +278,31 @@ class PrinterService {
       return !excludedItemIds.includes(itemId);
     });
 
-    // 2. Determine kitchen printer(s) from station map
-    const kitchenPrinters = new Set();
-    for (const item of kitchenItems) {
-      const mapping = categoryMap.find(m => m.category_id === item.category_id);
-      if (mapping) {
-        kitchenPrinters.add(mapping.printer_name);
-      } else if (defaultKotPrinter) {
-        kitchenPrinters.add(defaultKotPrinter);
-      }
-    }
-    if (kitchenPrinters.size === 0 && defaultKotPrinter && kitchenItems.length > 0) {
-      kitchenPrinters.add(defaultKotPrinter);
+    log.info(`[DISPATCH] KitchenItems (after exclusion): ${kitchenItems.length}`);
+    log.info(`[DISPATCH] CategoryMap entries: ${categoryMap.length}`);
+    if (categoryMap.length > 0) {
+      log.info(`[DISPATCH] CategoryMap sample: ${JSON.stringify(categoryMap.slice(0, 5))}`);
     }
 
-    log.info(`[DISPATCH] Kitchen printers resolved: [${[...kitchenPrinters].join(', ')}]`);
+    // 2. Determine target printers for Kitchen Bill Copy based on ALL items
+    // This ensures Bill Copy prints even if all items are excluded from KOT
+    const allKitchenPrinters = new Set();
+    for (const item of items) {
+      // Use String() to avoid type mismatch (category_id could be int or string)
+      const itemCatId = String(item.category_id);
+      const mapping = categoryMap.find(m => String(m.category_id) === itemCatId);
+      if (mapping) {
+        allKitchenPrinters.add(mapping.printer_name);
+      } else if (defaultKotPrinter) {
+        allKitchenPrinters.add(defaultKotPrinter);
+      }
+    }
+    // If no explicit mappings but we have a default KOT printer, use it
+    if (allKitchenPrinters.size === 0 && defaultKotPrinter) {
+      allKitchenPrinters.add(defaultKotPrinter);
+    }
+
+    log.info(`[DISPATCH] Target Kitchen Printers resolved: [${[...allKitchenPrinters].join(', ')}]`);
 
     // 3. Build print jobs
     const allJobPromises = [];
@@ -322,17 +332,15 @@ class PrinterService {
       }
     }
 
-    // ── KITCHEN BILL COPY + KOT JOBS ──
-    // For each kitchen printer, send a kitchen copy of the bill, then the KOT
-    const kitchenOrder = { ...enrichedOrder, items: kitchenItems };
+    // ── KITCHEN BILL COPY JOBS ──
+    // Send a kitchen copy to all target printers (if attachBill is true)
+    if (attachBill) {
+      const copyOrder = { ...enrichedOrder, items: items }; // Bill copy usually shows all items
+      for (const kitchenPrinterName of allKitchenPrinters) {
+        const kitchenQueue = this._getQueue(kitchenPrinterName);
+        if (!kitchenQueue) continue;
 
-    for (const kitchenPrinterName of kitchenPrinters) {
-      const kitchenQueue = this._getQueue(kitchenPrinterName);
-      if (!kitchenQueue) continue;
-
-      // Kitchen Bill Copy (same bill format, marked as "Kitchen Copy")
-      if (attachBill) {
-        const kitchenBillHtml = this.generateReceiptHtml(kitchenOrder, true); // isKitchenCopy = true
+        const kitchenBillHtml = this.generateReceiptHtml(copyOrder, true); // isKitchenCopy = true
         const kitchenBillJob = {
           type: 'KITCHEN_BILL_COPY',
           htmlContent: kitchenBillHtml,
@@ -349,25 +357,70 @@ class PrinterService {
           });
         allJobPromises.push(kitchenBillPromise);
       }
+    }
 
-      // KOT print (kitchen order ticket format)
-      if (kitchenItems.length > 0) {
-        // Filter items for this specific printer's station
-        let stationItems = kitchenItems;
-        let stationName = null;
+    // ── KOT JOBS (Grouped by Station) ──
+    if (kitchenItems.length > 0) {
+      // Group items by station_id (or a default 'unmapped' group)
+      const stationGroups = new Map(); // stationKey -> { name, printer, items }
+      const UNMAPPED_KEY = '__unmapped_default__';
 
-        // Find items mapped to this printer's station
-        const stationsForPrinter = categoryMap.filter(m => m.printer_name === kitchenPrinterName);
-        if (stationsForPrinter.length > 0) {
-          const mappedCategoryIds = stationsForPrinter.map(m => m.category_id);
-          const filteredItems = kitchenItems.filter(item => mappedCategoryIds.includes(item.category_id));
-          if (filteredItems.length > 0) {
-            stationItems = filteredItems;
-            stationName = stationsForPrinter[0].station_name;
+      for (const item of kitchenItems) {
+        const itemCatId = String(item.category_id);
+        // Find ALL mappings for this item's category (a category can map to multiple stations)
+        const mappings = categoryMap.filter(m => String(m.category_id) === itemCatId);
+        
+        log.info(`[DISPATCH] Item "${item.item_name}" cat_id="${itemCatId}" → ${mappings.length} station mapping(s)`);
+
+        if (mappings.length > 0) {
+          // Send this item to each mapped station
+          for (const mapping of mappings) {
+            const key = mapping.station_id || mapping.station_name;
+            log.info(`[DISPATCH]   → Station: "${mapping.station_name}" (id=${mapping.station_id}) printer="${mapping.printer_name}"`);
+            if (!stationGroups.has(key)) {
+              stationGroups.set(key, {
+                name: mapping.station_name,
+                printer: mapping.printer_name,
+                items: []
+              });
+            }
+            stationGroups.get(key).items.push(item);
           }
+        } else {
+          // Unmapped item goes to default KOT printer
+          log.info(`[DISPATCH]   → No station mapping, using default KOT printer`);
+          if (!stationGroups.has(UNMAPPED_KEY)) {
+            stationGroups.set(UNMAPPED_KEY, {
+              name: null, // No specific station name
+              printer: defaultKotPrinter,
+              items: []
+            });
+          }
+          stationGroups.get(UNMAPPED_KEY).items.push(item);
+        }
+      }
+
+      log.info(`[DISPATCH] Station groups formed: ${stationGroups.size}`);
+      for (const [key, group] of stationGroups.entries()) {
+        log.info(`[DISPATCH]   Station "${group.name || 'Default'}" → ${group.items.length} items → printer="${group.printer}"`);
+      }
+
+      // Generate a KOT job for each station group
+      for (const [key, group] of stationGroups.entries()) {
+        const printerToUse = group.printer;
+        if (!printerToUse) {
+          log.warn(`[DISPATCH] Skipping KOT for station "${group.name}" — no printer assigned`);
+          continue;
+        }
+        const kitchenQueue = this._getQueue(printerToUse);
+        if (!kitchenQueue) {
+          log.warn(`[DISPATCH] Skipping KOT for station "${group.name}" — could not get queue for "${printerToUse}"`);
+          continue;
         }
 
-        const kotHtml = this.generateKOTHtml(kitchenOrder, stationItems, null, stationName);
+        const kotOrder = { ...enrichedOrder, items: group.items };
+        const kotHtml = this.generateKOTHtml(kotOrder, group.items, null, group.name);
+        
         const kotJob = {
           type: 'KOT',
           htmlContent: kotHtml,
@@ -376,14 +429,33 @@ class PrinterService {
           orderId: enrichedOrder.id
         };
 
+        log.info(`[DISPATCH] Enqueuing KOT for station "${group.name || 'Default'}" with ${group.items.length} items to printer "${printerToUse}"`);
+
         const kotPromise = kitchenQueue.enqueue(kotJob, this.printHtml.bind(this))
-          .then(r => { results.kots.push({ ...r, type: 'KOT', printer: kitchenPrinterName }); })
+          .then(r => { results.kots.push({ ...r, type: 'KOT', printer: printerToUse, station: group.name }); })
           .catch(e => { 
-            results.kots.push({ success: false, error: e.message, type: 'KOT', printer: kitchenPrinterName });
-            results.errors.push({ type: 'KOT', printer: kitchenPrinterName, error: e.message });
+            results.kots.push({ success: false, error: e.message, type: 'KOT', printer: printerToUse, station: group.name });
+            results.errors.push({ type: 'KOT', printer: printerToUse, station: group.name, error: e.message });
           });
         allJobPromises.push(kotPromise);
       }
+
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const dumpPath = path.join(require('os').homedir(), 'Desktop', 'dbg_kot.json');
+        fs.writeFileSync(dumpPath, JSON.stringify({
+          enrichedOrder,
+          kitchenItemsLength: kitchenItems.length,
+          categoryMapLength: categoryMap.length,
+          stationGroups: Array.from(stationGroups.entries())
+        }, null, 2));
+        log.info(`[DISPATCH] Dumped debug KOT state to ${dumpPath}`);
+      } catch (err) {
+        log.error(`[DISPATCH] Failed to write debug KOT state: ${err.message}`);
+      }
+    } else {
+      log.info(`[DISPATCH] No kitchen items after exclusion — skipping KOT generation`);
     }
 
     // 4. Wait for all queues to process (they run independently per printer)

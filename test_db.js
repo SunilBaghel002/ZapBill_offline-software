@@ -1,9 +1,19 @@
-const SQL = require('sql.js');
-const fs = require('fs');
+const { Database } = require('./electron/database/db');
+const db = new Database();
 
-SQL().then(sql => {
-  const buf = fs.readFileSync('c:/Users/lenovo/AppData/Roaming/restaurant-pos/restaurant_pos.db');
-  const db = new sql.Database(buf);
-  const res = db.exec("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'");
-  console.log(res[0].values[0][0]);
-});
+const printers = db.getPrinterStations();
+console.log("PRINTERS:", printers);
+
+const map = db.getCategoryStationMap();
+console.log("CATEGORY MAP:", map);
+
+const menuItems = db.execute('SELECT id, name, category_id FROM menu_items LIMIT 5');
+console.log("MENU ITEMS SAMPLE:", menuItems);
+
+const testCart = db.execute(`
+      SELECT oi.*, mi.category_id 
+      FROM order_items oi
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      LIMIT 10
+`);
+console.log("ORDER ITEMS SAMPLE:", testCart);

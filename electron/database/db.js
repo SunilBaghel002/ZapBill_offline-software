@@ -1726,9 +1726,10 @@ class Database {
   // ===== KOT Operations =====
   getPendingKOTs() {
     return this.execute(`
-      SELECT oi.*, o.order_number, o.table_number, o.order_type, o.created_at as order_time,
+      SELECT oi.*, mi.category_id, o.order_number, o.table_number, o.order_type, o.created_at as order_time,
              o.customer_name, o.customer_phone, o.notes, o.urgency, o.chef_instructions
       FROM order_items oi
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
       JOIN orders o ON oi.order_id = o.id
       WHERE oi.kot_status != 'served' AND o.status != 'cancelled' AND o.is_deleted = 0 AND oi.is_deleted = 0
       ORDER BY 
