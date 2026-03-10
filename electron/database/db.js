@@ -3285,12 +3285,21 @@ class Database {
   // --- Category → Station Mapping ---
   getCategoryStationMap() {
     return this.execute(`
-      SELECT csm.category_id, csm.station_id, c.name as category_name, ps.station_name, ps.printer_name
+      SELECT csm.category_id, csm.station_id,
+             COALESCE(c.name, csm.category_id) as category_name,
+             ps.station_name, ps.printer_name
       FROM category_station_map csm
-      JOIN categories c ON csm.category_id = c.id
+      LEFT JOIN categories c ON csm.category_id = c.id
       JOIN printer_stations ps ON csm.station_id = ps.id
       WHERE ps.is_active = 1
     `);
+  }
+
+  // Lookup category_id for a menu item (used as fallback when items lack category_id)
+  getItemCategoryId(menuItemId) {
+    if (!menuItemId) return null;
+    const rows = this.execute(`SELECT category_id FROM menu_items WHERE id = ?`, [menuItemId]);
+    return rows[0]?.category_id || null;
   }
 
   saveCategoryStationMap(categoryId, stationIds) {

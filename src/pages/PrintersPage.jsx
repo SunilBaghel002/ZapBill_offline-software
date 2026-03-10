@@ -969,7 +969,7 @@ const PrintersPage = () => {
                     <p style={{ marginTop: '10px' }}>No menu items found. Click Refresh to load.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px', alignItems: 'start' }}>
                     {kotMenuData.map(cat => {
                       const isExpanded = expandedCategories.has(cat.id);
                       const totalItems = cat.items.length;

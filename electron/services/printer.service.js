@@ -366,7 +366,23 @@ class PrinterService {
       const UNMAPPED_KEY = '__unmapped_default__';
 
       for (const item of kitchenItems) {
-        const itemCatId = String(item.category_id);
+        const rawCatId = item.category_id;
+
+        // Guard against null/undefined category_id — these can never match a mapping
+        if (!rawCatId) {
+          log.warn(`[DISPATCH] Item "${item.item_name}" has NO category_id (menu_item_id=${item.menu_item_id || item.id}) → unmapped default`);
+          if (!stationGroups.has(UNMAPPED_KEY)) {
+            stationGroups.set(UNMAPPED_KEY, {
+              name: null,
+              printer: defaultKotPrinter,
+              items: []
+            });
+          }
+          stationGroups.get(UNMAPPED_KEY).items.push(item);
+          continue;
+        }
+
+        const itemCatId = String(rawCatId);
         // Find ALL mappings for this item's category (a category can map to multiple stations)
         const mappings = categoryMap.filter(m => String(m.category_id) === itemCatId);
         
@@ -388,7 +404,7 @@ class PrinterService {
           }
         } else {
           // Unmapped item goes to default KOT printer
-          log.info(`[DISPATCH]   → No station mapping, using default KOT printer`);
+          log.info(`[DISPATCH]   → No station mapping for cat_id="${itemCatId}", using default KOT printer`);
           if (!stationGroups.has(UNMAPPED_KEY)) {
             stationGroups.set(UNMAPPED_KEY, {
               name: null, // No specific station name
@@ -402,7 +418,7 @@ class PrinterService {
 
       log.info(`[DISPATCH] Station groups formed: ${stationGroups.size}`);
       for (const [key, group] of stationGroups.entries()) {
-        log.info(`[DISPATCH]   Station "${group.name || 'Default'}" → ${group.items.length} items → printer="${group.printer}"`);
+        log.info(`[DISPATCH]   Station "${group.name || 'Default'}" → ${group.items.length} items → printer="${group.printer}" [${group.items.map(i => i.item_name).join(', ')}]`);
       }
 
       // Generate a KOT job for each station group
@@ -438,21 +454,6 @@ class PrinterService {
             results.errors.push({ type: 'KOT', printer: printerToUse, station: group.name, error: e.message });
           });
         allJobPromises.push(kotPromise);
-      }
-
-      try {
-        const fs = require('fs');
-        const path = require('path');
-        const dumpPath = path.join(require('os').homedir(), 'Desktop', 'dbg_kot.json');
-        fs.writeFileSync(dumpPath, JSON.stringify({
-          enrichedOrder,
-          kitchenItemsLength: kitchenItems.length,
-          categoryMapLength: categoryMap.length,
-          stationGroups: Array.from(stationGroups.entries())
-        }, null, 2));
-        log.info(`[DISPATCH] Dumped debug KOT state to ${dumpPath}`);
-      } catch (err) {
-        log.error(`[DISPATCH] Failed to write debug KOT state: ${err.message}`);
       }
     } else {
       log.info(`[DISPATCH] No kitchen items after exclusion — skipping KOT generation`);

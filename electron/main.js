@@ -1311,12 +1311,30 @@ function setupIpcHandlers() {
         excludedItemIds = db.getKotExcludedItems().map(r => r.item_id);
       } catch (e) { /* table may not exist yet */ }
 
+      // ── CRITICAL: Ensure every item has category_id for station grouping ──
+      // Some code paths (KOT reprint, KOT-only) may pass items without category_id.
+      // Resolve it from menu_items so dispatchOrder can map items to stations.
+      const enrichedItems = items.map(item => {
+        if (item.category_id) return item;
+        // Try to resolve category_id from menu_items using menu_item_id
+        const menuItemId = item.menu_item_id || item.menuItemId || item.id;
+        const resolvedCatId = db.getItemCategoryId(menuItemId);
+        if (resolvedCatId) {
+          log.info(`[print:kotRouted] Resolved category_id for "${item.item_name}": ${resolvedCatId}`);
+        } else {
+          log.warn(`[print:kotRouted] Could not resolve category_id for "${item.item_name}" (menu_item_id=${menuItemId})`);
+        }
+        return { ...item, category_id: resolvedCatId };
+      });
+
+      log.info(`[print:kotRouted] Items: ${enrichedItems.length}, categoryMap: ${categoryMap.length} entries`);
+
       // Use dispatchOrder which handles per-printer queuing automatically
       // - Different printers: jobs run in parallel (independent queues)
       // - Same printer: jobs run sequentially with delay + paper cut
       const result = await printerService.dispatchOrder(
         enrichedOrder,
-        items,
+        enrichedItems,
         categoryMap,
         defaultKotPrinter,
         attachBill,
