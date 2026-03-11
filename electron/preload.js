@@ -114,6 +114,8 @@ const validInvokeChannels = [
   'printer:deleteStation',
   'printer:getCategoryMap',
   'printer:saveCategoryMap',
+  'printer:getItemMap',
+  'printer:saveItemMap',
   'printer:getKotExcludedItems',
   'printer:toggleKotExcludedItem',
   'printer:saveKotExcludedItems',

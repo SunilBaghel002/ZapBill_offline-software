@@ -1386,38 +1386,82 @@ const AddonAssignModal = ({ assignType, addon, categories = [], menuItems = [], 
 
   useEffect(() => {
     if (!addon) return;
-    // Initial selection based on whether items already have this addon
-    const initialIds = (menuItems || []).filter(item => {
+    const initialIds = [];
+    (menuItems || []).forEach(item => {
+      let hasItemAddon = false;
       if (assignType === 'global') {
         let addonsArr = [];
         try { if (item.addons) addonsArr = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons; } catch(e){}
-        return (addonsArr || []).some(a => a.name === addon.name);
+        hasItemAddon = (addonsArr || []).some(a => a.name === addon.name);
       } else {
         let maIdsArr = [];
         try { if (item.master_addon_ids) maIdsArr = typeof item.master_addon_ids === 'string' ? JSON.parse(item.master_addon_ids) : item.master_addon_ids; } catch(e){}
-        return (maIdsArr || []).includes(addon.id);
+        hasItemAddon = (maIdsArr || []).includes(addon.id);
       }
-    }).map(i => i.id);
+      
+      if (hasItemAddon) initialIds.push(item.id);
+      
+      // Also check variants
+      let variantsArr = [];
+      try { if (item.variants) variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants; } catch(e){}
+      
+      if (variantsArr && variantsArr.length > 0) {
+        variantsArr.forEach((v, vIndex) => {
+          let hasVariantAddon = false;
+          if (assignType === 'global') {
+            hasVariantAddon = (v.addons || []).some(a => a.name === addon.name);
+          } else {
+            hasVariantAddon = (v.master_addon_ids || []).includes(addon.id);
+          }
+          if (hasVariantAddon) initialIds.push(`${item.id}::${vIndex}`);
+        });
+      }
+    });
     setSelectedItemIds(initialIds);
   }, [addon, assignType, menuItems]);
 
   const toggleCategory = (catId) => {
-    const catItems = (menuItems || []).filter(i => i.category_id === catId).map(i => i.id);
-    const allSelected = catItems.every(id => selectedItemIds.includes(id));
-    
+    const catKeys = [];
+    (menuItems || []).filter(i => i.category_id === catId).forEach(item => {
+      catKeys.push(item.id);
+      let variantsArr = [];
+      try { if (item.variants) variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants; } catch(e){}
+      if (variantsArr && variantsArr.length > 0) {
+        variantsArr.forEach((_, vIndex) => catKeys.push(`${item.id}::${vIndex}`));
+      }
+    });
+
+    const allSelected = catKeys.every(id => selectedItemIds.includes(id));
     if (allSelected) {
-      setSelectedItemIds(selectedItemIds.filter(id => !catItems.includes(id)));
+      setSelectedItemIds(selectedItemIds.filter(id => !catKeys.includes(id)));
     } else {
-      const newIds = [...new Set([...selectedItemIds, ...catItems])];
-      setSelectedItemIds(newIds);
+      setSelectedItemIds([...new Set([...selectedItemIds, ...catKeys])]);
     }
   };
 
-  const toggleItem = (itemId) => {
-    if (selectedItemIds.includes(itemId)) {
-      setSelectedItemIds(selectedItemIds.filter(id => id !== itemId));
+  const toggleItem = (itemId, variantIndex = null) => {
+    const targetKey = variantIndex !== null ? `${itemId}::${variantIndex}` : itemId;
+    
+    // If it's a parent item, toggling it should also toggle all its variants
+    let keysToToggle = [targetKey];
+    
+    if (variantIndex === null) {
+        const item = menuItems.find(i => i.id === itemId);
+        if (item) {
+            let variantsArr = [];
+            try { if (item.variants) variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants; } catch(e){}
+            if (variantsArr && variantsArr.length > 0) {
+                variantsArr.forEach((_, vIndex) => keysToToggle.push(`${item.id}::${vIndex}`));
+            }
+        }
+    }
+
+    const allSelected = keysToToggle.every(k => selectedItemIds.includes(k));
+    
+    if (allSelected) {
+      setSelectedItemIds(selectedItemIds.filter(id => !keysToToggle.includes(id)));
     } else {
-      setSelectedItemIds([...selectedItemIds, itemId]);
+      setSelectedItemIds([...new Set([...selectedItemIds, ...keysToToggle])]);
     }
   };
 
@@ -1767,8 +1811,19 @@ const AddonAssignModal = ({ assignType, addon, categories = [], menuItems = [], 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {(categories || []).map(cat => {
                   const catItems = (menuItems || []).filter(i => i.category_id === cat.id);
-                  const selectedCount = catItems.filter(i => selectedItemIds.includes(i.id)).length;
-                  const isAll = catItems.length > 0 && selectedCount === catItems.length;
+                  
+                  let allCatKeys = [];
+                  catItems.forEach(item => {
+                    allCatKeys.push(item.id);
+                    let variantsArr = [];
+                    try { if (item.variants) variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants; } catch(e){}
+                    if (variantsArr && variantsArr.length > 0) {
+                      variantsArr.forEach((_, vIndex) => allCatKeys.push(`${item.id}::${vIndex}`));
+                    }
+                  });
+                  
+                  const selectedCount = allCatKeys.filter(k => selectedItemIds.includes(k)).length;
+                  const isAll = allCatKeys.length > 0 && selectedCount === allCatKeys.length;
                   const isPartial = selectedCount > 0 && !isAll;
                   const isExpanded = expandedCategories.includes(cat.id);
 
@@ -1803,7 +1858,7 @@ const AddonAssignModal = ({ assignType, addon, categories = [], menuItems = [], 
                           <div>
                             <div style={{ fontWeight: 600, fontSize: '1rem' }}>{cat.name}</div>
                             <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                              {selectedCount} item{selectedCount !== 1 ? 's' : ''} assigned
+                              {selectedCount} selected
                             </div>
                           </div>
                         </div>
@@ -1814,34 +1869,77 @@ const AddonAssignModal = ({ assignType, addon, categories = [], menuItems = [], 
 
                       {isExpanded && (
                         <div style={{ padding: '8px 20px 20px 56px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #e5e7eb', background: '#fafafa' }}>
-                          {catItems.map(item => (
-                            <div 
-                              key={item.id} 
-                              onClick={() => toggleItem(item.id)}
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '16px', 
-                                cursor: 'pointer',
-                                padding: '8px 0',
-                                color: selectedItemIds.includes(item.id) ? '#111827' : '#6b7280'
-                              }}
-                            >
-                              <div style={{ 
-                                width: '20px', 
-                                height: '20px', 
-                                border: `2px solid ${selectedItemIds.includes(item.id) ? '#16a34a' : '#d1d5db'}`,
-                                borderRadius: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: selectedItemIds.includes(item.id) ? '#16a34a' : 'white'
-                              }}>
-                                {selectedItemIds.includes(item.id) && <Plus size={16} color="white" />}
-                              </div>
-                              <div style={{ fontSize: '0.95rem', fontWeight: selectedItemIds.includes(item.id) ? 500 : 400 }}>{item.name}</div>
-                            </div>
-                          ))}
+                          {catItems.map(item => {
+                            let variantsArr = [];
+                            try { if (item.variants) variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants; } catch(e){}
+                            const hasVariants = variantsArr && variantsArr.length > 0;
+                            const isItemSelected = selectedItemIds.includes(item.id);
+
+                            return (
+                              <React.Fragment key={item.id}>
+                                <div 
+                                  onClick={() => toggleItem(item.id)}
+                                  style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '16px', 
+                                    cursor: 'pointer',
+                                    padding: '8px 0',
+                                    color: isItemSelected ? '#111827' : '#6b7280'
+                                  }}
+                                >
+                                  <div style={{ 
+                                    width: '20px', 
+                                    height: '20px', 
+                                    border: `2px solid ${isItemSelected ? '#16a34a' : '#d1d5db'}`,
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: isItemSelected ? '#16a34a' : 'white'
+                                  }}>
+                                    {isItemSelected && <Plus size={16} color="white" />}
+                                  </div>
+                                  <div style={{ fontSize: '0.95rem', fontWeight: isItemSelected ? 500 : 400 }}>{item.name}</div>
+                                </div>
+                                
+                                {hasVariants && variantsArr.map((v, vIndex) => {
+                                  const vKey = `${item.id}::${vIndex}`;
+                                  const isVariantSelected = selectedItemIds.includes(vKey);
+                                  return (
+                                    <div 
+                                      key={vKey} 
+                                      onClick={() => toggleItem(item.id, vIndex)}
+                                      style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '16px', 
+                                        cursor: 'pointer',
+                                        padding: '4px 0 4px 36px',
+                                        color: isVariantSelected ? '#111827' : '#6b7280'
+                                      }}
+                                    >
+                                      <div style={{ 
+                                        width: '18px', 
+                                        height: '18px', 
+                                        border: `2px solid ${isVariantSelected ? '#ca8a04' : '#d1d5db'}`,
+                                        borderRadius: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        background: isVariantSelected ? '#ca8a04' : 'white'
+                                      }}>
+                                        {isVariantSelected && <Plus size={12} color="white" />}
+                                      </div>
+                                      <div style={{ fontSize: '0.85rem', fontWeight: isVariantSelected ? 500 : 400, fontStyle: 'italic' }}>
+                                        {v.name} (variant)
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </React.Fragment>
+                            );
+                          })}
                           {catItems.length === 0 && <p style={{ fontSize: '0.875rem', color: '#9ca3af', fontStyle: 'italic' }}>No items in this category.</p>}
                         </div>
                       )}

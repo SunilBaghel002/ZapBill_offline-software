@@ -998,20 +998,49 @@ class Database {
         let addonsArr = [];
         try { if (item.addons) addonsArr = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons; } catch(e){}
         
+        let variantsArr = [];
+        try { if (item.variants) variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants; } catch(e){}
+
         const shouldHave = itemIds.includes(item.id);
         const hasAddon = addonsArr.some(a => a.name === addon.name);
+        let itemChanged = false;
+
         if (shouldHave && !hasAddon) {
           addonsArr.push({ name: addon.name, price: addon.price, type: addon.type });
+          itemChanged = true;
         } else if (!shouldHave && hasAddon) {
           addonsArr = addonsArr.filter(a => a.name !== addon.name);
-        } else {
-          continue; // No change for this item
+          itemChanged = true;
+        }
+        
+        // Handle variant-level assignments
+        if (variantsArr && variantsArr.length > 0) {
+          variantsArr.forEach((v, vIndex) => {
+            const variantKey = `${item.id}::${vIndex}`;
+            const vShouldHave = itemIds.includes(variantKey);
+            
+            let vAddons = v.addons || [];
+            const vHasAddon = vAddons.some(a => a.name === addon.name);
+            
+            if (vShouldHave && !vHasAddon) {
+              vAddons.push({ name: addon.name, price: addon.price, type: addon.type });
+              v.addons = vAddons;
+              itemChanged = true;
+            } else if (!vShouldHave && vHasAddon) {
+              v.addons = vAddons.filter(a => a.name !== addon.name);
+              itemChanged = true;
+            }
+          });
         }
 
+        if (!itemChanged) continue;
+
         const strAddons = addonsArr.length > 0 ? JSON.stringify(addonsArr) : null;
+        const strVariants = variantsArr.length > 0 ? JSON.stringify(variantsArr) : null;
+        
         // Use raw run to avoid individual saves
-        const query = `UPDATE menu_items SET addons = ?, updated_at = ? WHERE id = ?`;
-        const params = [strAddons, new Date().toISOString(), item.id];
+        const query = `UPDATE menu_items SET addons = ?, variants = ?, updated_at = ? WHERE id = ?`;
+        const params = [strAddons, strVariants, new Date().toISOString(), item.id];
         const stmt = this.db.prepare(query);
         stmt.run(params);
         stmt.free();
@@ -1036,20 +1065,49 @@ class Database {
         let maIdsArr = [];
         try { if (item.master_addon_ids) maIdsArr = typeof item.master_addon_ids === 'string' ? JSON.parse(item.master_addon_ids) : item.master_addon_ids; } catch(e){}
         
+        let variantsArr = [];
+        try { if (item.variants) variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants; } catch(e){}
+        
         const shouldHave = itemIds.includes(item.id);
         const hasAddon = maIdsArr.includes(masterAddonId);
+        let itemChanged = false;
+
         if (shouldHave && !hasAddon) {
           maIdsArr.push(masterAddonId);
+          itemChanged = true;
         } else if (!shouldHave && hasAddon) {
           maIdsArr = maIdsArr.filter(id => id !== masterAddonId);
-        } else {
-          continue; // No change
+          itemChanged = true;
+        }
+        
+        // Handle variant-level assignments
+        if (variantsArr && variantsArr.length > 0) {
+          variantsArr.forEach((v, vIndex) => {
+            const variantKey = `${item.id}::${vIndex}`;
+            const vShouldHave = itemIds.includes(variantKey);
+            
+            let vMaIds = v.master_addon_ids || [];
+            const vHasAddon = vMaIds.includes(masterAddonId);
+            
+            if (vShouldHave && !vHasAddon) {
+              vMaIds.push(masterAddonId);
+              v.master_addon_ids = vMaIds;
+              itemChanged = true;
+            } else if (!vShouldHave && vHasAddon) {
+              v.master_addon_ids = vMaIds.filter(id => id !== masterAddonId);
+              itemChanged = true;
+            }
+          });
         }
 
+        if (!itemChanged) continue;
+
         const strMaIds = maIdsArr.length > 0 ? JSON.stringify(maIdsArr) : null;
+        const strVariants = variantsArr.length > 0 ? JSON.stringify(variantsArr) : null;
+        
         // Use raw run to avoid individual saves
-        const query = `UPDATE menu_items SET master_addon_ids = ?, updated_at = ? WHERE id = ?`;
-        const params = [strMaIds, new Date().toISOString(), item.id];
+        const query = `UPDATE menu_items SET master_addon_ids = ?, variants = ?, updated_at = ? WHERE id = ?`;
+        const params = [strMaIds, strVariants, new Date().toISOString(), item.id];
         const stmt = this.db.prepare(query);
         stmt.run(params);
         stmt.free();
@@ -1128,18 +1186,30 @@ class Database {
         }
       }
 
+      // Track category display order based on order of first appearance in CSV
+      const categoryOrderMap = {};
+      let nextCatOrder = 1;
+
       for (const item of items) {
         try {
           // 1. Find or Create Category within THIS menu
           let categoryId;
           const catResult = this._rawQuery('SELECT id FROM categories WHERE name = ? AND menu_id = ? AND is_deleted = 0 COLLATE NOCASE', [item.category, targetMenuId]);
           
+          // Determine display_order for this category
+          if (!(item.category in categoryOrderMap)) {
+            categoryOrderMap[item.category] = nextCatOrder++;
+          }
+          const displayOrder = categoryOrderMap[item.category];
+
           if (catResult && catResult.length > 0) {
             categoryId = catResult[0].id;
+            // Update display_order for existing category
+            this.db.run('UPDATE categories SET display_order = ? WHERE id = ?', [displayOrder, categoryId]);
           } else {
             categoryId = uuidv4();
             this.db.run('INSERT INTO categories (id, name, display_order, is_active, menu_id, is_deleted) VALUES (?, ?, ?, ?, ?, 0)',
-              [categoryId, item.category, 99, 1, targetMenuId]);
+              [categoryId, item.category, displayOrder, 1, targetMenuId]);
           }
 
           // 1.5 Resolve Master Addon IDs from names
@@ -1156,22 +1226,23 @@ class Database {
           }
 
           // 2. Insert or Update Menu Item within THIS menu and THIS category
+          const isFavorite = item.is_favorite ? 1 : 0;
           const existing = this._rawQuery('SELECT id FROM menu_items WHERE name = ? AND menu_id = ? AND is_deleted = 0 COLLATE NOCASE', [item.name, targetMenuId]);
           
           if (existing && existing.length > 0) {
             // Update
             this.db.run(`
               UPDATE menu_items SET 
-                category_id = ?, price = ?, tax_rate = ?, is_vegetarian = ?, description = ?, variants = ?, addons = ?, master_addon_ids = ?, updated_at = ?
+                category_id = ?, price = ?, tax_rate = ?, is_vegetarian = ?, description = ?, variants = ?, addons = ?, master_addon_ids = ?, is_favorite = ?, updated_at = ?
               WHERE id = ?
-            `, [categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, masterAddonIds, new Date().toISOString(), existing[0].id]);
+            `, [categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, masterAddonIds, isFavorite, new Date().toISOString(), existing[0].id]);
           } else {
             // Insert
             const id = uuidv4();
             this.db.run(`
-              INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, variants, addons, master_addon_ids, is_available, created_at, updated_at, is_deleted, menu_id)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 0, ?)
-            `, [id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, masterAddonIds, new Date().toISOString(), new Date().toISOString(), targetMenuId]);
+              INSERT INTO menu_items (id, name, category_id, price, tax_rate, is_vegetarian, description, variants, addons, master_addon_ids, is_available, is_favorite, created_at, updated_at, is_deleted, menu_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 0, ?)
+            `, [id, item.name, categoryId, item.price, item.tax_rate, item.is_vegetarian, item.description, item.variants || null, item.addons || null, masterAddonIds, isFavorite, new Date().toISOString(), new Date().toISOString(), targetMenuId]);
           }
           successCount++;
         } catch (err) {
@@ -3354,6 +3425,7 @@ class Database {
 
   deletePrinterStation(id) {
     // Remove associated mappings first
+    this.run(`DELETE FROM item_station_map WHERE station_id = ?`, [id]);
     this.run(`DELETE FROM category_station_map WHERE station_id = ?`, [id]);
     this.run(`DELETE FROM printer_stations WHERE id = ?`, [id]);
     return { success: true };
@@ -3387,6 +3459,31 @@ class Database {
     for (const stationId of stationIds) {
       this.run(`INSERT INTO category_station_map (category_id, station_id) VALUES (?, ?)`,
         [categoryId, stationId]);
+    }
+    return { success: true };
+  }
+
+  // --- Item → Station Mapping ---
+  getItemStationMap() {
+    return this.execute(`
+      SELECT ism.item_id, ism.station_id,
+             i.name as item_name,
+             ps.station_name, ps.printer_name
+      FROM item_station_map ism
+      JOIN menu_items i ON ism.item_id = i.id
+      JOIN printer_stations ps ON ism.station_id = ps.id
+      WHERE ps.is_active = 1
+    `);
+  }
+
+  saveItemStationMap(itemId, stationIds) {
+    // Clear existing mappings for this item
+    this.run(`DELETE FROM item_station_map WHERE item_id = ?`, [itemId]);
+    
+    // Insert new mappings
+    for (const stationId of stationIds) {
+      this.run(`INSERT INTO item_station_map (item_id, station_id) VALUES (?, ?)`,
+        [itemId, stationId]);
     }
     return { success: true };
   }
@@ -3473,6 +3570,12 @@ class Database {
       category_id TEXT REFERENCES categories(id),
       station_id TEXT REFERENCES printer_stations(id),
       PRIMARY KEY (category_id, station_id)
+    )`);
+
+    this.run(`CREATE TABLE IF NOT EXISTS item_station_map (
+      item_id TEXT REFERENCES menu_items(id),
+      station_id TEXT REFERENCES printer_stations(id),
+      PRIMARY KEY (item_id, station_id)
     )`);
 
     this.run(`CREATE TABLE IF NOT EXISTS kot_logs (

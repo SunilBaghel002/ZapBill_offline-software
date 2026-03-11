@@ -29,6 +29,7 @@ const PrintersPage = () => {
   const [stations, setStations] = useState([]);
   const [categories, setCategories] = useState([]);
   const [categoryMap, setCategoryMap] = useState([]);
+  const [itemMap, setItemMap] = useState([]);
   
   const [printerTab, setPrinterTab] = useState('bill');
   const [newStation, setNewStation] = useState({ station_name: '', printer_name: '' });
@@ -49,20 +50,21 @@ const PrintersPage = () => {
   }, []);
 
   useEffect(() => {
-    if (printerTab === 'kotitems') {
+    if (printerTab === 'kotitems' || printerTab === 'stations') {
       loadKotMenuData();
     }
   }, [printerTab, activeMenu]);
 
   const loadData = async () => {
     try {
-      const [settingsResult, printersResult, stationsResult, categoriesResult, categoryMapResult, activeMenuResult] = await Promise.all([
+      const [settingsResult, printersResult, stationsResult, categoriesResult, categoryMapResult, activeMenuResult, itemMapResult] = await Promise.all([
         window.electronAPI.invoke('settings:getAll', {}),
         window.electronAPI.invoke('print:getPrinters'),
         window.electronAPI.invoke('printer:getStations').catch(() => []),
         window.electronAPI.invoke('menu:getCategories').catch(() => []),
         window.electronAPI.invoke('printer:getCategoryMap').catch(() => []),
-        window.electronAPI.invoke('menu:getActiveMenu').catch(() => null)
+        window.electronAPI.invoke('menu:getActiveMenu').catch(() => null),
+        window.electronAPI.invoke('printer:getItemMap').catch(() => [])
       ]);
       
       if (Array.isArray(settingsResult)) {
@@ -74,6 +76,7 @@ const PrintersPage = () => {
       if (Array.isArray(stationsResult)) setStations(stationsResult);
       if (Array.isArray(categoriesResult)) setCategories(categoriesResult);
       if (Array.isArray(categoryMapResult)) setCategoryMap(categoryMapResult);
+      if (Array.isArray(itemMapResult)) setItemMap(itemMapResult);
       setActiveMenu(activeMenuResult);
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -160,6 +163,19 @@ const PrintersPage = () => {
       await window.electronAPI.invoke('printer:saveCategoryMap', { categoryId, stationIds: newIds });
       const updated = await window.electronAPI.invoke('printer:getCategoryMap');
       setCategoryMap(updated || []);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleToggleItemStation = async (itemId, stationId) => {
+    const existing = itemMap.filter(m => m.item_id === itemId).map(m => m.station_id);
+    let newIds = existing.includes(stationId)
+      ? existing.filter(id => id !== stationId)
+      : [...existing, stationId];
+      
+    try {
+      await window.electronAPI.invoke('printer:saveItemMap', { itemId, stationIds: newIds });
+      const updated = await window.electronAPI.invoke('printer:getItemMap');
+      setItemMap(updated || []);
     } catch (e) { console.error(e); }
   };
 
@@ -822,30 +838,82 @@ const PrintersPage = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {categories.filter(c => !activeMenu ? true : c.menu_id === activeMenu.id).map((cat, idx) => (
-                            <tr key={cat.id} style={{ borderBottom: '1px solid var(--gray-100)', background: idx % 2 === 0 ? 'white' : 'var(--gray-50)' }}>
-                              <td style={{ padding: '12px 20px', fontWeight: '500', color: 'var(--gray-800)' }}>{cat.name}</td>
-                              {stations.map(station => {
-                                const isAssigned = categoryMap.some(m => m.category_id === cat.id && m.station_id === station.id);
-                                return (
-                                  <td key={station.id} style={{ padding: '10px', textAlign: 'center', borderLeft: '1px solid var(--gray-200)' }}>
-                                    <div onClick={() => handleToggleCategoryStation(cat.id, station.id)}
-                                      style={{ 
-                                        width: '26px', height: '26px', borderRadius: '7px',
-                                        border: isAssigned ? 'none' : '2px solid var(--gray-300)',
-                                        background: isAssigned ? 'var(--primary-500)' : 'white',
-                                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        cursor: 'pointer', margin: '0 auto', transition: 'all 0.15s ease',
-                                        boxShadow: isAssigned ? '0 2px 4px rgba(0,150,255,0.3)' : 'none'
-                                      }}
-                                    >
-                                      {isAssigned && <CheckCircle2 size={16} />}
+                          {categories.filter(c => !activeMenu ? true : c.menu_id === activeMenu.id).map((cat, idx) => {
+                            const isExpanded = expandedCategories.has(cat.id);
+                            const categoryItems = kotMenuData.find(k => k.id === cat.id)?.items || [];
+                            
+                            return (
+                              <React.Fragment key={cat.id}>
+                                <tr style={{ borderBottom: '1px solid var(--gray-100)', background: idx % 2 === 0 ? 'white' : 'var(--gray-50)' }}>
+                                  <td style={{ padding: '12px 20px', fontWeight: '500', color: 'var(--gray-800)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      {categoryItems.length > 0 && (
+                                        <button 
+                                          onClick={() => {
+                                            const newSet = new Set(expandedCategories);
+                                            if (isExpanded) newSet.delete(cat.id);
+                                            else newSet.add(cat.id);
+                                            setExpandedCategories(newSet);
+                                          }}
+                                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}
+                                        >
+                                          {isExpanded ? <ChevronDown size={18} color="var(--gray-500)"/> : <ChevronRight size={18} color="var(--gray-500)"/>}
+                                        </button>
+                                      )}
+                                      {cat.name}
                                     </div>
                                   </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
+                                  {stations.map(station => {
+                                    const isAssigned = categoryMap.some(m => m.category_id === cat.id && m.station_id === station.id);
+                                    return (
+                                      <td key={station.id} style={{ padding: '10px', textAlign: 'center', borderLeft: '1px solid var(--gray-200)' }}>
+                                        <div onClick={() => handleToggleCategoryStation(cat.id, station.id)}
+                                          style={{ 
+                                            width: '26px', height: '26px', borderRadius: '7px',
+                                            border: isAssigned ? 'none' : '2px solid var(--gray-300)',
+                                            background: isAssigned ? 'var(--primary-500)' : 'white',
+                                            color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            cursor: 'pointer', margin: '0 auto', transition: 'all 0.15s ease',
+                                            boxShadow: isAssigned ? '0 2px 4px rgba(0,150,255,0.3)' : 'none'
+                                          }}
+                                        >
+                                          {isAssigned && <CheckCircle2 size={16} />}
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                                
+                                {isExpanded && categoryItems.map(item => (
+                                  <tr key={`item-${item.id}`} style={{ background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
+                                    <td style={{ padding: '8px 20px 8px 50px', fontSize: '12px', color: 'var(--gray-600)', fontStyle: 'italic', display: 'flex', alignItems: 'center' }}>
+                                      <div style={{ width: '6px', height: '6px', background: 'var(--gray-400)', borderRadius: '50%', marginRight: '8px' }}></div>
+                                      {item.name}
+                                    </td>
+                                    {stations.map(station => {
+                                      // Item map overrides category map if present
+                                      const isAssigned = itemMap.some(m => m.item_id === item.id && m.station_id === station.id);
+                                      return (
+                                        <td key={`item-${item.id}-${station.id}`} style={{ padding: '6px', textAlign: 'center', borderLeft: '1px solid var(--gray-200)' }}>
+                                          <div onClick={() => handleToggleItemStation(item.id, station.id)}
+                                            style={{ 
+                                              width: '22px', height: '22px', borderRadius: '5px',
+                                              border: isAssigned ? 'none' : '1px solid var(--gray-300)',
+                                              background: isAssigned ? 'var(--purple-500)' : 'white',
+                                              color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                              cursor: 'pointer', margin: '0 auto', transition: 'all 0.15s ease'
+                                            }}
+                                          >
+                                            {isAssigned && <CheckCircle2 size={14} />}
+                                          </div>
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </React.Fragment>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

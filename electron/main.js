@@ -1243,6 +1243,16 @@ function setupIpcHandlers() {
     catch (e) { log.error('Save category map error:', e); return { success: false, error: e.message }; }
   });
 
+  ipcMain.handle('printer:getItemMap', async () => {
+    try { return db.getItemStationMap(); }
+    catch (e) { log.error('Get item map error:', e); return []; }
+  });
+
+  ipcMain.handle('printer:saveItemMap', async (event, { itemId, stationIds }) => {
+    try { return db.saveItemStationMap(itemId, stationIds); }
+    catch (e) { log.error('Save item map error:', e); return { success: false, error: e.message }; }
+  });
+
   // ============ KOT ITEM EXCLUSION ============
   ipcMain.handle('printer:getKotExcludedItems', async () => {
     try { return db.getKotExcludedItems(); }
@@ -1319,6 +1329,9 @@ function setupIpcHandlers() {
 
       // Get station mapping and excluded items
       const categoryMap = db.getCategoryStationMap();
+      let itemMap = [];
+      try { itemMap = db.getItemStationMap(); } catch (e) { /* might not exist */ }
+      
       const defaultKotPrinter = settings.printer_kot;
       const billPrinterName = settings.printer_bill;
       const attachBill = settings.kot_attach_bill !== 'false';
@@ -1358,7 +1371,8 @@ function setupIpcHandlers() {
         attachBill,
         billPrinterName,
         printBill,
-        excludedItemIds
+        excludedItemIds,
+        itemMap
       );
 
       return result;

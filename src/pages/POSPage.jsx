@@ -1710,12 +1710,21 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
       }
     }
     
-    // 2. From variant (legacy fallback, as variants used to have a single master_addon_id string)
-    if (selectedVariant?.master_addon_id) {
-       if (!idsToFetch.includes(selectedVariant.master_addon_id)) {
+    // 2. From variant (legacy fallback + new array format)
+    if (selectedVariant) {
+       if (selectedVariant.master_addon_ids) {
+           try {
+               const parsed = typeof selectedVariant.master_addon_ids === 'string' ? JSON.parse(selectedVariant.master_addon_ids) : selectedVariant.master_addon_ids;
+               if (Array.isArray(parsed)) idsToFetch = [...idsToFetch, ...parsed];
+           } catch(e) {}
+       }
+       if (selectedVariant.master_addon_id) {
            idsToFetch.push(selectedVariant.master_addon_id);
        }
     }
+    
+    // Deduplicate
+    idsToFetch = [...new Set(idsToFetch)];
 
     return masterAddons.filter(ma => idsToFetch.includes(ma.id)).map(ma => {
        // Parse global addon IDs inside the group
@@ -1730,7 +1739,19 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
   };
 
   const assignedGroups = getAssignedMasterAddons();
-  const itemLevelAddons = parsedAddons;
+
+  const getAssignedGlobalAddons = () => {
+      let combined = [...parsedAddons];
+      if (selectedVariant && selectedVariant.addons && Array.isArray(selectedVariant.addons)) {
+          selectedVariant.addons.forEach(va => {
+              if (!combined.some(a => a.name === va.name)) {
+                  combined.push(va);
+              }
+          });
+      }
+      return combined;
+  };
+  const itemLevelAddons = getAssignedGlobalAddons();
 
   const calculateTotal = () => {
     let basePrice = item.price;

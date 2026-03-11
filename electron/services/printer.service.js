@@ -305,7 +305,7 @@ class PrinterService {
    * @param {Array} excludedItemIds - Item IDs excluded from KOT
    * @returns {Promise<Object>} Combined results
    */
-  async dispatchOrder(enrichedOrder, items, categoryMap, defaultKotPrinter, attachBill, billPrinterName, printBill = false, excludedItemIds = []) {
+  async dispatchOrder(enrichedOrder, items, categoryMap, defaultKotPrinter, attachBill, billPrinterName, printBill = false, excludedItemIds = [], itemMap = []) {
     const orderNumber = enrichedOrder.order_number || 'N/A';
     const paperWidth = enrichedOrder.paperWidth || '80';
     
@@ -322,21 +322,27 @@ class PrinterService {
 
     log.info(`[DISPATCH] KitchenItems (after exclusion): ${kitchenItems.length}`);
     log.info(`[DISPATCH] CategoryMap entries: ${categoryMap.length}`);
-    if (categoryMap.length > 0) {
-      log.info(`[DISPATCH] CategoryMap sample: ${JSON.stringify(categoryMap.slice(0, 5))}`);
-    }
+    log.info(`[DISPATCH] ItemMap entries: ${itemMap.length}`);
 
     // 2. Determine target printers for Kitchen Bill Copy based on ALL items
     // This ensures Bill Copy prints even if all items are excluded from KOT
     const allKitchenPrinters = new Set();
     for (const item of items) {
-      // Use String() to avoid type mismatch (category_id could be int or string)
+      const itemId = String(item.menu_item_id || item.id);
       const itemCatId = String(item.category_id);
-      const mapping = categoryMap.find(m => String(m.category_id) === itemCatId);
-      if (mapping) {
-        allKitchenPrinters.add(mapping.printer_name);
-      } else if (defaultKotPrinter) {
-        allKitchenPrinters.add(defaultKotPrinter);
+      
+      const itemMappings = itemMap.filter(m => String(m.item_id) === itemId);
+      
+      if (itemMappings && itemMappings.length > 0) {
+        // Item-level routing overrides category-level routing completely
+        itemMappings.forEach(m => allKitchenPrinters.add(m.printer_name));
+      } else {
+        const mapping = categoryMap.find(m => String(m.category_id) === itemCatId);
+        if (mapping) {
+          allKitchenPrinters.add(mapping.printer_name);
+        } else if (defaultKotPrinter) {
+          allKitchenPrinters.add(defaultKotPrinter);
+        }
       }
     }
     // If no explicit mappings but we have a default KOT printer, use it
@@ -424,11 +430,19 @@ class PrinterService {
           continue;
         }
 
+        const itemId = String(item.menu_item_id || item.id);
         const itemCatId = String(rawCatId);
-        // Find ALL mappings for this item's category (a category can map to multiple stations)
-        const mappings = categoryMap.filter(m => String(m.category_id) === itemCatId);
         
-        log.info(`[DISPATCH] Item "${item.item_name}" cat_id="${itemCatId}" → ${mappings.length} station mapping(s)`);
+        let mappings = itemMap.filter(m => String(m.item_id) === itemId);
+        let usedItemMap = true;
+        
+        if (!mappings || mappings.length === 0) {
+          // Find ALL mappings for this item's category (a category can map to multiple stations) // eslint-disable-next-line
+          mappings = categoryMap.filter(m => String(m.category_id) === itemCatId);
+          usedItemMap = false;
+        }
+        
+        log.info(`[DISPATCH] Item "${item.item_name}" id="${itemId}" → ${mappings.length} station mapping(s) [Source: ${usedItemMap ? 'ITEM' : 'CATEGORY'}]`);
 
         if (mappings.length > 0) {
           // Send this item to each mapped station

@@ -48,6 +48,9 @@ const dataImporter = {
         const addons = dataImporter._parseAddons(row['Addons']);
         const masterAddons = row['Master Addons'] ? row['Master Addons'].split(',').map(s => s.trim()).filter(Boolean) : null;
 
+        const isFavoriteRaw = (row['IsFavorite'] || row['Is Favorite'] || '').toString().trim().toLowerCase();
+        const isFavorite = (isFavoriteRaw === 'yes' || isFavoriteRaw === '1' || isFavoriteRaw === 'true') ? 1 : 0;
+
         return {
           name: row['Item Name'] || row['Name'],
           category: row['Category'] || 'Uncategorized',
@@ -58,7 +61,8 @@ const dataImporter = {
           is_vegetarian: (row['Type'] || row['Veg/Non-Veg'] || 'veg').toLowerCase() === 'veg' ? 1 : 0,
           variants: variants ? JSON.stringify(variants) : null,
           addons: addons ? JSON.stringify(addons) : null,
-          master_addons_list: masterAddons // New field for master addon group names
+          master_addons_list: masterAddons, // Master addon group names
+          is_favorite: isFavorite
         };
       }).filter(item => item.name); // Filter empty rows
     } catch (error) {
