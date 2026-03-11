@@ -32,6 +32,8 @@ const validInvokeChannels = [
   'menu:getMasterAddons',
   'menu:saveMasterAddon',
   'menu:deleteMasterAddon',
+  'menu:assignGlobalAddonToItems',
+  'menu:assignMasterAddonToItems',
   // Orders
   'order:create',
   'order:update',

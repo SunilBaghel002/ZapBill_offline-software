@@ -1,6 +1,6 @@
 {
   "name": "restaurant-pos",
-  "version": "1.0.0",
+  "version": "1.9.0",
   "description": "Offline-first Restaurant POS System",
   "main": "electron/main.js",
   "scripts": {

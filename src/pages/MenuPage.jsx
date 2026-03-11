@@ -11,7 +11,9 @@ import {
   RefreshCw,
   List,
   Layers, // New icon
-  ArrowLeft
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import './MenuPage.css'; // Added import
 
@@ -36,6 +38,13 @@ const MenuPage = () => {
   const [menus, setMenus] = useState([]);
   const [activeMenu, setActiveMenu] = useState(null);
   const [showMenuManager, setShowMenuManager] = useState(false);
+  const [assigningAddon, setAssigningAddon] = useState(null); // { type: 'global' | 'master', data: addon }
+  const [showAssignModal, setShowAssignModal] = useState(false);
+
+  const handleAssignAddon = (type, addon) => {
+    setAssigningAddon({ type, data: addon });
+    setShowAssignModal(true);
+  };
 
   useEffect(() => {
     loadData();
@@ -65,6 +74,9 @@ const MenuPage = () => {
   };
 
   const filteredItems = menuItems.filter(item => {
+    // Filter by Active Menu if it exists
+    if (activeMenu && item.menu_id && item.menu_id !== activeMenu.id) return false;
+
     const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
     const matchesSearch = !searchQuery ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -214,9 +226,9 @@ const MenuPage = () => {
               <h4 style={{ marginBottom: 'var(--spacing-2)' }}>Categories</h4>
               <div style={{ display: 'flex', gap: 'var(--spacing-2)', flexWrap: 'wrap' }}>
                 <button className={`category-tab ${!selectedCategory ? 'active' : ''}`} onClick={() => setSelectedCategory(null)}>
-                  All ({menuItems.length})
+                  All ({menuItems.filter(i => !activeMenu || i.menu_id === activeMenu.id).length})
                 </button>
-                {categories.map(cat => (
+                {categories.filter(c => !activeMenu || c.menu_id === activeMenu.id).map(cat => (
                   <div key={cat.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <button className={`category-tab ${selectedCategory === cat.id ? 'active' : ''}`} onClick={() => setSelectedCategory(cat.id)}>
                       {cat.name} ({menuItems.filter(i => i.category_id === cat.id).length})
@@ -322,6 +334,7 @@ const MenuPage = () => {
             onAdd={() => { setEditingAddon(null); setShowAddonModal(true); }}
             onEdit={(addon) => { setEditingAddon(addon); setShowAddonModal(true); }}
             onDelete={handleDeleteAddon}
+            onAssign={(addon) => { setShowGlobalAddonsModal(false); handleAssignAddon('global', addon); }}
           />
         )}
 
@@ -349,6 +362,7 @@ const MenuPage = () => {
             onAdd={() => { setEditingMasterAddon(null); setShowMasterAddonsModal(false); setEditingMasterAddonModalOpen(true); }}
             onEdit={(ma) => { setEditingMasterAddon(ma); setShowMasterAddonsModal(false); setEditingMasterAddonModalOpen(true); }}
             onDelete={handleDeleteMasterAddon}
+            onAssign={(ma) => { setShowMasterAddonsModal(false); handleAssignAddon('master', ma); }}
           />
         )}
 
@@ -360,13 +374,25 @@ const MenuPage = () => {
             onSave={() => { setEditingMasterAddonModalOpen(false); setEditingMasterAddon(null); setShowMasterAddonsModal(true); loadData(); }}
           />
         )}
+
+        {showAssignModal && assigningAddon && (
+          <AddonAssignModal
+            assignType={assigningAddon.type}
+            addon={assigningAddon.data}
+            categories={categories.filter(c => !activeMenu || c.menu_id === activeMenu.id)}
+            menuItems={menuItems.filter(i => !activeMenu || i.menu_id === activeMenu.id)}
+            addons={addons}
+            onClose={() => { setShowAssignModal(false); setAssigningAddon(null); }}
+            onSave={() => { setShowAssignModal(false); setAssigningAddon(null); loadData(); }}
+          />
+        )}
       </div>
     </div>
   );
 };
 
 // Global Add-ons List Modal
-const GlobalAddonsListModal = ({ addons, onClose, onAdd, onEdit, onDelete }) => {
+const GlobalAddonsListModal = ({ addons, onClose, onAdd, onEdit, onDelete, onAssign }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: '600px', height: '70vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
@@ -426,6 +452,13 @@ const GlobalAddonsListModal = ({ addons, onClose, onAdd, onEdit, onDelete }) => 
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => onAssign(addon)}
+                      style={{ padding: '4px 12px', fontSize: '0.8rem' }}
+                    >
+                      Assign
+                    </button>
                     <button
                       className="btn btn-ghost btn-icon btn-sm"
                       onClick={() => onEdit(addon)}
@@ -1303,6 +1336,527 @@ const MenuManagerModal = ({ menus, activeMenu, onClose, onRefresh }) => {
   );
 };
 
+// New assignment modal for bulk actions
+const AddonAssignModal = ({ assignType, addon, categories = [], menuItems = [], addons = [], onClose, onSave }) => {
+  const [selectedItemIds, setSelectedItemIds] = useState([]);
+  const [expandedCategories, setExpandedCategories] = useState([]);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Edit states
+  const [name, setName] = useState(addon?.name || '');
+  const [price, setPrice] = useState(addon?.price || '');
+  const [type, setType] = useState(addon?.type || 'veg');
+  const [selectionType, setSelectionType] = useState(addon?.selection_type || 'multi');
+  const [isMandatory, setIsMandatory] = useState(addon?.is_mandatory ? true : false);
+  const [groupAddons, setGroupAddons] = useState([]);
+  const [addonSearch, setAddonSearch] = useState('');
+
+  useEffect(() => {
+    if (assignType === 'master' && addon && addons) {
+      let ids = [];
+      try {
+        const rawIds = addon.addon_ids;
+        ids = typeof rawIds === 'string' ? JSON.parse(rawIds) : (rawIds || []);
+      } catch (e) {
+        console.error('Error parsing addon_ids', e);
+      }
+      
+      // Map IDs to full objects for local editing
+      const initialGroupAddons = ids.map(id => addons.find(a => a.id === id)).filter(Boolean);
+      setGroupAddons(initialGroupAddons);
+    }
+  }, [addon, assignType, addons]);
+
+  const updateGroupAddon = (id, field, value) => {
+    setGroupAddons(prev => prev.map(a => a.id === id ? { ...a, [field]: value } : a));
+  };
+
+  const removeGroupAddon = (id) => {
+    setGroupAddons(prev => prev.filter(a => a.id !== id));
+  };
+
+  const addGroupAddon = (globalAddon) => {
+    if (!groupAddons.find(a => a.id === globalAddon.id)) {
+      setGroupAddons([...groupAddons, { ...globalAddon }]);
+      setAddonSearch(''); // Clear search
+    } else {
+      window.showAlert('This add-on is already in the group');
+    }
+  };
+
+  useEffect(() => {
+    if (!addon) return;
+    // Initial selection based on whether items already have this addon
+    const initialIds = (menuItems || []).filter(item => {
+      if (assignType === 'global') {
+        let addonsArr = [];
+        try { if (item.addons) addonsArr = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons; } catch(e){}
+        return (addonsArr || []).some(a => a.name === addon.name);
+      } else {
+        let maIdsArr = [];
+        try { if (item.master_addon_ids) maIdsArr = typeof item.master_addon_ids === 'string' ? JSON.parse(item.master_addon_ids) : item.master_addon_ids; } catch(e){}
+        return (maIdsArr || []).includes(addon.id);
+      }
+    }).map(i => i.id);
+    setSelectedItemIds(initialIds);
+  }, [addon, assignType, menuItems]);
+
+  const toggleCategory = (catId) => {
+    const catItems = (menuItems || []).filter(i => i.category_id === catId).map(i => i.id);
+    const allSelected = catItems.every(id => selectedItemIds.includes(id));
+    
+    if (allSelected) {
+      setSelectedItemIds(selectedItemIds.filter(id => !catItems.includes(id)));
+    } else {
+      const newIds = [...new Set([...selectedItemIds, ...catItems])];
+      setSelectedItemIds(newIds);
+    }
+  };
+
+  const toggleItem = (itemId) => {
+    if (selectedItemIds.includes(itemId)) {
+      setSelectedItemIds(selectedItemIds.filter(id => id !== itemId));
+    } else {
+      setSelectedItemIds([...selectedItemIds, itemId]);
+    }
+  };
+
+  const toggleExpand = (catId) => {
+    if (expandedCategories.includes(catId)) {
+      setExpandedCategories(expandedCategories.filter(id => id !== catId));
+    } else {
+      setExpandedCategories([...expandedCategories, catId]);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      window.showAlert('Please enter a name');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      // 1. Save the addon/master addon data first
+      if (assignType === 'global') {
+        await window.electronAPI.invoke('menu:saveAddon', { 
+          addon: { ...addon, name, price: parseFloat(price) || 0, type } 
+        });
+        // 2. Assign
+        await window.electronAPI.invoke('menu:assignGlobalAddonToItems', { 
+          addon: { ...addon, name, price: parseFloat(price) || 0, type }, 
+          itemIds: selectedItemIds 
+        });
+      } else {
+        // 1b. Save any modified global addons inside the group
+        for (const ga of groupAddons) {
+          const original = addons.find(o => o.id === ga.id);
+          if (original && (parseFloat(original.price) !== parseFloat(ga.price) || original.name !== ga.name)) {
+            await window.electronAPI.invoke('menu:saveAddon', { 
+              addon: { ...ga, price: parseFloat(ga.price) || 0 } 
+            });
+          }
+        }
+        
+        await window.electronAPI.invoke('menu:saveMasterAddon', {
+          data: { 
+            ...addon, 
+            name, 
+            selection_type: selectionType, 
+            is_mandatory: isMandatory, 
+            addon_ids: JSON.stringify(groupAddons.map(a => a.id)) 
+          }
+        });
+        // 2. Assign
+        await window.electronAPI.invoke('menu:assignMasterAddonToItems', { 
+          masterAddonId: addon.id, 
+          itemIds: selectedItemIds 
+        });
+      }
+      window.showAlert('Data and assignments updated successfully', 'success');
+      onSave();
+    } catch (error) {
+      window.showAlert('Failed to update: ' + error.message, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!addon) return null;
+
+  return (
+    <div className="page-container" style={{ height: 'calc(100vh - 65px)', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#f9fafb', position: 'absolute', top: 0, left: 0, width: '100%', zIndex: 1000 }}>
+      {/* Header - Styled like Add Item page */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'white',
+        padding: '16px 24px',
+        margin: '0',
+        zIndex: 20,
+        borderBottom: '1px solid var(--gray-200)',
+        flexShrink: 0
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button 
+            onClick={onClose} 
+            className="btn btn-ghost btn-icon"
+            style={{ 
+              background: 'white', 
+              border: '1px solid #e5e7eb', 
+              borderRadius: '8px', 
+              width: '36px', 
+              height: '36px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              cursor: 'pointer'
+            }}
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 style={{ fontSize: '1.5rem', margin: 0, color: '#111827' }}>
+              Edit & Assign {assignType === 'global' ? 'Add-on' : 'Master Add-on'}
+            </h1>
+            <p className="text-muted" style={{ fontSize: '0.875rem', margin: '4px 0 0 0' }}>
+              {assignType === 'global' ? 'Manage global add-on details and item assignments.' : 'Compose master group and assign to items.'}
+            </p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={isSaving} style={{ background: '#D32F2F', border: 'none' }}>
+            <Save size={18} style={{ marginRight: '8px' }} />
+            {isSaving ? 'Saving...' : 'Save & Apply Assignments'}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', maxWidth: '1600px', margin: '0 auto' }}>
+          
+          {/* Left Side: Configuration */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div style={{ background: 'white', padding: '24px', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <h2 style={{ fontSize: '1.25rem', color: '#111827', marginBottom: '20px', borderBottom: '1px solid #e5e7eb', paddingBottom: '12px' }}>
+                Configuration
+              </h2>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="input-group">
+                  <label className="input-label">Name</label>
+                  <input type="text" className="input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Extra Cheese" style={{ padding: '12px' }} />
+                </div>
+
+                {assignType === 'global' ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="input-group">
+                      <label className="input-label">Price (₹)</label>
+                      <input type="number" className="input" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" style={{ padding: '12px' }} />
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label">Type</label>
+                      <select className="input select" value={type} onChange={e => setType(e.target.value)} style={{ padding: '12px' }}>
+                        <option value="veg">Veg</option>
+                        <option value="non-veg">Non-Veg</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div className="input-group">
+                        <label className="input-label">Selection Type</label>
+                        <select className="input select" value={selectionType} onChange={e => setSelectionType(e.target.value)} style={{ padding: '12px' }}>
+                          <option value="single">Single Choice (Radio)</option>
+                          <option value="multi">Multiple Choice (Checkbox)</option>
+                        </select>
+                      </div>
+                      <div className="input-group">
+                        <label className="input-label" style={{ display: 'block', marginBottom: '8px' }}>Requirements</label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', height: '42px' }}>
+                          <input type="checkbox" checked={isMandatory} onChange={e => setIsMandatory(e.target.checked)} style={{ width: '18px', height: '18px' }} />
+                          <span style={{ fontWeight: 500 }}>Make this group mandatory</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <label className="input-label" style={{ margin: 0 }}>Selected Add-ons ({groupAddons.length})</label>
+                        <div style={{ position: 'relative', width: '280px' }}>
+                          <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+                          <input 
+                            type="text" 
+                            className="input" 
+                            placeholder="Add more add-ons..." 
+                            value={addonSearch}
+                            onChange={e => setAddonSearch(e.target.value)}
+                            style={{ paddingLeft: '34px', height: '36px', fontSize: '0.85rem' }}
+                          />
+                          {addonSearch && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              right: 0,
+                              background: 'white',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              marginTop: '4px',
+                              boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                              zIndex: 50,
+                              maxHeight: '250px',
+                              overflowY: 'auto'
+                            }}>
+                              {addons.filter(a => a.name.toLowerCase().includes(addonSearch.toLowerCase()) && !groupAddons.find(ga => ga.id === a.id)).map(ga => (
+                                <div 
+                                  key={ga.id}
+                                  onClick={() => addGroupAddon(ga)}
+                                  style={{
+                                    padding: '10px 14px',
+                                    borderBottom: '1px solid #f3f4f6',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center'
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.background = '#f0fdf4'}
+                                  onMouseOut={e => e.currentTarget.style.background = 'white'}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Plus size={14} color="#16a34a" />
+                                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{ga.name}</span>
+                                  </div>
+                                  <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>₹{ga.price}</span>
+                                </div>
+                              ))}
+                              
+                              {/* Quick Create Option */}
+                              <div 
+                                onClick={async () => {
+                                  try {
+                                    const newAddon = { name: addonSearch, price: 0, type: 'veg' };
+                                    const result = await window.electronAPI.invoke('menu:saveAddon', { addon: newAddon });
+                                    
+                                    // Get the actual saved addon (either the result object or by assuming result is ID)
+                                    const savedAddon = (result && typeof result === 'object') ? result : { id: result, ...newAddon };
+                                    
+                                    if (savedAddon.id) {
+                                      setGroupAddons([...groupAddons, savedAddon]);
+                                      setAddonSearch('');
+                                      window.showAlert(`"${newAddon.name}" created and added to group`, 'success');
+                                    } else {
+                                      window.showAlert('Failed to get ID for new addon');
+                                    }
+                                  } catch(e) { 
+                                    console.error(e);
+                                    window.showAlert('Failed to create addon'); 
+                                  }
+                                }}
+                                style={{
+                                  padding: '12px 14px',
+                                  cursor: 'pointer',
+                                  background: '#f8fafc',
+                                  color: '#1e40af',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 600,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  borderTop: '1px solid #e2e8f0'
+                                }}
+                                onMouseOver={e => e.currentTarget.style.background = '#eff6ff'}
+                                onMouseOut={e => e.currentTarget.style.background = '#f8fafc'}
+                              >
+                                <Plus size={16} /> Create "{addonSearch}" as new add-on
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ 
+                        maxHeight: '400px', 
+                        overflowY: 'auto', 
+                        border: '1px solid #e5e7eb', 
+                        borderRadius: '12px',
+                        background: '#fafafa',
+                        padding: '12px'
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {groupAddons.map(ga => (
+                            <div 
+                              key={ga.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '10px 14px',
+                                background: 'white',
+                                borderRadius: '10px',
+                                border: '1px solid #e5e7eb',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                              }}
+                            >
+                              <div style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: ga.type === 'veg' ? '#dcfce7' : '#fee2e2',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: ga.type === 'veg' ? '#16a34a' : '#ef4444' }} />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <input 
+                                  type="text" 
+                                  value={ga.name} 
+                                  onChange={e => updateGroupAddon(ga.id, 'name', e.target.value)}
+                                  style={{ border: 'none', background: 'transparent', fontWeight: 600, fontSize: '0.9rem', width: '100%', padding: '2px 0' }}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', background: '#f3f4f6', borderRadius: '6px', padding: '2px 8px' }}>
+                                <span style={{ fontSize: '0.8rem', color: '#6b7280', marginRight: '4px' }}>₹</span>
+                                <input 
+                                  type="number" 
+                                  value={ga.price} 
+                                  onChange={e => updateGroupAddon(ga.id, 'price', e.target.value)}
+                                  style={{ border: 'none', background: 'transparent', fontWeight: 700, fontSize: '0.9rem', width: '60px', padding: '4px 0', textAlign: 'right' }}
+                                />
+                              </div>
+                              <button 
+                                onClick={() => removeGroupAddon(ga.id)}
+                                className="btn btn-ghost btn-icon btn-sm"
+                                style={{ color: '#ef4444' }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))}
+                          {groupAddons.length === 0 && (
+                            <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>
+                              <Plus size={32} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                              <p>No add-ons selected for this group.</p>
+                              <p style={{ fontSize: '0.8rem' }}>Use the search bar above to add global add-ons.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side: Assignment Tree */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div style={{ background: 'white', padding: '24px', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+              <h2 style={{ fontSize: '1.25rem', color: '#111827', marginBottom: '20px', borderBottom: '1px solid #e5e7eb', paddingBottom: '12px' }}>
+                Assignment Area
+              </h2>
+              <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: '24px' }}>
+                Select exactly which items or categories should offer this {assignType === 'global' ? 'add-on' : 'group'}.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {(categories || []).map(cat => {
+                  const catItems = (menuItems || []).filter(i => i.category_id === cat.id);
+                  const selectedCount = catItems.filter(i => selectedItemIds.includes(i.id)).length;
+                  const isAll = catItems.length > 0 && selectedCount === catItems.length;
+                  const isPartial = selectedCount > 0 && !isAll;
+                  const isExpanded = expandedCategories.includes(cat.id);
+
+                  return (
+                    <div key={cat.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden' }}>
+                      <div style={{ 
+                        padding: '14px 20px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        background: isAll ? '#f0fdf4' : (isPartial ? '#fefce8' : 'white'),
+                        transition: 'background 0.2s'
+                      }} onClick={() => toggleExpand(cat.id)}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <div 
+                            onClick={(e) => { e.stopPropagation(); toggleCategory(cat.id); }}
+                            style={{ 
+                              width: '24px', 
+                              height: '24px', 
+                              border: `2px solid ${isAll ? '#16a34a' : (isPartial ? '#ca8a04' : '#d1d5db')}`,
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              background: isAll ? '#16a34a' : (isPartial ? '#ca8a04' : 'white')
+                            }}
+                          >
+                            {isAll && <Plus size={16} color="white" />}
+                            {isPartial && <div style={{ width: '12px', height: '2px', background: 'white' }} />}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '1rem' }}>{cat.name}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                              {selectedCount} item{selectedCount !== 1 ? 's' : ''} assigned
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ color: '#9ca3af' }}>
+                          {isExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div style={{ padding: '8px 20px 20px 56px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #e5e7eb', background: '#fafafa' }}>
+                          {catItems.map(item => (
+                            <div 
+                              key={item.id} 
+                              onClick={() => toggleItem(item.id)}
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '16px', 
+                                cursor: 'pointer',
+                                padding: '8px 0',
+                                color: selectedItemIds.includes(item.id) ? '#111827' : '#6b7280'
+                              }}
+                            >
+                              <div style={{ 
+                                width: '20px', 
+                                height: '20px', 
+                                border: `2px solid ${selectedItemIds.includes(item.id) ? '#16a34a' : '#d1d5db'}`,
+                                borderRadius: '6px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: selectedItemIds.includes(item.id) ? '#16a34a' : 'white'
+                              }}>
+                                {selectedItemIds.includes(item.id) && <Plus size={16} color="white" />}
+                              </div>
+                              <div style={{ fontSize: '0.95rem', fontWeight: selectedItemIds.includes(item.id) ? 500 : 400 }}>{item.name}</div>
+                            </div>
+                          ))}
+                          {catItems.length === 0 && <p style={{ fontSize: '0.875rem', color: '#9ca3af', fontStyle: 'italic' }}>No items in this category.</p>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default MenuPage;
 
 // Addon Modal
@@ -1482,7 +2036,7 @@ const AddonModal = ({ addon, onClose, onSave }) => {
 };
 
 // Master Add-ons List Modal
-const MasterAddonsModal = ({ masterAddons, onClose, onAdd, onEdit, onDelete }) => {
+const MasterAddonsModal = ({ masterAddons, onClose, onAdd, onEdit, onDelete, onAssign }) => {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: '700px', height: '80vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
@@ -1531,6 +2085,9 @@ const MasterAddonsModal = ({ masterAddons, onClose, onAdd, onEdit, onDelete }) =
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>{ma.name}</h4>
                       <div style={{ display: 'flex', gap: '4px' }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => onAssign(ma)} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+                          Assign
+                        </button>
                         <button className="btn btn-ghost btn-icon btn-sm" onClick={() => onEdit(ma)}>
                           <Edit2 size={14} />
                         </button>

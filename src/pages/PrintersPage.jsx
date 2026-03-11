@@ -42,25 +42,27 @@ const PrintersPage = () => {
   const [kotMenuData, setKotMenuData] = useState([]);
   const [expandedCategories, setExpandedCategories] = useState(new Set());
   const [kotItemsLoading, setKotItemsLoading] = useState(false);
+  const [activeMenu, setActiveMenu] = useState(null);
 
   useEffect(() => {
     loadData();
   }, []);
 
   useEffect(() => {
-    if (printerTab === 'kotitems' && kotMenuData.length === 0) {
+    if (printerTab === 'kotitems') {
       loadKotMenuData();
     }
-  }, [printerTab]);
+  }, [printerTab, activeMenu]);
 
   const loadData = async () => {
     try {
-      const [settingsResult, printersResult, stationsResult, categoriesResult, categoryMapResult] = await Promise.all([
+      const [settingsResult, printersResult, stationsResult, categoriesResult, categoryMapResult, activeMenuResult] = await Promise.all([
         window.electronAPI.invoke('settings:getAll', {}),
         window.electronAPI.invoke('print:getPrinters'),
         window.electronAPI.invoke('printer:getStations').catch(() => []),
         window.electronAPI.invoke('menu:getCategories').catch(() => []),
-        window.electronAPI.invoke('printer:getCategoryMap').catch(() => [])
+        window.electronAPI.invoke('printer:getCategoryMap').catch(() => []),
+        window.electronAPI.invoke('menu:getActiveMenu').catch(() => null)
       ]);
       
       if (Array.isArray(settingsResult)) {
@@ -72,6 +74,7 @@ const PrintersPage = () => {
       if (Array.isArray(stationsResult)) setStations(stationsResult);
       if (Array.isArray(categoriesResult)) setCategories(categoriesResult);
       if (Array.isArray(categoryMapResult)) setCategoryMap(categoryMapResult);
+      setActiveMenu(activeMenuResult);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -174,7 +177,12 @@ const PrintersPage = () => {
     setKotItemsLoading(true);
     try {
       const data = await window.electronAPI.invoke('printer:getMenuItemsByCategory');
-      setKotMenuData(data || []);
+      // Filter by active menu
+      let filteredData = data || [];
+      if (activeMenu) {
+        filteredData = filteredData.filter(cat => cat.menu_id === activeMenu.id);
+      }
+      setKotMenuData(filteredData);
     } catch (e) { console.error(e); }
     finally { setKotItemsLoading(false); }
   };
@@ -814,7 +822,7 @@ const PrintersPage = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {categories.map((cat, idx) => (
+                          {categories.filter(c => !activeMenu ? true : c.menu_id === activeMenu.id).map((cat, idx) => (
                             <tr key={cat.id} style={{ borderBottom: '1px solid var(--gray-100)', background: idx % 2 === 0 ? 'white' : 'var(--gray-50)' }}>
                               <td style={{ padding: '12px 20px', fontWeight: '500', color: 'var(--gray-800)' }}>{cat.name}</td>
                               {stations.map(station => {

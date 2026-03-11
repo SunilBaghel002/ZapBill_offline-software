@@ -988,6 +988,83 @@ class Database {
     return this.update('master_addons', { is_deleted: 1 }, { id });
   }
 
+  // ============ ADDON ASSIGNMENT (BULK) ============
+  assignGlobalAddonToItems({ addon, itemIds }) {
+    const allItems = this.getMenuItems();
+    try {
+      this.db.run('BEGIN TRANSACTION');
+      
+      for (const item of allItems) {
+        let addonsArr = [];
+        try { if (item.addons) addonsArr = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons; } catch(e){}
+        
+        const shouldHave = itemIds.includes(item.id);
+        const hasAddon = addonsArr.some(a => a.name === addon.name);
+        if (shouldHave && !hasAddon) {
+          addonsArr.push({ name: addon.name, price: addon.price, type: addon.type });
+        } else if (!shouldHave && hasAddon) {
+          addonsArr = addonsArr.filter(a => a.name !== addon.name);
+        } else {
+          continue; // No change for this item
+        }
+
+        const strAddons = addonsArr.length > 0 ? JSON.stringify(addonsArr) : null;
+        // Use raw run to avoid individual saves
+        const query = `UPDATE menu_items SET addons = ?, updated_at = ? WHERE id = ?`;
+        const params = [strAddons, new Date().toISOString(), item.id];
+        const stmt = this.db.prepare(query);
+        stmt.run(params);
+        stmt.free();
+      }
+      
+      this.db.run('COMMIT');
+      this.save(); // Save once at the end
+      return { success: true };
+    } catch (err) {
+      console.error('Bulk assign global error:', err);
+      try { this.db.run('ROLLBACK'); } catch (e) {}
+      throw err;
+    }
+  }
+
+  assignMasterAddonToItems({ masterAddonId, itemIds }) {
+    const allItems = this.getMenuItems();
+    try {
+      this.db.run('BEGIN TRANSACTION');
+      
+      for (const item of allItems) {
+        let maIdsArr = [];
+        try { if (item.master_addon_ids) maIdsArr = typeof item.master_addon_ids === 'string' ? JSON.parse(item.master_addon_ids) : item.master_addon_ids; } catch(e){}
+        
+        const shouldHave = itemIds.includes(item.id);
+        const hasAddon = maIdsArr.includes(masterAddonId);
+        if (shouldHave && !hasAddon) {
+          maIdsArr.push(masterAddonId);
+        } else if (!shouldHave && hasAddon) {
+          maIdsArr = maIdsArr.filter(id => id !== masterAddonId);
+        } else {
+          continue; // No change
+        }
+
+        const strMaIds = maIdsArr.length > 0 ? JSON.stringify(maIdsArr) : null;
+        // Use raw run to avoid individual saves
+        const query = `UPDATE menu_items SET master_addon_ids = ?, updated_at = ? WHERE id = ?`;
+        const params = [strMaIds, new Date().toISOString(), item.id];
+        const stmt = this.db.prepare(query);
+        stmt.run(params);
+        stmt.free();
+      }
+      
+      this.db.run('COMMIT');
+      this.save(); // Save once
+      return { success: true };
+    } catch (err) {
+      console.error('Bulk assign master error:', err);
+      try { this.db.run('ROLLBACK'); } catch (e) {}
+      throw err;
+    }
+  }
+
   deleteMenuItem(id) {
     this.delete('menu_items', { id });
     this.addToSyncQueue('menu_item', id, 'delete', { id });
@@ -3356,7 +3433,7 @@ class Database {
   getMenuItemsWithKotStatus() {
     // Get categories with their items and KOT exclusion status
     const categories = this.execute(`
-      SELECT id, name FROM categories WHERE is_deleted = 0 ORDER BY display_order, name
+      SELECT id, name, menu_id FROM categories WHERE is_deleted = 0 ORDER BY display_order, name
     `);
 
     const excludedIds = new Set(

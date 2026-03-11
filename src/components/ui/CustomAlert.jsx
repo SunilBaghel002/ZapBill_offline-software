@@ -55,7 +55,7 @@ const CustomAlert = ({ isOpen, message, type = 'info', onClose, onConfirm }) => 
   const currentConfig = config[type] || config.info;
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 3000, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}>
+    <div className="modal-overlay" style={{ zIndex: 20000, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}>
       <div 
         className="custom-alert-modal"
         onClick={(e) => e.stopPropagation()}

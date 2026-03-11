@@ -378,8 +378,8 @@ const POSPage = () => {
       setGlobalAddons(ga || []);
       setActiveItemDiscounts(discounts || []);
 
-      // Default to All Items
-      setSelectedCategory(null);
+      // Default to Favorites as requested
+      setSelectedCategory('favorites');
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -408,6 +408,9 @@ const POSPage = () => {
   };
 
   const filteredItems = menuItems.filter(item => {
+    // Filter by Active Menu if it exists
+    if (activeMenu && item.menu_id && item.menu_id !== activeMenu.id) return false;
+
     // Favorites Category Logic
     if (selectedCategory === 'favorites') {
       return item.is_favorite && (!searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -806,9 +809,6 @@ const POSPage = () => {
               className={`pos-category-item ${!selectedCategory ? 'active' : ''}`}
               onClick={() => setSelectedCategory(null)}
             >
-              <div className="pos-category-icon-wrapper" style={{ marginBottom: '4px' }}>
-                <ClipboardList size={32} />
-              </div>
               <span>All Items</span>
             </div>
             
@@ -817,41 +817,18 @@ const POSPage = () => {
               className={`pos-category-item ${selectedCategory === 'favorites' ? 'active' : ''}`}
               onClick={() => setSelectedCategory('favorites')}
             >
-              <div className="pos-category-icon-wrapper" style={{ marginBottom: '4px' }}>
-                <Star size={32} fill={selectedCategory === 'favorites' ? "white" : "#FFC107"} color={selectedCategory === 'favorites' ? "white" : "#FFB300"} />
-              </div>
               <span>Favorites</span>
             </div>
 
-            {categories.map((category, index) => {
-              // Helper to get icon based on category name
-              const getIcon = (name) => {
-                const n = name.toLowerCase();
-                if (n.includes('pizza')) return <Pizza size={32} />;
-                if (n.includes('coffee') || n.includes('tea') || n.includes('beverage')) return <Coffee size={32} />;
-                if (n.includes('ice') || n.includes('dessert')) return <IceCream size={32} />;
-                if (n.includes('sandwich') || n.includes('burger')) return <Sandwich size={32} />;
-                if (n.includes('soup')) return <Soup size={32} />;
-                if (n.includes('veg') || n.includes('salad')) return <Carrot size={32} />;
-                if (n.includes('chicken') || n.includes('beef') || n.includes('meat')) return <Beef size={32} />;
-                if (n.includes('cake') || n.includes('pastry')) return <Cake size={32} />;
-                if (n.includes('beer') || n.includes('alcohol')) return <Beer size={32} />;
-                return <Utensils size={32} />;
-              };
-
-              return (
-                <div
-                  key={category.id}
-                  className={`pos-category-item ${selectedCategory === category.id ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory(category.id)}
-                >
-                  <div className="pos-category-icon-wrapper" style={{ marginBottom: '4px' }}>
-                    {getIcon(category.name)}
-                  </div>
-                  <span>{category.name}</span>
-                </div>
-              );
-            })}
+            {categories.filter(c => !activeMenu || c.menu_id === activeMenu.id).map((category) => (
+              <div
+                key={category.id}
+                className={`pos-category-item ${selectedCategory === category.id ? 'active' : ''}`}
+                onClick={() => setSelectedCategory(category.id)}
+              >
+                <span>{category.name}</span>
+              </div>
+            ))}
           </div>
 
           {/* Menu Grid Area */}

@@ -353,6 +353,24 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('menu:assignGlobalAddonToItems', async (event, data) => {
+    try {
+      return db.assignGlobalAddonToItems(data);
+    } catch (error) {
+      log.error('Assign global addon to items error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('menu:assignMasterAddonToItems', async (event, data) => {
+    try {
+      return db.assignMasterAddonToItems(data);
+    } catch (error) {
+      log.error('Assign master addon to items error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // ============ MULTI-MENU OPERATIONS ============
   ipcMain.handle('menu:getMenus', async () => {
     try {

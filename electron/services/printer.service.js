@@ -52,9 +52,12 @@ class PrinterQueue {
       resolve({ success: false, error: error.message, type: job.type });
     }
 
-    // Delay before processing next job (allows paper feed + cutter)
+    // Force a specific hardware delay before sending the NEXT job to the spooler.
+    // This allows the POS printer buffer to clear and the physical paper cutter to complete its cycle.
     if (this.queue.length > 0) {
-      await new Promise(r => setTimeout(r, this.delayMs));
+      const waitTime = Math.max(this.delayMs, 500); // 500ms minimum delay to avoid buffer merging on client OS
+      log.info(`[PrinterQueue:${this.printerName}] Waiting ${waitTime}ms to maintain physical job isolation...`);
+      await new Promise(r => setTimeout(r, waitTime)); 
     }
 
     this.processing = false;
@@ -80,7 +83,7 @@ class PrinterService {
   constructor() {
     this.queues = new Map();        // printerName → PrinterQueue
     this.activePrints = new Set();
-    this.JOB_DELAY_MS = 800;       // Delay between sequential jobs on same printer
+    this.JOB_DELAY_MS = 500;       // 500ms Delay strictly enforced between sequential jobs
   }
 
   // ─── Queue Management ──────────────────────────────────────
@@ -138,53 +141,91 @@ class PrinterService {
 
         log.info(`[PrinterService] Finalizing routing: Requested="${printerName || 'DEFAULT'}" -> Actual="${targetPrinter}"`);
 
+        const jobId = `JOB_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        log.info(`[PrinterService] Generated logical job: ${jobId} for "${targetPrinter}"`);
+
         const html = `<!DOCTYPE html>
   <html>
     <head>
       <meta charset="UTF-8">
+      <title>${jobId}</title>
       <style>
         @page { margin: 0; size: ${pageSize} auto; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { 
-          margin: 0; padding: 6px 8px; 
-          font-family: 'Courier New', 'Consolas', monospace;
-          font-size: 13px; color: #000; background: #fff;
-          width: ${contentWidth}px; line-height: 1.2;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-          font-weight: 700;
+          margin: 0; padding: 12px 10px; 
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 14px; 
+          color: #000; 
+          background: #fff;
+          width: ${contentWidth}px; 
+          line-height: 1.4;
+          font-weight: 600;
         }
-        *, *::before, *::after { box-sizing: border-box; }
-        h1,h2,h3,h4,h5,h6,p { margin: 0; padding: 0; }
-        .divider { border-top: 1px dashed #000; margin: 10px 0; }
-        .divider-dark { border-top: 1px dashed #000; margin: 10px 0; }
-        .divider-solid { border-top: 2px solid #000; margin: 8px 0; }
+        h1, h2, h3, h4, h5, h6, p { margin: 0; padding: 0; }
+        
+        /* Layout Utilities */
         .text-center { text-align: center; }
         .text-right { text-align: right; }
-        .bold { font-weight: 700; }
-        .row { display: flex; justify-content: space-between; line-height: 1.8; }
-        .row .label { color: #000; }
-        .item-row { display: flex; justify-content: space-between; padding: 5px 0; line-height: 1.4; }
-        .item-row .amount { font-weight: 800; }
-        .total-row { display: flex; justify-content: space-between; font-weight: 900; font-size: 18px; margin-top: 8px; padding-top: 10px; border-top: 2px solid #000; }
-        .header { font-weight: 700; font-size: 16px; letter-spacing: 1px; text-align: center; }
-        .subheader { font-size: 11px; text-align: center; color: #000; margin-top: 4px; }
-        .reprint-badge { text-align: center; background: #000; color: #fff; font-weight: 900; padding: 4px; font-size: 14px; letter-spacing: 3px; margin-bottom: 6px; }
-        .kitchen-badge { text-align: center; font-weight: 700; font-size: 12px; letter-spacing: 1px; padding: 4px; border: 2px solid #000; margin-bottom: 6px; }
-        .logo { text-align: center; margin-bottom: 6px; }
-        .logo img { max-width: ${contentWidth - 40}px; max-height: 80px; object-fit: contain; }
-        .qr-section { text-align: center; margin-top: 8px; }
-        .item-detail { font-size: 11px; padding-left: 12px; color: #000; }
-        .tax-detail { font-size: 10px; color: #000; padding-left: 12px; }
-        .kot-header { font-size: 22px; font-weight: 900; text-align: center; letter-spacing: 2px; }
-        .station-name { text-align: center; background: #000; color: #fff; font-weight: 900; padding: 6px; font-size: 16px; margin-bottom: 6px; letter-spacing: 1px; }
-        .kot-item { font-size: 15px; font-weight: 900; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dotted #000; }
-        .kot-note { font-size: 13px; background: #000; color: #fff; font-weight: 700; padding: 4px 8px; margin-top: 3px; }
-        .void-badge { text-align: center; border: 3px solid #000; font-weight: 900; padding: 8px; font-size: 20px; letter-spacing: 3px; margin-bottom: 8px; }
-        /* Paper cut trigger - forces page break which triggers thermal cutter */
-        .paper-cut { page-break-after: always; height: 0; visibility: hidden; }
+        .text-left { text-align: left; }
+        .bold { font-weight: 900; }
+        .uppercase { text-transform: uppercase; }
+        
+        /* Professional Separators */
+        .line-dashed { border-top: 1px dashed #000; margin: 6px 0; width: 100%; }
+        .line-double { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 4px; margin: 8px 0; width: 100%; padding: 0; }
+        .line-thick { border-top: 2px solid #000; margin: 8px 0; width: 100%; }
+        .line-dotted { border-top: 1px dotted #000; margin: 6px 0; width: 100%; }
+        
+        /* Bill Header */
+        .restaurant-name { font-weight: 900; font-size: 19px; text-align: center; margin-bottom: 4px; }
+        .tax-invoice-label { font-size: 15px; font-weight: 900; text-align: center; border: 1px solid #000; padding: 3px; margin: 8px 0; letter-spacing: 2px; }
+        .info-label { font-size: 11px; text-align: center; margin-bottom: 2px; }
+        
+        /* Info Grid */
+        .info-section { margin: 10px 0; }
+        .info-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 2px; }
+        .info-val { font-weight: 900; }
+        
+        /* Table Layout */
+        .table-header { display: flex; font-weight: 900; font-size: 14px; padding-bottom: 4px; border-bottom: 1px solid #000; margin-bottom: 4px; }
+        .item-row { display: flex; padding: 5px 0; align-items: flex-start; font-size: 14px; }
+        .col-name { flex: 0 0 62%; text-align: left; overflow-wrap: break-word; font-weight: 900; padding-right: 4px; }
+        .col-qty { flex: 0 0 13%; text-align: center; font-weight: 900; }
+        .col-price { flex: 0 0 25%; text-align: right; font-weight: 900; }
+        
+        /* Sub-items */
+        .sub-item { font-size: 11px; font-weight: 700; padding-left: 10px; margin-top: -1px; }
+        .item-tax { font-size: 10px; padding-left: 10px; font-style: italic; }
+        
+        /* Totals Area */
+        .total-container { margin-top: 10px; }
+        .total-row { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 14px; }
+        .grand-total { 
+          display: flex; justify-content: space-between; 
+          font-weight: 900; font-size: 22px; 
+          margin: 10px 0; padding: 10px 0;
+          border-top: 1px solid #000; border-bottom: 1px solid #000;
+        }
+        
+        /* Badges */
+        .reprint-title { background: #000; color: #fff; text-align: center; font-weight: 900; font-size: 16px; padding: 6px; margin-bottom: 10px; letter-spacing: 4px; }
+        .kitchen-title { text-align: center; border: 2px solid #000; font-weight: 900; font-size: 14px; padding: 4px; margin-bottom: 10px; }
+        
+        /* KOT Styles */
+        .kot-num { font-size: 26px; font-weight: 900; text-align: center; padding: 5px; border: 2px solid #000; margin: 10px 0; }
+        .kot-item-row { display: flex; align-items: flex-start; gap: 12px; font-size: 20px; font-weight: 900; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dotted #000; }
+        .kot-qty { flex: 0 0 45px; border-right: 2px solid #000; }
+        
+        .footer-tag { text-align: center; margin-top: 20px; font-size: 10px; }
+        .paper-cut { page-break-after: always; height: 1px; visibility: hidden; }
       </style>
     </head>
-    <body>${htmlContent}<div class="paper-cut"></div></body>
+    <!-- We append ESC/POS GS V 0 cut sequence (\x1D\x56\x00) for drivers that pass text through naturally -->
+    <body>${htmlContent}
+      <div style="font-family: inherit; font-size: 1px;">\x1D\x56\x00</div>
+      <div class="paper-cut"></div>
+    </body>
   </html>`;
 
         await printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -198,7 +239,8 @@ class PrinterService {
           scaleFactor: 100
         };
 
-        log.info(`[PrinterService] Executing webContents.print to: "${targetPrinter}" (silent=true)`);
+        log.info(`[PrinterService] Initiating isolated webContents print buffer for job: ${jobId}`);
+        log.info(`[PrinterService] Executing webContents.print to: "${targetPrinter}" (silent=true). A completely separate physical print job buffer will be sent to the Windows spooler.`);
 
         printWindow.webContents.print(options, (success, errorType) => {
           if (!success) {
@@ -601,9 +643,9 @@ class PrinterService {
 
     // Badges
     const reprintBadge = order.isReprint
-      ? '<div class="reprint-badge">*** REPRINT ***</div>' : '';
+      ? '<div class="reprint-title">*** REPRINT ***</div>' : '';
     const kitchenBadge = isKitchenCopy
-      ? '<div class="kitchen-badge">--- KITCHEN COPY ---</div>' : '';
+      ? '<div class="kitchen-title">--- KITCHEN COPY ---</div>' : '';
 
     // Logo
     const logoHtml = order.showLogo && order.logoPath
@@ -611,47 +653,58 @@ class PrinterService {
 
     // Restaurant header
     const restaurantName = order.restaurantName || 'Restaurant POS';
-    const address = order.restaurantAddress ? `<div class="subheader">${order.restaurantAddress}</div>` : '';
-    const phone = order.restaurantPhone ? `<div class="subheader">Tel: ${order.restaurantPhone}</div>` : '';
-    const gst = order.gstNumber ? `<div class="subheader" style="font-weight:700;">GSTIN: ${order.gstNumber}</div>` : '';
-    const fssai = order.fssaiNumber ? `<div class="subheader">FSSAI: ${order.fssaiNumber}</div>` : '';
+    const address = order.restaurantAddress ? `<div class="info-label">${order.restaurantAddress}</div>` : '';
+    const phone = order.restaurantPhone ? `<div class="info-label">Tel: ${order.restaurantPhone}</div>` : '';
+    const gstValue = order.gstNumber;
+    const gstHtml = gstValue ? `<div class="info-label bold">GSTIN: ${gstValue}</div>` : '';
+    const fssai = order.fssaiNumber ? `<div class="info-label">FSSAI: ${order.fssaiNumber}</div>` : '';
+
+    const taxInvoice = gstValue ? '<div class="tax-invoice-label">TAX INVOICE</div>' : '';
 
     // Format date
     const formatDate = (dateStr) => {
       try {
-        return new Date(dateStr).toLocaleString('en-IN', {
-          day: '2-digit', month: 'short', year: 'numeric',
-          hour: '2-digit', minute: '2-digit'
-        });
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       } catch (e) { return ''; }
     };
 
-    // Order details
-    let orderDetails = '';
-    orderDetails += `<div class="row"><span class="label">Bill No:</span><strong>#${order.order_number || ''}</strong></div>`;
-    orderDetails += `<div class="row"><span class="label">Date:</span><span>${formatDate(order.created_at || new Date().toISOString())}</span></div>`;
+    // Order info grid
+    let orderDetails = `<div class="line-thick"></div><div class="info-section">`;
+    orderDetails += `<div class="info-row"><span>Bill No:</span><span class="info-val">#${order.order_number || ''}</span></div>`;
+    orderDetails += `<div class="info-row"><span>Date:</span><span>${formatDate(order.created_at || new Date().toISOString())}</span></div>`;
+    
     if (order.table_number) {
-      orderDetails += `<div class="row"><span class="label">Table:</span><span>${order.table_number}</span></div>`;
+      orderDetails += `<div class="info-row"><span>Table:</span><span class="info-val uppercase">TABLE ${order.table_number}</span></div>`;
     }
-    orderDetails += `<div class="row"><span class="label">Type:</span><span>${(order.order_type || 'dine_in').replace('_', ' ').toUpperCase()}</span></div>`;
+    orderDetails += `<div class="info-row"><span>Order Type:</span><span class="uppercase">${(order.order_type || 'dine_in').replace('_', ' ')}</span></div>`;
     
     // Customer info
     if (order.showCustomerDetails !== false) {
       if (order.customer_name) {
-        orderDetails += `<div class="row"><span class="label">Customer:</span><span>${order.customer_name}</span></div>`;
+        orderDetails += `<div class="info-row"><span>Customer:</span><span class="info-val">${order.customer_name}</span></div>`;
       }
       if (order.customer_phone) {
-        orderDetails += `<div class="row"><span class="label">Phone:</span><span>${order.customer_phone}</span></div>`;
+        orderDetails += `<div class="info-row"><span>Phone:</span><span>${order.customer_phone}</span></div>`;
       }
     }
+    orderDetails += `</div><div class="line-thick"></div>`;
 
-    // Items
-    const itemsHtml = items.map(item => {
+    // Items Table
+    let itemsHtml = `
+      <div class="table-header">
+        <span class="col-name">ITEM DESCRIPTION</span>
+        <span class="col-qty">QTY</span>
+        <span class="col-price">PRICE</span>
+      </div>
+    `;
+
+    itemsHtml += items.map(item => {
       let details = '';
       if (item.variant) {
         try {
           const v = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
-          if (v && v.name) details += `<div class="item-detail">↳ ${v.name}</div>`;
+          if (v && v.name) details += `<div class="sub-item">↳ ${v.name}</div>`;
         } catch (_) {}
       }
       if (item.addons) {
@@ -659,45 +712,47 @@ class PrinterService {
           const a = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
           if (Array.isArray(a)) {
             a.forEach(addon => {
-              details += `<div class="item-detail">+ ${addon.name}${addon.price ? ` (${cs}${Number(addon.price).toFixed(2)})` : ''}</div>`;
+              details += `<div class="sub-item">+ ${addon.name}${addon.price ? ` (${cs}${Number(addon.price).toFixed(2)})` : ''}</div>`;
             });
           }
         } catch (_) {}
       }
       if (item.special_instructions) {
-        details += `<div class="item-detail" style="font-style:italic;">Note: ${item.special_instructions}</div>`;
+        details += `<div class="sub-item" style="font-style:italic;">Note: ${item.special_instructions}</div>`;
       }
 
       let taxInfo = '';
       if (order.showItemwiseTax && item.tax_rate) {
         const taxAmt = ((item.item_total || 0) * (item.tax_rate / 100)).toFixed(2);
-        taxInfo = `<div class="tax-detail">Tax ${item.tax_rate}%: ${cs}${taxAmt}</div>`;
+        taxInfo = `<div class="item-tax">Tax ${item.tax_rate}%: ${cs}${taxAmt}</div>`;
       }
 
       return `
         <div class="item-row">
-          <span>${item.item_name} × ${item.quantity}</span>
-          <span class="amount">${cs}${(item.item_total || 0).toFixed(2)}</span>
+          <span class="col-name uppercase">${item.item_name}</span>
+          <span class="col-qty">${item.quantity}</span>
+          <span class="col-price">${(item.item_total || 0).toFixed(2)}</span>
         </div>
         ${details}${taxInfo}`;
     }).join('');
 
-    // Totals
-    let totalsHtml = '';
-    totalsHtml += `<div class="row"><span class="label">Subtotal:</span><span>${cs}${(order.subtotal || 0).toFixed(2)}</span></div>`;
+    // Totals Area
+    let totalsHtml = `<div class="total-container">`;
+    totalsHtml += `<div class="total-row"><span>SUB TOTAL:</span><span class="bold">${cs}${(order.subtotal || 0).toFixed(2)}</span></div>`;
     
     if (order.tax_amount > 0) {
-      totalsHtml += `<div class="row"><span class="label">Tax:</span><span>${cs}${order.tax_amount.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="total-row"><span>GST TOTAL:</span><span class="bold">${cs}${order.tax_amount.toFixed(2)}</span></div>`;
     }
     if (order.delivery_charge > 0) {
-      totalsHtml += `<div class="row"><span class="label">Delivery:</span><span>${cs}${order.delivery_charge.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="total-row"><span>DELIVERY:</span><span>${cs}${order.delivery_charge.toFixed(2)}</span></div>`;
     }
     if (order.container_charge > 0) {
-      totalsHtml += `<div class="row"><span class="label">Container:</span><span>${cs}${order.container_charge.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="total-row"><span>CONTAINER:</span><span>${cs}${order.container_charge.toFixed(2)}</span></div>`;
     }
     if (order.discount_amount > 0) {
-      totalsHtml += `<div class="row" style="color: #000; font-weight:700;"><span>Discount:</span><span>-${cs}${order.discount_amount.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="total-row uppercase bold"><span>Discount:</span><span>-${cs}${order.discount_amount.toFixed(2)}</span></div>`;
     }
+    totalsHtml += `</div>`;
 
     // Payment info
     const paymentHtml = order.payment_method ? `
@@ -711,10 +766,10 @@ class PrinterService {
       qrHtml = `
         <div class="qr-section">
           <div class="divider"></div>
-          <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px;">Scan to Pay via UPI</div>
-          <div style="border: 2px solid #000; padding: 8px; display: inline-block; font-size: 12px;">
-            <div style="font-weight: 700;">UPI: ${order.qrUpiId}</div>
-            <div style="font-size: 11px; margin-top: 3px;">Amount: ${cs}${(order.total_amount || 0).toFixed(2)}</div>
+          <div style="font-size: 14px; font-weight: 900; margin-bottom: 8px;">SCAN & PAY VIA UPI</div>
+          <div style="border: 2px solid #000; padding: 10px; display: inline-block;">
+            <div style="font-size: 13px;">UPI: ${order.qrUpiId}</div>
+            <div style="font-size: 14px; font-weight: 900; margin-top: 5px;">AMOUNT: ${cs}${(order.total_amount || 0).toFixed(2)}</div>
           </div>
         </div>`;
     }
@@ -722,38 +777,39 @@ class PrinterService {
     // Footer
     const footer = order.receiptFooter || 'Thank you for dining with us!';
 
+    // Final Template
     return `
       ${reprintBadge}
       ${kitchenBadge}
       ${logoHtml}
       
-      <div class="header" style="color:#000;">${restaurantName}</div>
-      ${address}${phone}${gst}${fssai}
+      <div class="restaurant-name text-center uppercase">${restaurantName}</div>
+      ${address}${phone}${gstHtml}${fssai}
       
-      <div class="divider"></div>
+      ${taxInvoice}
       
       ${orderDetails}
       
-      <div class="divider"></div>
-      
       ${itemsHtml}
       
-      <div class="divider"></div>
-      
+      <div class="line-thick" style="margin-top: 15px;"></div>
       ${totalsHtml}
       
-      <div class="total-row" style="color:#000;">
-        <span>TOTAL:</span>
+      <div class="grand-total">
+        <span>NET AMOUNT:</span>
         <span>${cs}${(order.total_amount || 0).toFixed(2)}</span>
       </div>
       
       ${paymentHtml}
       ${qrHtml}
       
-      <div class="divider" style="margin-top: 10px;"></div>
-      <div class="text-center" style="font-size: 12px; color: #000; letter-spacing: 0.5px;">${footer}</div>
-      <div class="text-center" style="font-size: 9px; margin-top: 4px; color: #000;">Powered by ZapBill POS</div>
-      ${isKitchenCopy ? '<div class="text-center" style="font-size: 10px; margin-top: 6px; font-weight: 700; color:#000;">--- Kitchen Copy ---</div>' : ''}
+      <div class="line-dashed" style="margin-top: 15px;"></div>
+      <div class="text-center" style="font-size: 13px; font-weight: 900; margin-top: 5px;">${footer}</div>
+      <div class="footer-tag">
+        Generated by ZapBill POS<br/>
+        ${new Date().toLocaleString()}
+      </div>
+      ${isKitchenCopy ? '<div class="line-double"></div><div class="text-center bold">KITCHEN BILL COPY</div>' : ''}
     `;
   }
 
@@ -792,7 +848,10 @@ class PrinterService {
 
       return `
         <div class="kot-item">
-          <div style="font-size: 16px; font-weight: 900;">${item.quantity} × ${item.item_name}</div>
+          <div style="display: flex; align-items: flex-start; gap: 10px;">
+            <span style="flex: 0 0 45px; font-size: 22px;">${item.quantity}x</span>
+            <span style="flex: 1;">${item.item_name}</span>
+          </div>
           ${details}
         </div>`;
     }).join('');
@@ -805,33 +864,25 @@ class PrinterService {
     return `
       ${urgencyBadge}
       ${reprintBadge}
-      ${stationBadge}
       
-      <div class="kot-header">KITCHEN ORDER TICKET</div>
-      ${kotNumberLine}
-      <div style="text-align: center; font-size: 14px; font-weight: 700;">${(order.order_type || '').replace('_', ' ').toUpperCase()}</div>
+      <div class="kot-header">K.O.T</div>
+      <div class="kot-num">#${order.order_number || 'N/A'}</div>
       
-      <div class="divider-solid"></div>
+      <div class="info-row bold"><span class="uppercase">${stationName || 'KITCHEN'}</span><span>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>
+      ${order.table_number ? `<div class="text-center bold" style="font-size: 22px; margin: 5px 0;">TAB: ${order.table_number}</div>` : `<div class="text-center italic">${(order.order_type || '').replace('_', ' ').toUpperCase()}</div>`}
       
-      <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700;">
-        <span>Order #: ${order.order_number || 'N/A'}</span>
-        <span>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-      </div>
-      ${order.table_number ? `<div style="font-size: 20px; font-weight: 900; text-align: center; margin: 6px 0; background: #000; color: #fff; padding: 6px;">TABLE ${order.table_number}</div>` : ''}
-      ${order.customer_name ? `<div style="font-size: 13px; font-weight: 700;">Customer: ${order.customer_name}</div>` : ''}
-      
-      <div class="divider-solid"></div>
+      <div class="line-thick"></div>
       
       ${itemsHtml}
       
       ${order.chef_instructions ? `
-        <div style="margin-top: 8px; padding: 6px; border: 3px solid #000; font-weight: 900; font-size: 14px;">
-          🍳 CHEF: ${order.chef_instructions}
+        <div style="margin-top: 10px; padding: 8px; border: 2px solid #000; font-weight: 900; font-size: 16px;">
+          INSTRUCTIONS: ${order.chef_instructions}
         </div>
       ` : ''}
       
-      <div class="divider-solid" style="margin-top: 12px;"></div>
-      <div class="text-center" style="font-size: 11px; font-weight: 600;">--- Kitchen Copy ---</div>
+      <div class="line-thick" style="margin-top: 15px;"></div>
+      <div class="text-center bold" style="font-size: 12px;">--- KITCHEN ORDER COPY ---</div>
     `;
   }
 
