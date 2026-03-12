@@ -9,6 +9,7 @@ export const useCartStore = create(
       tableNumber: '',
       customerName: '',
       customerPhone: '',
+      customerAddress: '',
       notes: '',
       urgency: 'normal', // 'normal', 'urgent', 'critical'
       chefInstructions: '',
@@ -132,6 +133,7 @@ export const useCartStore = create(
       setTableNumber: (number) => set({ tableNumber: number }),
       setCustomerName: (name) => set({ customerName: name }),
       setCustomerPhone: (phone) => set({ customerPhone: phone }),
+      setCustomerAddress: (address) => set({ customerAddress: address }),
       setNotes: (notes) => set({ notes }),
       setUrgency: (urgency) => set({ urgency }),
       setChefInstructions: (instructions) => set({ chefInstructions: instructions }),
@@ -169,6 +171,7 @@ export const useCartStore = create(
       setDeliveryCharge: (amount) => set({ deliveryCharge: amount }),
       setContainerCharge: (amount) => set({ containerCharge: amount }),
       setCustomerPaid: (amount) => set({ customerPaid: amount }),
+      setOrderType: (type) => set({ orderType: type }),
 
       // Calculate subtotal
       getSubtotal: () => {
@@ -242,14 +245,26 @@ export const useCartStore = create(
         return (taxableAmount * serviceChargePercent) / 100;
       },
 
-      // Calculate grand total
-      getGrandTotal: () => {
+      // Calculate actual total (unrounded)
+      getActualTotal: () => {
         const { isSalesReturn, deliveryCharge, containerCharge } = get();
         const taxableAmount = get().getTaxableAmount();
         const tax = get().getTaxBreakdown().total;
         const serviceCharge = get().getServiceCharge();
         const total = taxableAmount + tax + serviceCharge + (deliveryCharge || 0) + (containerCharge || 0);
         return isSalesReturn ? -total : total;
+      },
+
+      // Calculate grand total (rounded to nearest integer)
+      getGrandTotal: () => {
+        return Math.round(get().getActualTotal());
+      },
+
+      // Calculate rounding difference
+      getRoundOff: () => {
+        const actual = get().getActualTotal();
+        const rounded = Math.round(actual);
+        return rounded - actual;
       },
 
       // Legacy method for compatibility
@@ -269,6 +284,7 @@ export const useCartStore = create(
         tableNumber: '',
         customerName: '',
         customerPhone: '',
+        customerAddress: '',
         notes: '',
         urgency: 'normal',
         chefInstructions: '',
@@ -302,6 +318,7 @@ export const useCartStore = create(
           table_number: state.tableNumber || null,
           customer_name: state.customerName || null,
           customer_phone: state.customerPhone || null,
+          customer_address: state.customerAddress || null,
           notes: state.notes || null,
           urgency: state.urgency || 'normal',
           chef_instructions: state.chefInstructions || null,
@@ -311,6 +328,7 @@ export const useCartStore = create(
           discount_type: state.discountType,
           discount_reason: state.discountReason || null,
           service_charge: state.getServiceCharge(),
+          round_off: state.getRoundOff(),
           total_amount: state.getGrandTotal(),
           payment_method: state.paymentMethod === 'split' ? 'mixed' : state.paymentMethod,
           is_complimentary: state.isComplimentary ? 1 : 0,
@@ -363,6 +381,7 @@ export const useCartStore = create(
           tableNumber: state.tableNumber,
           customerName: state.customerName,
           customerPhone: state.customerPhone,
+          customerAddress: state.customerAddress,
           notes: state.notes,
           urgency: state.urgency,
           chefInstructions: state.chefInstructions,
@@ -405,6 +424,7 @@ export const useCartStore = create(
           tableNumber: heldOrder.tableNumber || '',
           customerName: heldOrder.customerName || '',
           customerPhone: heldOrder.customerPhone || '',
+          customerAddress: heldOrder.customerAddress || '',
           notes: heldOrder.notes || '',
           urgency: heldOrder.urgency || 'normal',
           chefInstructions: heldOrder.chefInstructions || '',
@@ -433,6 +453,7 @@ export const useCartStore = create(
         tableNumber: state.tableNumber,
         customerName: state.customerName,
         customerPhone: state.customerPhone,
+        customerAddress: state.customerAddress,
         notes: state.notes,
         urgency: state.urgency,
         chefInstructions: state.chefInstructions,

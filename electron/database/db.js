@@ -250,8 +250,8 @@ class Database {
         try { this.db.run("ALTER TABLE orders ADD COLUMN container_charge REAL DEFAULT 0"); } catch (e) {}
         try { this.db.run("ALTER TABLE orders ADD COLUMN customer_paid REAL DEFAULT 0"); } catch (e) {}
         try { this.db.run("ALTER TABLE orders ADD COLUMN customer_address TEXT"); } catch (e) {}
+        try { this.db.run("ALTER TABLE orders ADD COLUMN round_off REAL DEFAULT 0"); } catch (e) {}
      } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
-    } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
 
     try {
         // Add urgency and chef_instructions to orders
@@ -263,6 +263,10 @@ class Database {
         // Add tax_rate to order_items
         try { this.db.run("ALTER TABLE order_items ADD COLUMN tax_rate REAL DEFAULT 0"); } catch (e) {}
      } catch (error) { if (!error.message.includes("duplicate column name")) console.log('Migration note:', error.message); }
+
+    try {
+      this.db.run("UPDATE orders SET order_type = 'pickup' WHERE order_type = 'takeaway'");
+    } catch (e) {}
 
     try {
       // Add menu_id to categories and menu_items
@@ -366,7 +370,7 @@ class Database {
           CREATE TABLE orders (
             id TEXT PRIMARY KEY,
             order_number INTEGER NOT NULL,
-            order_type TEXT CHECK(order_type IN ('dine_in', 'takeaway', 'delivery')) DEFAULT 'dine_in',
+            order_type TEXT CHECK(order_type IN ('dine_in', 'pickup', 'delivery')) DEFAULT 'dine_in',
             table_number TEXT,
             customer_name TEXT,
             customer_phone TEXT,
@@ -445,7 +449,7 @@ class Database {
           CREATE TABLE orders (
             id TEXT PRIMARY KEY,
             order_number INTEGER NOT NULL,
-            order_type TEXT CHECK(order_type IN ('dine_in', 'takeaway', 'delivery')) DEFAULT 'dine_in',
+            order_type TEXT CHECK(order_type IN ('dine_in', 'pickup', 'delivery')) DEFAULT 'dine_in',
             table_number TEXT,
             customer_name TEXT,
             customer_phone TEXT,
@@ -1482,6 +1486,7 @@ class Database {
       container_charge: order.container_charge || 0,
       customer_paid: order.customer_paid || 0,
       customer_address: order.customer_address || '',
+      round_off: order.round_off || 0,
       total_amount: order.total_amount || 0,
       payment_method: (pm === 'split' ? 'mixed' : pm) || null,
       payment_status: paymentStatus,
@@ -2066,7 +2071,7 @@ class Database {
         COALESCE((SELECT SUM(amount) FROM order_payments op JOIN orders o2 ON op.order_id = o2.id WHERE op.payment_method = 'due' AND o2.payment_method = 'mixed' AND DATE(o2.created_at, 'localtime') = ? AND o2.status IN ('completed', 'active') AND o2.is_deleted = 0 AND op.is_deleted = 0), 0) as due_amount,
         
         COALESCE(SUM(CASE WHEN order_type = 'dine_in' AND status != 'cancelled' THEN total_amount ELSE 0 END), 0) as dine_in_amount,
-        COALESCE(SUM(CASE WHEN (order_type = 'takeaway' OR order_type = 'pickup') AND status != 'cancelled' THEN total_amount ELSE 0 END), 0) as pickup_amount,
+        COALESCE(SUM(CASE WHEN order_type = 'pickup' AND status != 'cancelled' THEN total_amount ELSE 0 END), 0) as pickup_amount,
         COALESCE(SUM(CASE WHEN order_type = 'delivery' AND status != 'cancelled' THEN total_amount ELSE 0 END), 0) as delivery_amount
         
       FROM orders 

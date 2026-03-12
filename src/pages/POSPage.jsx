@@ -261,7 +261,6 @@ const POSPage = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [customerAddress, setCustomerAddress] = useState('');
   const [customerDue, setCustomerDue] = useState({ hasDue: false, totalDue: 0 });
   const [showTableDropdown, setShowTableDropdown] = useState(false);
   const [showOrderInfo, setShowOrderInfo] = useState(false);
@@ -335,6 +334,7 @@ const POSPage = () => {
   const selectCustomer = (cust) => {
     cart.setCustomerName(cust.customer_name);
     cart.setCustomerPhone(cust.customer_phone);
+    cart.setCustomerAddress(cust.customer_address || '');
     checkCustomerDue(cust.customer_phone);
     setShowSuggestions(false);
   };
@@ -484,13 +484,7 @@ const POSPage = () => {
   };
 
   const handleNewOrder = () => {
-    if (cart.items.length > 0) {
-      showAlert('Clear current order?', 'confirm', () => {
-        cart.clearCart();
-      });
-    } else {
-      cart.clearCart();
-    }
+    cart.clearCart();
   };
 
   const handleHoldOrder = () => {
@@ -904,8 +898,8 @@ const POSPage = () => {
               Delivery
             </button>
             <button
-              className={`pos-order-type-tab ${cart.orderType === 'takeaway' ? 'active pickup' : ''}`}
-              onClick={() => cart.setOrderType('takeaway')}
+              className={`pos-order-type-tab ${cart.orderType === 'pickup' ? 'active pickup' : ''}`}
+              onClick={() => cart.setOrderType('pickup')}
             >
               Pick Up
             </button>
@@ -1089,8 +1083,8 @@ const POSPage = () => {
                 <input
                   type="text"
                   placeholder="Enter Address"
-                  value={customerAddress}
-                  onChange={(e) => setCustomerAddress(e.target.value)}
+                  value={cart.customerAddress || ''}
+                  onChange={(e) => cart.setCustomerAddress(e.target.value)}
                   style={{ border: '1px solid #CFD8DC', borderRadius: '4px', padding: '8px', fontSize: '14px', outline: 'none', width: '100%' }}
                 />
               </div>
@@ -1272,6 +1266,13 @@ const POSPage = () => {
               </div>
             )}
 
+            {Math.abs(cart.getRoundOff()) > 0 && (
+              <div className="pos-bill-row">
+                <span className="pos-bill-label">Round Off</span>
+                <span className="pos-bill-value">{cart.getRoundOff() > 0 ? '+' : ''}{cart.getRoundOff().toFixed(2)}</span>
+              </div>
+            )}
+
             <div className="pos-bill-divider"></div>
 
             <div className="pos-bill-total-row">
@@ -1338,6 +1339,13 @@ const POSPage = () => {
                   style={{ width: '80px', textAlign: 'right', border: '1px solid #CFD8DC', padding: '4px 8px', borderRadius: '4px', outline: 'none', fontSize: '14px' }}
                 />
               </div>
+              )}
+
+              {Math.abs(cart.getRoundOff()) > 0 && (
+                <div className="bill-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#78909C' }}>
+                  <span>Round Off</span>
+                  <span>{cart.getRoundOff() > 0 ? '+' : ''}{cart.getRoundOff().toFixed(2)}</span>
+                </div>
               )}
 
               {/* Divider */}

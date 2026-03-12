@@ -94,6 +94,24 @@ const OrdersPage = () => {
       filtered = filtered.filter(order => order.order_type === orderTypeFilter);
     }
 
+    // Sort by type: dine_in > delivery > pickup
+    const typePriority = {
+      'dine_in': 1,
+      'delivery': 2,
+      'pickup': 3,
+      'takeaway': 3 // legacy support
+    };
+
+    filtered.sort((a, b) => {
+      const priorityA = typePriority[a.order_type] || 99;
+      const priorityB = typePriority[b.order_type] || 99;
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      // If same type, sort by date descending (newest first)
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
     // Apply date filter
     const today = new Date().toISOString().split('T')[0];
     if (dateFilter === 'today') {
@@ -337,7 +355,7 @@ const OrdersPage = () => {
           >
             <option value="all">All Types</option>
             <option value="dine_in">Dine In</option>
-            <option value="takeaway">Takeaway / Pick Up</option>
+            <option value="pickup">Pick Up</option>
             <option value="delivery">Delivery</option>
           </select>
         </div>
@@ -676,6 +694,12 @@ const BillViewModal = ({ order, onClose, onPrint }) => {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Subtotal:</span><span>₹{(order.subtotal || 0).toFixed(2)}</span></div>
               {order.tax_amount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Tax:</span><span>₹{(order.tax_amount || 0).toFixed(2)}</span></div>}
               {order.discount_amount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a' }}><span>Discount:</span><span>-₹{(order.discount_amount || 0).toFixed(2)}</span></div>}
+              {order.round_off && Math.abs(order.round_off) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#6b7280' }}>Round Off:</span>
+                  <span>{order.round_off > 0 ? '+' : ''}₹{order.round_off.toFixed(2)}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '17px', marginTop: '8px', paddingTop: '10px', borderTop: '2px solid #111827' }}>
                 <span>TOTAL:</span><span>₹{(order.total_amount || 0).toFixed(2)}</span>
               </div>
@@ -722,7 +746,9 @@ const OrderEditModal = ({ order, onClose, onSave }) => {
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
   const taxAmount = items.reduce((sum, item) => sum + ((item.unit_price * item.quantity) * (item.tax_rate || 0) / 100), 0);
-  const totalAmount = subtotal + taxAmount - (parseFloat(formData.discount_amount) || 0);
+  const actualTotal = subtotal + taxAmount - (parseFloat(formData.discount_amount) || 0);
+  const totalAmount = Math.round(actualTotal);
+  const roundOff = totalAmount - actualTotal;
 
   const handleItemChange = (index, field, value) => {
     const updatedItems = [...items];
@@ -758,6 +784,7 @@ const OrderEditModal = ({ order, onClose, onSave }) => {
           ...formData,
           subtotal: subtotal,
           tax_amount: taxAmount,
+          round_off: roundOff,
           total_amount: totalAmount,
           discount_amount: parseFloat(formData.discount_amount) || 0
         }
@@ -816,7 +843,7 @@ const OrderEditModal = ({ order, onClose, onSave }) => {
                   onChange={(e) => setFormData({ ...formData, order_type: e.target.value })}
                 >
                   <option value="dine_in">Dine In</option>
-                  <option value="takeaway">Takeaway</option>
+                  <option value="pickup">Pick Up</option>
                   <option value="delivery">Delivery</option>
                 </select>
               </div>
@@ -957,6 +984,12 @@ const OrderEditModal = ({ order, onClose, onSave }) => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', color: 'var(--success-600)' }}>
                     <span>Discount:</span>
                     <span>-₹{parseFloat(formData.discount_amount).toFixed(2)}</span>
+                  </div>
+                )}
+                {Math.abs(roundOff) > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)' }}>
+                    <span>Round Off:</span>
+                    <span>{roundOff > 0 ? '+' : ''}₹{roundOff.toFixed(2)}</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginTop: 'var(--spacing-2)', paddingTop: 'var(--spacing-2)', borderTop: '1px solid var(--primary-200)' }}>

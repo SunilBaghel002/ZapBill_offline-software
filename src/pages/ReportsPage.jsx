@@ -81,7 +81,7 @@ const OrderDetailsModal = ({ order, onClose }) => {
            </div>
            <div>
              <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '4px' }}>Order Type</div>
-             <div style={{ fontWeight: '600', color: '#334155', textTransform: 'capitalize' }}>{order.order_type?.replace('_', ' ')}</div>
+             <div style={{ fontWeight: '600', color: '#334155', textTransform: 'capitalize' }}>{order.order_type === 'pickup' ? 'Pick Up' : order.order_type?.replace('_', ' ')}</div>
            </div>
            <div>
              <div style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '4px' }}>Payment Method</div>
@@ -125,9 +125,33 @@ const OrderDetailsModal = ({ order, onClose }) => {
            </table>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '2px solid #f1f5f9', paddingTop: '20px' }}>
-           <span style={{ fontSize: '16px', fontWeight: 600, color: '#64748b' }}>Total Amount</span>
-           <span style={{ fontSize: '24px', fontWeight: 800, color: '#10b981' }}>₹{(order.total_amount || 0).toFixed(2)}</span>
+        <div style={{ borderTop: '2px solid #f1f5f9', paddingTop: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#64748b' }}>
+            <span>Subtotal</span>
+            <span style={{ fontWeight: 600 }}>₹{(order.subtotal || 0).toFixed(2)}</span>
+          </div>
+          {order.tax_amount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#64748b' }}>
+              <span>Tax (GST)</span>
+              <span style={{ fontWeight: 600 }}>₹{order.tax_amount.toFixed(2)}</span>
+            </div>
+          )}
+          {order.discount_amount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#10b981' }}>
+              <span>Discount</span>
+              <span style={{ fontWeight: 600 }}>-₹{order.discount_amount.toFixed(2)}</span>
+            </div>
+          )}
+          {order.round_off && Math.abs(order.round_off) > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', color: '#64748b' }}>
+              <span>Round Off</span>
+              <span style={{ fontWeight: 600 }}>{order.round_off > 0 ? '+' : ''}₹{order.round_off.toFixed(2)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #e2e8f0' }}>
+            <span style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>Grand Total</span>
+            <span style={{ fontSize: '24px', fontWeight: 800, color: '#10b981' }}>₹{(order.total_amount || 0).toFixed(2)}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -556,7 +580,7 @@ const ReportsPage = () => {
                                     }} style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}>
                                         <td style={{...tdStyle, fontWeight: 700, color: '#6366f1'}}>#{order.order_number}</td>
                                         <td style={tdStyle}>{new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-                                        <td style={{...tdStyle, textTransform: 'capitalize'}}>{order.order_type.replace('_', ' ')}</td>
+                                        <td style={{...tdStyle, textTransform: 'capitalize'}}>{order.order_type === 'pickup' ? 'Pick Up' : order.order_type.replace('_', ' ')}</td>
                                         <td style={tdStyle}><span style={{ padding: '4px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: 700, background: order.status === 'completed' ? '#f0fdf4' : '#fef2f2', color: order.status === 'completed' ? '#10b981' : '#ef4444' }}>{order.status}</span></td>
                                         <td style={tdStyle}><span style={{ fontWeight: 600 }}>{order.payment_method?.toUpperCase()}</span></td>
                                         <td style={{...tdStyle, textAlign: 'right', fontWeight: 800}}>₹{order.total_amount.toFixed(2)}</td>
@@ -589,7 +613,7 @@ const ReportsPage = () => {
                             <option value="all">All Payments</option><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option>
                         </select>
                         <select value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ padding: '10px 16px', borderRadius: '10px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '14px', fontWeight: 600 }}>
-                            <option value="all">All Types</option><option value="dine_in">Dine In</option><option value="takeaway">Takeaway</option><option value="delivery">Delivery</option>
+                            <option value="all">All Types</option><option value="dine_in">Dine In</option><option value="pickup">Pick Up</option><option value="delivery">Delivery</option>
                         </select>
                         <div style={{ marginLeft: 'auto', fontSize: '14px', fontWeight: 600, color: '#64748b' }}>{filteredData.length} Records</div>
                     </div>
@@ -617,7 +641,7 @@ const ReportsPage = () => {
                                         <td style={{...tdStyle, textAlign: 'center', fontWeight: 600}}>{row.quantity}</td>
                                         <td style={{...tdStyle, textAlign: 'right', fontWeight: 800}}>₹{row.item_total?.toFixed(2)}</td>
                                         <td style={tdStyle}>{row.customer_name || '-'}</td>
-                                        <td style={{...tdStyle, textTransform: 'capitalize'}}>{row.order_type?.replace('_', ' ')}</td>
+                                        <td style={{...tdStyle, textTransform: 'capitalize'}}>{row.order_type === 'pickup' ? 'Pick Up' : row.order_type?.replace('_', ' ')}</td>
                                         <td style={tdStyle}><span style={{ fontWeight: 600 }}>{row.payment_method?.toUpperCase()}</span></td>
                                         <td style={tdStyle}>{row.cashier_name}</td>
                                     </tr>

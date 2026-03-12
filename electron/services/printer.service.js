@@ -217,12 +217,9 @@ class PrinterService {
         .kot-item-row { display: flex; align-items: flex-start; gap: 12px; font-size: 20px; font-weight: 900; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dotted #000; }
         .kot-qty { flex: 0 0 45px; border-right: 2px solid #000; }
         
-        .paper-cut { page-break-after: always; height: 1px; visibility: hidden; }
       </style>
     </head>
-    <body>${htmlContent}
-      <div class="paper-cut"></div>
-    </body>
+    <body>${htmlContent}</body>
   </html>`;
 
         await printWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -687,7 +684,9 @@ class PrinterService {
     if (order.table_number) {
       orderDetails += `<div class="info-row" style="font-size: 16px;"><span style="font-weight: 900;">Token No:</span><span style="font-weight: 900; font-size: 18px;">${order.table_number}</span></div>`;
     }
-    orderDetails += `<div class="info-row" style="font-size: 15px;"><span style="font-weight: 900;">Order Type:</span><span class="uppercase" style="font-weight: 900; font-size: 16px;">${(order.order_type || 'dine_in').replace('_', ' ')}</span></div>`;
+    
+    const displayOrderType = (order.order_type === 'pickup') ? 'PICKUP' : (order.order_type || 'dine_in').replace('_', ' ').toUpperCase();
+    orderDetails += `<div class="info-row" style="font-size: 15px;"><span style="font-weight: 900;">Order Type:</span><span style="font-weight: 900; font-size: 16px;">${displayOrderType}</span></div>`;
     
     // Customer info
     if (order.showCustomerDetails !== false) {
@@ -696,6 +695,9 @@ class PrinterService {
       }
       if (order.customer_phone) {
         orderDetails += `<div class="info-row"><span>Phone:</span><span>${order.customer_phone}</span></div>`;
+      }
+      if (order.customer_address) {
+        orderDetails += `<div class="info-row"><span>Address:</span><span class="info-val" style="font-size: 11px;">${order.customer_address}</span></div>`;
       }
     }
     orderDetails += `</div><div class="line-thick"></div>`;
@@ -764,6 +766,9 @@ class PrinterService {
     }
     if (order.discount_amount > 0) {
       totalsHtml += `<div class="total-row uppercase bold"><span>Discount:</span><span>-${cs}${order.discount_amount.toFixed(2)}</span></div>`;
+    }
+    if (order.round_off && Math.abs(order.round_off) > 0) {
+      totalsHtml += `<div class="total-row"><span>ROUND OFF:</span><span>${order.round_off > 0 ? '+' : ''}${order.round_off.toFixed(2)}</span></div>`;
     }
     totalsHtml += `</div>`;
 
@@ -880,7 +885,7 @@ class PrinterService {
       <div class="kot-num">TOKEN: ${tokenNumber}</div>
       
       <div class="info-row bold"><span class="uppercase">${stationName || 'KITCHEN'}</span><span>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>
-      <div class="text-center" style="font-size: 16px; font-weight: 900; margin: 4px 0;">${(order.order_type || 'dine_in').replace('_', ' ').toUpperCase()}</div>
+      <div class="text-center" style="font-size: 16px; font-weight: 900; margin: 4px 0;">${(order.order_type === 'pickup' ? 'PICKUP' : (order.order_type || 'dine_in').replace('_', ' ')).toUpperCase()}</div>
       
       <div class="line-thick"></div>
       

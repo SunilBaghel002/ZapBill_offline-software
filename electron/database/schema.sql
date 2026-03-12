@@ -118,6 +118,7 @@ CREATE TABLE IF NOT EXISTS orders (
     discount_amount REAL DEFAULT 0,
     discount_reason TEXT,
     total_amount REAL NOT NULL,
+    round_off REAL DEFAULT 0,
     delivery_charge REAL DEFAULT 0,
     container_charge REAL DEFAULT 0,
     customer_paid REAL DEFAULT 0,
