@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
 import { 
   Search, 
   Eye, 
@@ -21,12 +22,14 @@ import {
 } from 'lucide-react';
 
 const OrdersPage = () => {
+  const { user } = useAuthStore();
   const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [searchQuery, setSearchQuery] = useState(location.state?.search || '');
   const [dateFilter, setDateFilter] = useState('today');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState('dine_in');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -40,6 +43,7 @@ const OrdersPage = () => {
       setSearchQuery(location.state.search);
       setDateFilter('all');
       setStatusFilter('all');
+      setOrderTypeFilter('all');
     }
   }, [location.state?.search]);
 
@@ -49,7 +53,7 @@ const OrdersPage = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [orders, searchQuery, statusFilter]);
+  }, [orders, searchQuery, statusFilter, orderTypeFilter]);
 
   const loadOrders = async () => {
     setIsLoading(true);
@@ -83,6 +87,11 @@ const OrdersPage = () => {
       } else {
         filtered = filtered.filter(order => order.status === statusFilter);
       }
+    }
+
+    // Apply order type filter
+    if (orderTypeFilter !== 'all') {
+      filtered = filtered.filter(order => order.order_type === orderTypeFilter);
     }
 
     // Apply date filter
@@ -239,7 +248,7 @@ const OrdersPage = () => {
           <h1>Bills & Orders</h1>
           <p className="text-muted">View, edit, and manage all orders</p>
         </div>
-        {selectedOrders.length > 0 && (
+        {user?.role === 'admin' && selectedOrders.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', animation: 'fadeIn 0.2s' }}>
             <span style={{ fontWeight: 600, color: 'var(--gray-700)' }}>{selectedOrders.length} selected</span>
             <button 
@@ -314,6 +323,22 @@ const OrdersPage = () => {
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
             <option value="due">Due Payment</option>
+          </select>
+        </div>
+
+        {/* Order Type Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)' }}>
+          <ShoppingCart size={18} style={{ color: 'var(--gray-500)' }} />
+          <select
+            className="input select"
+            value={orderTypeFilter}
+            onChange={(e) => setOrderTypeFilter(e.target.value)}
+            style={{ width: 'auto' }}
+          >
+            <option value="all">All Types</option>
+            <option value="dine_in">Dine In</option>
+            <option value="takeaway">Takeaway / Pick Up</option>
+            <option value="delivery">Delivery</option>
           </select>
         </div>
       </div>
@@ -458,26 +483,30 @@ const OrdersPage = () => {
                     )}
                     <button 
                       className="btn btn-ghost btn-icon btn-sm"
-                      onClick={() => handleEditOrder(order)}
-                      title="Edit Order"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button 
-                      className="btn btn-ghost btn-icon btn-sm"
                       onClick={() => handlePrintBill(order)}
                       title="Print Bill"
                     >
                       <Printer size={16} />
                     </button>
-                    <button 
-                      className="btn btn-ghost btn-icon btn-sm"
-                      onClick={() => handleDeleteOrder(order)}
-                      title="Delete Order"
-                      style={{ color: 'var(--error-500)' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {user?.role === 'admin' && (
+                      <>
+                        <button 
+                          className="btn btn-ghost btn-icon btn-sm"
+                          onClick={() => handleEditOrder(order)}
+                          title="Edit Order"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          className="btn btn-ghost btn-icon btn-sm"
+                          onClick={() => handleDeleteOrder(order)}
+                          title="Delete Order"
+                          style={{ color: 'var(--error-500)' }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -519,6 +548,7 @@ const OrdersPage = () => {
       {showCompleteModal && selectedOrder && (
         <CompleteOrderModal 
           order={selectedOrder}
+          userId={user?.id}
           onClose={() => setShowCompleteModal(false)}
           onComplete={() => {
             setShowCompleteModal(false);
@@ -531,7 +561,7 @@ const OrdersPage = () => {
 };
 
 // Complete Order Modal
-const CompleteOrderModal = ({ order, onClose, onComplete }) => {
+const CompleteOrderModal = ({ order, onClose, onComplete, userId }) => {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -541,7 +571,8 @@ const CompleteOrderModal = ({ order, onClose, onComplete }) => {
     try {
       await window.electronAPI.invoke('order:complete', { 
         id: order.id, 
-        paymentMethod 
+        paymentMethod,
+        userId: userId
       });
       onComplete();
     } catch (error) {

@@ -150,10 +150,10 @@ class PrinterService {
       <meta charset="UTF-8">
       <title>${jobId}</title>
       <style>
-        @page { margin: 0; size: ${pageSize} auto; }
+        @page { margin: 0; padding: 0; size: ${pageSize} auto; }
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { 
-          margin: 0; padding: 12px 10px; 
+          margin: 0; padding: 8px 8px 2px 8px; 
           font-family: 'Courier New', Courier, monospace;
           font-size: 14px; 
           color: #000; 
@@ -213,17 +213,14 @@ class PrinterService {
         .kitchen-title { text-align: center; border: 2px solid #000; font-weight: 900; font-size: 14px; padding: 4px; margin-bottom: 10px; }
         
         /* KOT Styles */
-        .kot-num { font-size: 26px; font-weight: 900; text-align: center; padding: 5px; border: 2px solid #000; margin: 10px 0; }
+        .kot-num { font-size: 32px; font-weight: 900; text-align: center; padding: 6px; border: 3px solid #000; margin: 10px 0; }
         .kot-item-row { display: flex; align-items: flex-start; gap: 12px; font-size: 20px; font-weight: 900; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dotted #000; }
         .kot-qty { flex: 0 0 45px; border-right: 2px solid #000; }
         
-        .footer-tag { text-align: center; margin-top: 20px; font-size: 10px; }
         .paper-cut { page-break-after: always; height: 1px; visibility: hidden; }
       </style>
     </head>
-    <!-- We append ESC/POS GS V 0 cut sequence (\x1D\x56\x00) for drivers that pass text through naturally -->
     <body>${htmlContent}
-      <div style="font-family: inherit; font-size: 1px;">\x1D\x56\x00</div>
       <div class="paper-cut"></div>
     </body>
   </html>`;
@@ -658,8 +655,7 @@ class PrinterService {
     // Badges
     const reprintBadge = order.isReprint
       ? '<div class="reprint-title">*** REPRINT ***</div>' : '';
-    const kitchenBadge = isKitchenCopy
-      ? '<div class="kitchen-title">--- KITCHEN COPY ---</div>' : '';
+    // Kitchen copy is now a duplicate of the main bill — no special badge
 
     // Logo
     const logoHtml = order.showLogo && order.logoPath
@@ -689,9 +685,9 @@ class PrinterService {
     orderDetails += `<div class="info-row"><span>Date:</span><span>${formatDate(order.created_at || new Date().toISOString())}</span></div>`;
     
     if (order.table_number) {
-      orderDetails += `<div class="info-row"><span>Table:</span><span class="info-val uppercase">TABLE ${order.table_number}</span></div>`;
+      orderDetails += `<div class="info-row" style="font-size: 16px;"><span style="font-weight: 900;">Token No:</span><span style="font-weight: 900; font-size: 18px;">${order.table_number}</span></div>`;
     }
-    orderDetails += `<div class="info-row"><span>Order Type:</span><span class="uppercase">${(order.order_type || 'dine_in').replace('_', ' ')}</span></div>`;
+    orderDetails += `<div class="info-row" style="font-size: 15px;"><span style="font-weight: 900;">Order Type:</span><span class="uppercase" style="font-weight: 900; font-size: 16px;">${(order.order_type || 'dine_in').replace('_', ' ')}</span></div>`;
     
     // Customer info
     if (order.showCustomerDetails !== false) {
@@ -750,12 +746,15 @@ class PrinterService {
         ${details}${taxInfo}`;
     }).join('');
 
-    // Totals Area
+    // Totals Area — with CGST/SGST breakdown
     let totalsHtml = `<div class="total-container">`;
     totalsHtml += `<div class="total-row"><span>SUB TOTAL:</span><span class="bold">${cs}${(order.subtotal || 0).toFixed(2)}</span></div>`;
     
     if (order.tax_amount > 0) {
-      totalsHtml += `<div class="total-row"><span>GST TOTAL:</span><span class="bold">${cs}${order.tax_amount.toFixed(2)}</span></div>`;
+      const halfTax = (order.tax_amount / 2);
+      totalsHtml += `<div class="total-row"><span>CGST:</span><span class="bold">${cs}${halfTax.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="total-row"><span>SGST:</span><span class="bold">${cs}${halfTax.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="total-row" style="border-top: 1px dotted #000; padding-top: 3px;"><span>GST TOTAL:</span><span class="bold">${cs}${order.tax_amount.toFixed(2)}</span></div>`;
     }
     if (order.delivery_charge > 0) {
       totalsHtml += `<div class="total-row"><span>DELIVERY:</span><span>${cs}${order.delivery_charge.toFixed(2)}</span></div>`;
@@ -788,13 +787,12 @@ class PrinterService {
         </div>`;
     }
 
-    // Footer
+    // Footer — no branding, no timestamp
     const footer = order.receiptFooter || 'Thank you for dining with us!';
 
-    // Final Template
+    // Final Template — kitchen copy is identical to main bill (duplicate)
     return `
       ${reprintBadge}
-      ${kitchenBadge}
       ${logoHtml}
       
       <div class="restaurant-name text-center uppercase">${restaurantName}</div>
@@ -819,11 +817,6 @@ class PrinterService {
       
       <div class="line-dashed" style="margin-top: 15px;"></div>
       <div class="text-center" style="font-size: 13px; font-weight: 900; margin-top: 5px;">${footer}</div>
-      <div class="footer-tag">
-        Generated by ZapBill POS<br/>
-        ${new Date().toLocaleString()}
-      </div>
-      ${isKitchenCopy ? '<div class="line-double"></div><div class="text-center bold">KITCHEN BILL COPY</div>' : ''}
     `;
   }
 
@@ -832,41 +825,45 @@ class PrinterService {
     const reprintBadge = isReprint
       ? '<div class="reprint-badge">*** REPRINT KOT ***</div>' : '';
 
-    const stationBadge = stationName
-      ? `<div class="station-name">📍 ${stationName.toUpperCase()}</div>` : '';
-
-    const kotNumberLine = kotNumber
-      ? `<div style="font-size: 18px; font-weight: 900; text-align: center;">KOT #${kotNumber}</div>` : '';
+    // Use token number (table_number) instead of order number for KOT display
+    const tokenNumber = order.table_number || order.order_number || 'N/A';
 
     const itemsHtml = (items || []).map(item => {
-      let details = '';
+      // Build variant string to show to the LEFT of item name
+      let variantLabel = '';
       if (item.variant) {
         try {
           const v = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
-          if (v && v.name) details += `<div style="font-size: 13px; padding-left: 14px; font-weight: 600;">↳ ${v.name}</div>`;
+          if (v && v.name) variantLabel = `[${v.name}] `;
         } catch (_) {}
       }
+
+      // Build addons to show BELOW the item
+      let addonsHtml = '';
       if (item.addons) {
         try {
           const a = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
-          if (Array.isArray(a)) {
-            a.forEach(addon => {
-              details += `<div style="font-size: 13px; padding-left: 14px; font-weight: 600;">+ ${addon.name}</div>`;
-            });
+          if (Array.isArray(a) && a.length > 0) {
+            addonsHtml = a.map(addon =>
+              `<div style="font-size: 16px; padding-left: 55px; font-weight: 700; margin-top: 2px;">+ ${addon.name}</div>`
+            ).join('');
           }
         } catch (_) {}
       }
+
+      let notesHtml = '';
       if (item.special_instructions) {
-        details += `<div class="kot-note">📝 ${item.special_instructions}</div>`;
+        notesHtml = `<div style="font-size: 14px; padding-left: 55px; font-weight: 700; font-style: italic; margin-top: 2px;">📝 ${item.special_instructions}</div>`;
       }
 
       return `
-        <div class="kot-item">
+        <div class="kot-item" style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dotted #000;">
           <div style="display: flex; align-items: flex-start; gap: 10px;">
-            <span style="flex: 0 0 45px; font-size: 22px;">${item.quantity}x</span>
-            <span style="flex: 1;">${item.item_name}</span>
+            <span style="flex: 0 0 45px; font-size: 26px; font-weight: 900;">${item.quantity}x</span>
+            <span style="flex: 1; font-size: 24px; font-weight: 900;">${variantLabel}${item.item_name}</span>
           </div>
-          ${details}
+          ${addonsHtml}
+          ${notesHtml}
         </div>`;
     }).join('');
 
@@ -879,11 +876,11 @@ class PrinterService {
       ${urgencyBadge}
       ${reprintBadge}
       
-      <div class="kot-header">K.O.T</div>
-      <div class="kot-num">#${order.order_number || 'N/A'}</div>
+      <div style="text-align: center; font-size: 20px; font-weight: 900; letter-spacing: 3px;">K.O.T</div>
+      <div class="kot-num">TOKEN: ${tokenNumber}</div>
       
       <div class="info-row bold"><span class="uppercase">${stationName || 'KITCHEN'}</span><span>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>
-      ${order.table_number ? `<div class="text-center bold" style="font-size: 22px; margin: 5px 0;">TAB: ${order.table_number}</div>` : `<div class="text-center italic">${(order.order_type || '').replace('_', ' ').toUpperCase()}</div>`}
+      <div class="text-center" style="font-size: 16px; font-weight: 900; margin: 4px 0;">${(order.order_type || 'dine_in').replace('_', ' ').toUpperCase()}</div>
       
       <div class="line-thick"></div>
       
@@ -895,8 +892,7 @@ class PrinterService {
         </div>
       ` : ''}
       
-      <div class="line-thick" style="margin-top: 15px;"></div>
-      <div class="text-center bold" style="font-size: 12px;">--- KITCHEN ORDER COPY ---</div>
+      <div class="line-thick" style="margin-top: 10px;"></div>
     `;
   }
 

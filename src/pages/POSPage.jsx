@@ -2487,6 +2487,7 @@ const PaymentModal = ({ total, onClose, onSuccess, userId }) => {
         await window.electronAPI.invoke('order:complete', {
           id: result.id,
           paymentMethod: method,
+          userId: userId // Pass the userId from props
         });
 
         setOrderId(result.id);

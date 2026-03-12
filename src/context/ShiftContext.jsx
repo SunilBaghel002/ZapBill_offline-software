@@ -76,8 +76,8 @@ export const ShiftProvider = ({ children }) => {
       const result = await window.electronAPI.invoke('shifts:getStatus', { userId: user.id });
       if (result.success) {
         setActiveShift(result.shift);
-        if (!result.shift && (user.role === 'biller' || user.role === 'cashier' || user.role === 'admin')) {
-          // If no active shift and user can bill, prompt to start
+        // Only prompt to start shift if day is OPEN and no active shift exists
+        if (!result.shift && dayResult.status?.status === 'open' && (user.role === 'biller' || user.role === 'cashier' || user.role === 'admin')) {
           setShowStartModal(true);
         }
       }
@@ -168,6 +168,42 @@ export const ShiftProvider = ({ children }) => {
     }
   };
 
+  const closeBusinessDay = async (closingBalance) => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. End shift if active
+      if (activeShift) {
+        await window.electronAPI.invoke('shifts:end', { 
+          userId: user.id, 
+          endCash: parseFloat(closingBalance || 0) 
+        });
+        setActiveShift(null);
+      }
+
+      // 2. Close the business day
+      const today = new Date().toLocaleDateString('en-CA');
+      const result = await window.electronAPI.invoke('day:close', { 
+        date: today,
+        closingBalance: parseFloat(closingBalance || 0) 
+      });
+      
+      if (result.success) {
+        setDayStatus(null);
+        return { success: true };
+      } else {
+        throw new Error(result.error || 'Failed to close day');
+      }
+    } catch (err) {
+      console.error('Error closing business day:', err);
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     activeShift,
     dayStatus,
@@ -181,7 +217,8 @@ export const ShiftProvider = ({ children }) => {
     checkActiveShift,
     openDay,
     startShift,
-    endShift
+    endShift,
+    closeBusinessDay
   };
 
   return (

@@ -4,7 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { DollarSign, Clock, AlertCircle, ArrowRight, Wallet } from 'lucide-react';
 
 const ShiftModal = ({ isOpen, type, onClose }) => {
-  const { startShift, endShift, error } = useShift();
+  const { startShift, endShift, closeBusinessDay, error } = useShift();
   const { user } = useAuthStore();
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -46,6 +46,8 @@ const ShiftModal = ({ isOpen, type, onClose }) => {
     let result;
     if (type === 'start') {
       result = await startShift(amount || 0);
+    } else if (type === 'day') {
+      result = await closeBusinessDay(amount || 0);
     } else {
       result = await endShift(amount || 0);
     }
@@ -53,14 +55,15 @@ const ShiftModal = ({ isOpen, type, onClose }) => {
     setLoading(false);
     if (result.success) {
       setAmount('');
-      onClose();
+      onClose(result);
     }
   };
 
   const isStart = type === 'start';
-  const themeColor = isStart ? '#10b981' : '#f59e0b';
-  const themeGradient = isStart ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-  const shadowColor = isStart ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)';
+  const isDay = type === 'day';
+  const themeColor = isStart ? '#10b981' : (isDay ? '#ef4444' : '#f59e0b');
+  const themeGradient = isStart ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : (isDay ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)');
+  const shadowColor = isStart ? 'rgba(16, 185, 129, 0.4)' : (isDay ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.4)');
 
   const today = new Date();
   const timeStr = today.toLocaleTimeString('en-IN', {
@@ -128,7 +131,7 @@ const ShiftModal = ({ isOpen, type, onClose }) => {
             marginBottom: 'var(--spacing-2)',
             letterSpacing: '-0.025em'
           }}>
-            {isStart ? 'Start Shift' : 'End Shift'}
+            {isStart ? 'Start Shift' : (isDay ? 'End Business Day' : 'End Shift')}
           </h2>
           
           <div style={{ 
@@ -160,7 +163,7 @@ const ShiftModal = ({ isOpen, type, onClose }) => {
               <p style={{ color: 'var(--gray-500)', fontSize: '0.925rem', lineHeight: '1.5' }}>
                 {isStart 
                   ? 'Please enter the starting cash amount in your drawer to begin your shift.'
-                  : 'Please enter the final cash amount in your drawer to close your shift.'}
+                  : (isDay ? 'Are you sure you want to end the business day? This will close all active shifts and settle day logs. Please enter the final outlet cash.' : 'Please enter the final cash amount in your drawer to close your shift.')}
               </p>
 
               {expectedCash !== null && (
@@ -208,7 +211,7 @@ const ShiftModal = ({ isOpen, type, onClose }) => {
                 marginBottom: 'var(--spacing-3)'
               }}>
                 <Wallet size={16} />
-                {isStart ? 'Starting Cash Amount' : 'Closing Cash Amount'}
+                {isStart ? 'Starting Cash Amount' : (isDay ? 'Final Outlet Cash' : 'Closing Cash Amount')}
               </label>
               
               <div style={{ position: 'relative' }}>
@@ -308,7 +311,7 @@ const ShiftModal = ({ isOpen, type, onClose }) => {
                   <>Processing...</>
                 ) : (
                   <>
-                    {isStart ? 'Start Shift' : 'End Shift'}
+                    {isStart ? 'Start Shift' : (isDay ? 'End Day & Logout' : 'End Shift')}
                     <ArrowRight size={20} />
                   </>
                 )}

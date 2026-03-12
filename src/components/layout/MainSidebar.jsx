@@ -98,6 +98,13 @@ const MainSidebar = ({ isOpen, onClose }) => {
     navigate('/login');
   };
 
+  const handleDayEndSuccess = async () => {
+    // Force logout and redirect after day end
+    await logout();
+    onClose();
+    navigate('/login');
+  };
+
   return (
     <>
       {/* Overlay */}
@@ -246,8 +253,13 @@ const MainSidebar = ({ isOpen, onClose }) => {
 
         <ShiftModal 
           isOpen={showEndShiftModal} 
-          type="end" 
-          onClose={() => setShowEndShiftModal(false)} 
+          type="day" 
+          onClose={(result) => {
+            setShowEndShiftModal(false);
+            if (result && result.success) {
+              handleDayEndSuccess();
+            }
+          }} 
         />
 
         {/* User Footer */}

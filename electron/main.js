@@ -483,10 +483,10 @@ function setupIpcHandlers() {
   });
 
   // ============ ORDER OPERATIONS ============
-  ipcMain.handle('order:create', async (event, { order, items }) => {
+  ipcMain.handle('order:create', async (event, { order, items, userId }) => {
     try {
-      const userId = authService.getCurrentUser()?.id;
-      return db.createOrder(order, items, userId);
+      const uid = userId || authService.getCurrentUser()?.id;
+      return db.createOrder(order, items, uid);
     } catch (error) {
       log.error('Create order error:', error);
       return { success: false, error: error.message };
@@ -539,10 +539,11 @@ function setupIpcHandlers() {
     }
   });
 
-  ipcMain.handle('order:complete', async (event, { id, paymentMethod, paymentDetails }) => {
+  ipcMain.handle('order:complete', async (event, { id, paymentMethod, paymentDetails, userId }) => {
     try {
       log.info('Completing order:', id, 'with payment method:', paymentMethod);
-      const result = db.completeOrder(id, paymentMethod, paymentDetails);
+      const uid = userId || authService.getCurrentUser()?.id;
+      const result = db.completeOrder(id, paymentMethod, paymentDetails, uid);
       log.info('Order completion result:', result);
       return result;
     } catch (error) {
@@ -898,6 +899,15 @@ function setupIpcHandlers() {
       return { success: true, status };
     } catch (error) {
       log.error('Add day balance error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('day:close', async (event, { date, closingBalance }) => {
+    try {
+      return db.closeDay(date, closingBalance);
+    } catch (error) {
+      log.error('Close day error:', error);
       return { success: false, error: error.message };
     }
   });

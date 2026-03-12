@@ -336,7 +336,7 @@ export const useCartStore = create(
         }));
 
         try {
-          const result = await window.electronAPI.invoke('order:create', { order, items });
+          const result = await window.electronAPI.invoke('order:create', { order, items, userId: cashierId });
           
           if (result && result.id) {
             get().clearCart();

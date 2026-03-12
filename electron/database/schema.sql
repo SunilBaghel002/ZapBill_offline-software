@@ -108,10 +108,11 @@ CREATE TABLE IF NOT EXISTS inventory_transactions (
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     order_number INTEGER NOT NULL,
-    order_type TEXT CHECK(order_type IN ('dine_in', 'takeaway', 'delivery')) DEFAULT 'dine_in',
+    order_type TEXT CHECK(order_type IN ('dine_in', 'pickup', 'delivery')) DEFAULT 'dine_in',
     table_number TEXT,
     customer_name TEXT,
     customer_phone TEXT,
+    customer_address TEXT,
     subtotal REAL NOT NULL,
     tax_amount REAL DEFAULT 0,
     discount_amount REAL DEFAULT 0,

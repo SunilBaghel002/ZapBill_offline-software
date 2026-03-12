@@ -77,6 +77,12 @@ const Sidebar = () => {
     navigate('/login');
   };
 
+  const handleDayEndSuccess = async () => {
+    // Force logout and redirect after day end
+    await logout();
+    navigate('/login');
+  };
+
 
 
   return (
@@ -211,8 +217,13 @@ const Sidebar = () => {
 
       <ShiftModal 
         isOpen={showEndShiftModal} 
-        type="end" 
-        onClose={() => setShowEndShiftModal(false)} 
+        type="day" 
+        onClose={(result) => {
+          setShowEndShiftModal(false);
+          if (result && result.success) {
+            handleDayEndSuccess();
+          }
+        }} 
       />
 
       {/* User Section - Unified with MainSidebar */}
