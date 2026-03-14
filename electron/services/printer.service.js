@@ -153,14 +153,14 @@ class PrinterService {
         @page { margin: 0; padding: 0; size: ${pageSize} auto; }
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { 
-          margin: 0; padding: 8px 8px 2px 8px; 
+          margin: 0; padding: 5px; 
           font-family: 'Courier New', Courier, monospace;
-          font-size: 14px; 
+          font-size: 13px; 
           color: #000; 
           background: #fff;
           width: ${contentWidth}px; 
-          line-height: 1.4;
-          font-weight: 600;
+          line-height: 1.25;
+          font-weight: 700;
         }
         h1, h2, h3, h4, h5, h6, p { margin: 0; padding: 0; }
         
@@ -170,53 +170,74 @@ class PrinterService {
         .text-left { text-align: left; }
         .bold { font-weight: 900; }
         .uppercase { text-transform: uppercase; }
+        .small-font { font-size: 10px; font-weight: 600; }
+        .x-small-font { font-size: 9px; font-weight: 600; }
         
         /* Professional Separators */
-        .line-dashed { border-top: 1px dashed #000; margin: 6px 0; width: 100%; }
-        .line-double { border-top: 1px solid #000; border-bottom: 1px solid #000; height: 4px; margin: 8px 0; width: 100%; padding: 0; }
-        .line-thick { border-top: 2px solid #000; margin: 8px 0; width: 100%; }
-        .line-dotted { border-top: 1px dotted #000; margin: 6px 0; width: 100%; }
+        .line-dashed { border-top: 1px dashed #000; margin: 4px 0; width: 100%; }
+        .line-thick { border-top: 2px solid #000; margin: 6px 0; width: 100%; }
+        .line-solid { border-top: 1px solid #000; margin: 4px 0; width: 100%; }
         
         /* Bill Header */
-        .restaurant-name { font-weight: 900; font-size: 19px; text-align: center; margin-bottom: 4px; }
-        .tax-invoice-label { font-size: 15px; font-weight: 900; text-align: center; border: 1px solid #000; padding: 3px; margin: 8px 0; letter-spacing: 2px; }
-        .info-label { font-size: 11px; text-align: center; margin-bottom: 2px; }
+        .restaurant-name { font-weight: 900; font-size: 17px; text-align: center; margin-bottom: 2px; }
+        .info-label { font-size: 11px; text-align: center; margin-bottom: 1px; }
         
         /* Info Grid */
-        .info-section { margin: 10px 0; }
-        .info-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 2px; }
+        .info-section { margin: 6px 0; }
+        .info-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 1px; }
         .info-val { font-weight: 900; }
         
         /* Table Layout */
-        .table-header { display: flex; font-weight: 900; font-size: 14px; padding-bottom: 4px; border-bottom: 1px solid #000; margin-bottom: 4px; }
-        .item-row { display: flex; padding: 5px 0; align-items: flex-start; font-size: 14px; }
-        .col-name { flex: 0 0 62%; text-align: left; overflow-wrap: break-word; font-weight: 900; padding-right: 4px; }
-        .col-qty { flex: 0 0 13%; text-align: center; font-weight: 900; }
-        .col-price { flex: 0 0 25%; text-align: right; font-weight: 900; }
+        .receipt-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
+        .receipt-table th { border-bottom: 1px solid #000; padding: 3px 0; font-size: 12px; text-align: left; font-weight: 900; }
+        .receipt-table td { padding: 3px 0; font-size: 12px; vertical-align: top; }
+        
+        .col-item { text-align: left; width: 50%; }
+        .col-qty { text-align: center; width: 12%; }
+        .col-price { text-align: right; width: 18%; }
+        .col-amount { text-align: right; width: 20%; }
         
         /* Sub-items */
-        .sub-item { font-size: 11px; font-weight: 700; padding-left: 10px; margin-top: -1px; }
-        .item-tax { font-size: 10px; padding-left: 10px; font-style: italic; }
+        .sub-item { font-size: 10px; font-weight: 600; padding-left: 8px; margin-top: 1px; }
         
         /* Totals Area */
-        .total-container { margin-top: 10px; }
-        .total-row { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 14px; }
+        .total-container { margin-top: 6px; }
+        .total-row { display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 13px; }
         .grand-total { 
           display: flex; justify-content: space-between; 
-          font-weight: 900; font-size: 22px; 
-          margin: 10px 0; padding: 10px 0;
+          font-weight: 900; font-size: 18px; 
+          margin: 6px 0; padding: 6px 0;
           border-top: 1px solid #000; border-bottom: 1px solid #000;
         }
         
-        /* Badges */
-        .reprint-title { background: #000; color: #fff; text-align: center; font-weight: 900; font-size: 16px; padding: 6px; margin-bottom: 10px; letter-spacing: 4px; }
-        .kitchen-title { text-align: center; border: 2px solid #000; font-weight: 900; font-size: 14px; padding: 4px; margin-bottom: 10px; }
-        
         /* KOT Styles */
-        .kot-num { font-size: 32px; font-weight: 900; text-align: center; padding: 6px; border: 3px solid #000; margin: 10px 0; }
-        .kot-item-row { display: flex; align-items: flex-start; gap: 12px; font-size: 20px; font-weight: 900; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dotted #000; }
-        .kot-qty { flex: 0 0 45px; border-right: 2px solid #000; }
-        
+        .kot-header { font-size: 18px; font-weight: 900; text-align: center; margin-bottom: 4px; }
+        .kot-num { font-size: 20px; font-weight: 900; text-align: left; margin: 4px 0; }
+        .kot-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+        .kot-table th { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; text-align: left; font-size: 14px; font-weight: 900; }
+        .kot-table td { padding: 6px 0; border-bottom: 1px dotted #000; font-size: 18px; font-weight: 900; vertical-align: top; }
+        .kot-qty { width: 50px; text-align: center; border-left: 1px dashed #000; }
+        .kot-special { font-size: 12px; font-weight: 700; color: #000; }
+
+        /* Targeted Font Scaling */
+        /* Bill: Increase overall font */
+        .bill-content { font-size: 15px !important; }
+        .bill-content .restaurant-name { font-size: 19px !important; }
+        .bill-content .info-label { font-size: 12px !important; }
+        .bill-content .info-row { font-size: 14px !important; }
+        .bill-content .receipt-table th { font-size: 14px !important; }
+        .bill-content .receipt-table td { font-size: 14px !important; }
+        .bill-content .total-row { font-size: 15px !important; }
+        .bill-content .grand-total { font-size: 21px !important; }
+        .bill-content .sub-item { font-size: 11px !important; }
+
+        /* KOT: Decrease overall font */
+        .kot-content { font-size: 12px !important; }
+        .kot-content .kot-header { font-size: 16px !important; }
+        .kot-content .kot-num { font-size: 18px !important; }
+        .kot-content .kot-table th { font-size: 12px !important; }
+        .kot-content .kot-table td { font-size: 16px !important; }
+        .kot-content .kot-special { font-size: 11px !important; }
       </style>
     </head>
     <body>${htmlContent}</body>
@@ -651,72 +672,60 @@ class PrinterService {
 
     // Badges
     const reprintBadge = order.isReprint
-      ? '<div class="reprint-title">*** REPRINT ***</div>' : '';
-    // Kitchen copy is now a duplicate of the main bill — no special badge
-
-    // Logo
-    const logoHtml = order.showLogo && order.logoPath
-      ? `<div class="logo"><img src="${order.logoPath}" alt="Logo"></div>` : '';
+      ? '<div style="background:#000;color:#fff;text-align:center;font-weight:bold;margin-bottom:5px;">*** REPRINT ***</div>' : '';
 
     // Restaurant header
     const restaurantName = order.restaurantName || 'Restaurant POS';
     const address = order.restaurantAddress ? `<div class="info-label">${order.restaurantAddress}</div>` : '';
-    const phone = order.restaurantPhone ? `<div class="info-label">Tel: ${order.restaurantPhone}</div>` : '';
+    const phone = order.restaurantPhone ? `<div class="info-label">Mob: ${order.restaurantPhone}</div>` : '';
     const gstValue = order.gstNumber;
-    const gstHtml = gstValue ? `<div class="info-label bold">GSTIN: ${gstValue}</div>` : '';
-    const fssai = order.fssaiNumber ? `<div class="info-label">FSSAI: ${order.fssaiNumber}</div>` : '';
+    const gstHtml = gstValue ? `<div class="info-label">GST: ${gstValue}</div>` : '';
 
-    const taxInvoice = gstValue ? '<div class="tax-invoice-label">TAX INVOICE</div>' : '';
+    // Format date and time separately
+    const d = new Date(order.created_at || new Date().toISOString());
+    const dateStr = d.toLocaleDateString('en-GB');
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Format date
-    const formatDate = (dateStr) => {
-      try {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      } catch (e) { return ''; }
-    };
+    const orderType = (order.order_type === 'pickup' ? 'PickUp' : (order.order_type || 'dine_in').replace('_', ' ')).replace(/\b\w/g, l => l.toUpperCase());
 
-    // Order info grid
-    let orderDetails = `<div class="line-thick"></div><div class="info-section">`;
-    orderDetails += `<div class="info-row"><span>Bill No:</span><span class="info-val">#${order.order_number || ''}</span></div>`;
-    orderDetails += `<div class="info-row"><span>Date:</span><span>${formatDate(order.created_at || new Date().toISOString())}</span></div>`;
-    
-    if (order.table_number) {
-      orderDetails += `<div class="info-row" style="font-size: 16px;"><span style="font-weight: 900;">Token No:</span><span style="font-weight: 900; font-size: 18px;">${order.table_number}</span></div>`;
-    }
-    
-    const displayOrderType = (order.order_type === 'pickup') ? 'PICKUP' : (order.order_type || 'dine_in').replace('_', ' ').toUpperCase();
-    orderDetails += `<div class="info-row" style="font-size: 15px;"><span style="font-weight: 900;">Order Type:</span><span style="font-weight: 900; font-size: 16px;">${displayOrderType}</span></div>`;
-    
     // Customer info
+    let customerInfo = '';
     if (order.showCustomerDetails !== false) {
       if (order.customer_name) {
-        orderDetails += `<div class="info-row"><span>Customer:</span><span class="info-val">${order.customer_name}</span></div>`;
+        customerInfo += `<div style="font-size:14px; font-weight:900;">Name: ${order.customer_name}</div>`;
       }
       if (order.customer_phone) {
-        orderDetails += `<div class="info-row"><span>Phone:</span><span>${order.customer_phone}</span></div>`;
+        customerInfo += `<div style="font-size:14px;">Mob: ${order.customer_phone}</div>`;
       }
       if (order.customer_address) {
-        orderDetails += `<div class="info-row"><span>Address:</span><span class="info-val" style="font-size: 11px;">${order.customer_address}</span></div>`;
+        customerInfo += `<div style="font-size:12px;">Adr: ${order.customer_address}</div>`;
       }
     }
-    orderDetails += `</div><div class="line-thick"></div>`;
 
     // Items Table
     let itemsHtml = `
-      <div class="table-header">
-        <span class="col-name">ITEM DESCRIPTION</span>
-        <span class="col-qty">QTY</span>
-        <span class="col-price">PRICE</span>
-      </div>
+      <table class="receipt-table">
+        <thead>
+          <tr>
+            <th class="col-item">Item</th>
+            <th class="col-qty">Qty.</th>
+            <th class="col-price">Price</th>
+            <th class="col-amount">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
     `;
 
+    let totalQty = 0;
     itemsHtml += items.map(item => {
+      totalQty += Number(item.quantity || 0);
+      const unitPrice = item.unit_price || (item.item_total / item.quantity) || 0;
+      
       let details = '';
       if (item.variant) {
         try {
           const v = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
-          if (v && v.name) details += `<div class="sub-item">↳ ${v.name}</div>`;
+          if (v && v.name) details += `<div class="sub-item">(${v.name})</div>`;
         } catch (_) {}
       }
       if (item.addons) {
@@ -724,180 +733,166 @@ class PrinterService {
           const a = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
           if (Array.isArray(a)) {
             a.forEach(addon => {
-              details += `<div class="sub-item">+ ${addon.name}${addon.price ? ` (${cs}${Number(addon.price).toFixed(2)})` : ''}</div>`;
+              details += `<div class="sub-item">+ ${addon.name}</div>`;
             });
           }
         } catch (_) {}
       }
-      if (item.special_instructions) {
-        details += `<div class="sub-item" style="font-style:italic;">Note: ${item.special_instructions}</div>`;
-      }
-
-      let taxInfo = '';
-      if (order.showItemwiseTax && item.tax_rate) {
-        const taxAmt = ((item.item_total || 0) * (item.tax_rate / 100)).toFixed(2);
-        taxInfo = `<div class="item-tax">Tax ${item.tax_rate}%: ${cs}${taxAmt}</div>`;
-      }
 
       return `
-        <div class="item-row">
-          <span class="col-name uppercase">${item.item_name}</span>
-          <span class="col-qty">${item.quantity}</span>
-          <span class="col-price">${(item.item_total || 0).toFixed(2)}</span>
-        </div>
-        ${details}${taxInfo}`;
+        <tr>
+          <td class="col-item">
+            ${item.item_name}
+            ${details}
+          </td>
+          <td class="col-qty">${item.quantity}</td>
+          <td class="col-price">${unitPrice.toFixed(2)}</td>
+          <td class="col-amount">${(item.item_total || 0).toFixed(2)}</td>
+        </tr>`;
     }).join('');
 
-    // Totals Area — with CGST/SGST breakdown
+    itemsHtml += `</tbody></table>`;
+
+    // Totals Area
     let totalsHtml = `<div class="total-container">`;
-    totalsHtml += `<div class="total-row"><span>SUB TOTAL:</span><span class="bold">${cs}${(order.subtotal || 0).toFixed(2)}</span></div>`;
+    totalsHtml += `<div class="info-row"><span>Total Qty: ${totalQty}</span><span>Sub Total: ${(order.subtotal || 0).toFixed(2)}</span></div>`;
     
     if (order.tax_amount > 0) {
       const halfTax = (order.tax_amount / 2);
-      totalsHtml += `<div class="total-row"><span>CGST:</span><span class="bold">${cs}${halfTax.toFixed(2)}</span></div>`;
-      totalsHtml += `<div class="total-row"><span>SGST:</span><span class="bold">${cs}${halfTax.toFixed(2)}</span></div>`;
-      totalsHtml += `<div class="total-row" style="border-top: 1px dotted #000; padding-top: 3px;"><span>GST TOTAL:</span><span class="bold">${cs}${order.tax_amount.toFixed(2)}</span></div>`;
-    }
-    if (order.delivery_charge > 0) {
-      totalsHtml += `<div class="total-row"><span>DELIVERY:</span><span>${cs}${order.delivery_charge.toFixed(2)}</span></div>`;
-    }
-    if (order.container_charge > 0) {
-      totalsHtml += `<div class="total-row"><span>CONTAINER:</span><span>${cs}${order.container_charge.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row"><span>CGST 2.5%</span><span>${halfTax.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row"><span>SGST 2.5%</span><span>${halfTax.toFixed(2)}</span></div>`;
     }
     if (order.discount_amount > 0) {
-      totalsHtml += `<div class="total-row uppercase bold"><span>Discount:</span><span>-${cs}${order.discount_amount.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row"><span>Discount:</span><span>-${order.discount_amount.toFixed(2)}</span></div>`;
     }
+    
     if (order.round_off && Math.abs(order.round_off) > 0) {
-      totalsHtml += `<div class="total-row"><span>ROUND OFF:</span><span>${order.round_off > 0 ? '+' : ''}${order.round_off.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row" style="font-size: 8px; color: #333;"><span>Round off</span><span>${order.round_off > 0 ? '+' : ''}${order.round_off.toFixed(2)}</span></div>`;
     }
     totalsHtml += `</div>`;
 
-    // Payment info
-    const paymentHtml = order.payment_method ? `
-      <div style="text-align: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #000; color: #000; font-size: 12px; letter-spacing: 0.5px;">
-        Paid via <strong style="color: #000;">${order.payment_method.toUpperCase()}</strong>
-      </div>` : '';
-
-    // QR Code
-    let qrHtml = '';
-    if (order.showQR && order.qrUpiId) {
-      qrHtml = `
-        <div class="qr-section">
-          <div class="divider"></div>
-          <div style="font-size: 14px; font-weight: 900; margin-bottom: 8px;">SCAN & PAY VIA UPI</div>
-          <div style="border: 2px solid #000; padding: 10px; display: inline-block;">
-            <div style="font-size: 13px;">UPI: ${order.qrUpiId}</div>
-            <div style="font-size: 14px; font-weight: 900; margin-top: 5px;">AMOUNT: ${cs}${(order.total_amount || 0).toFixed(2)}</div>
-          </div>
-        </div>`;
-    }
-
-    // Footer — no branding, no timestamp
-    const footer = order.receiptFooter || 'Thank you for dining with us!';
-
-    // Final Template — kitchen copy is identical to main bill (duplicate)
+    // Final Template
     return `
-      ${reprintBadge}
-      ${logoHtml}
+      <div class="bill-content">
+        ${reprintBadge}
+      <div class="restaurant-name uppercase">${restaurantName}</div>
+      ${address}${phone}${gstHtml}
       
-      <div class="restaurant-name text-center uppercase">${restaurantName}</div>
-      ${address}${phone}${gstHtml}${fssai}
+      <div class="line-solid"></div>
+      ${customerInfo}
+      <div class="line-solid"></div>
       
-      ${taxInvoice}
+      <div class="info-row">
+        <span>Date: ${dateStr}</span>
+        <span class="bold" style="font-size: 16px; border: 1px solid #000; padding: 0 4px;">${orderType}</span>
+      </div>
+      <div class="info-row">
+        <span>${timeStr}</span>
+      </div>
       
-      ${orderDetails}
+      <div class="info-row">
+        <span>Bill No.: ${order.order_number || ''}</span>
+      </div>
+      <div class="info-row">
+        <span class="bold" style="font-size:16px;">Token No.: ${order.table_number || ''}</span>
+      </div>
       
+      <div class="line-solid"></div>
       ${itemsHtml}
+      <div class="line-solid"></div>
       
-      <div class="line-thick" style="margin-top: 15px;"></div>
       ${totalsHtml}
       
       <div class="grand-total">
-        <span>NET AMOUNT:</span>
-        <span>${cs}${(order.total_amount || 0).toFixed(2)}</span>
+        <span>Grand Total</span>
+        <span>${cs}${(order.total_amount || 0).toFixed(0)}.00</span>
       </div>
       
-      ${paymentHtml}
-      ${qrHtml}
-      
-      <div class="line-dashed" style="margin-top: 15px;"></div>
-      <div class="text-center" style="font-size: 13px; font-weight: 900; margin-top: 5px;">${footer}</div>
+      <div class="text-center" style="font-size: 13px; font-weight: 900; margin-top: 5px;">Thanks</div>
+      </div>
     `;
   }
 
   // ─── KOT HTML ──────────────────────────────────────────────
   generateKOTHtml(order, items, kotNumber = null, stationName = null, isReprint = false) {
     const reprintBadge = isReprint
-      ? '<div class="reprint-badge">*** REPRINT KOT ***</div>' : '';
+      ? '<div style="background:#000;color:#fff;text-align:center;font-weight:bold;margin-bottom:5px;">*** REPRINT KOT ***</div>' : '';
 
-    // Use token number (table_number) instead of order number for KOT display
-    const tokenNumber = order.table_number || order.order_number || 'N/A';
+    const d = new Date();
+    const dateStr = d.toLocaleDateString('en-GB');
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const itemsHtml = (items || []).map(item => {
-      // Build variant string to show to the LEFT of item name
-      let variantLabel = '';
+      let itemDisplay = item.item_name;
       if (item.variant) {
         try {
           const v = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
-          if (v && v.name) variantLabel = `[${v.name}] `;
+          if (v && v.name) itemDisplay += ` (${v.name})`;
         } catch (_) {}
       }
 
-      // Build addons to show BELOW the item
-      let addonsHtml = '';
+      let addonsList = [];
       if (item.addons) {
         try {
           const a = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
-          if (Array.isArray(a) && a.length > 0) {
-            addonsHtml = a.map(addon =>
-              `<div style="font-size: 16px; padding-left: 55px; font-weight: 700; margin-top: 2px;">+ ${addon.name}</div>`
-            ).join('');
+          if (Array.isArray(a)) {
+            a.forEach(addon => addonsList.push(addon.name));
           }
         } catch (_) {}
       }
-
-      let notesHtml = '';
-      if (item.special_instructions) {
-        notesHtml = `<div style="font-size: 14px; padding-left: 55px; font-weight: 700; font-style: italic; margin-top: 2px;">📝 ${item.special_instructions}</div>`;
-      }
+      
+      const specialNote = [
+        ...addonsList,
+        item.special_instructions
+      ].filter(Boolean).join(', ');
 
       return `
-        <div class="kot-item" style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dotted #000;">
-          <div style="display: flex; align-items: flex-start; gap: 10px;">
-            <span style="flex: 0 0 45px; font-size: 26px; font-weight: 900;">${item.quantity}x</span>
-            <span style="flex: 1; font-size: 24px; font-weight: 900;">${variantLabel}${item.item_name}</span>
-          </div>
-          ${addonsHtml}
-          ${notesHtml}
-        </div>`;
+        <tr>
+          <td>
+            ${itemDisplay}
+          </td>
+          <td class="kot-special">
+            ${specialNote || ''}
+          </td>
+          <td class="kot-qty">
+            ${item.quantity}
+          </td>
+        </tr>`;
     }).join('');
 
-    const urgency = order.urgency || 'normal';
-    const urgencyBadge = (urgency === 'urgent' || urgency === 'critical')
-      ? `<div style="text-align: center; background: #000; color: #fff; font-weight: 900; padding: 6px; font-size: 16px; letter-spacing: 3px; margin-bottom: 6px;">⚡ ${urgency.toUpperCase()} ⚡</div>`
-      : '';
+    const tokenDisplay = order.table_number || order.order_number || 'N/A';
+    const orderType = (order.order_type === 'pickup' ? 'PickUp' : (order.order_type || 'dine_in').replace('_', ' ')).replace(/\b\w/g, l => l.toUpperCase());
 
     return `
-      ${urgencyBadge}
-      ${reprintBadge}
+      <div class="kot-content">
+        ${reprintBadge}
+      <div class="kot-header">${stationName || 'Kitchen 1'}</div>
+      <div class="info-row text-center">
+        <span>${dateStr} ${timeStr}</span>
+      </div>
       
-      <div style="text-align: center; font-size: 20px; font-weight: 900; letter-spacing: 3px;">K.O.T</div>
-      <div class="kot-num">TOKEN: ${tokenNumber}</div>
+      <div class="kot-num text-center">Token No: ${tokenDisplay}</div>
+      <div class="bold text-center" style="font-size:18px;">${orderType}</div>
       
-      <div class="info-row bold"><span class="uppercase">${stationName || 'KITCHEN'}</span><span>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>
-      <div class="text-center" style="font-size: 16px; font-weight: 900; margin: 4px 0;">${(order.order_type === 'pickup' ? 'PICKUP' : (order.order_type || 'dine_in').replace('_', ' ')).toUpperCase()}</div>
-      
-      <div class="line-thick"></div>
-      
-      ${itemsHtml}
+      <table class="kot-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Special Note</th>
+            <th>Qty.</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsHtml}
+        </tbody>
+      </table>
       
       ${order.chef_instructions ? `
-        <div style="margin-top: 10px; padding: 8px; border: 2px solid #000; font-weight: 900; font-size: 16px;">
-          INSTRUCTIONS: ${order.chef_instructions}
+        <div style="margin-top: 5px; padding: 4px; border: 1px solid #000; font-weight: bold; font-size: 13px;">
+          Note: ${order.chef_instructions}
         </div>
       ` : ''}
-      
-      <div class="line-thick" style="margin-top: 10px;"></div>
+      </div>
     `;
   }
 

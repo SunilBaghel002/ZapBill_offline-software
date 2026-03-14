@@ -142,6 +142,22 @@ const MenuPage = () => {
     });
   };
 
+  const handleResetAllAddons = async () => {
+    window.showAlert('This will clear ALL add-on and master add-on assignments from ALL items and variants. This cannot be undone. Are you sure?', 'confirm', async () => {
+      try {
+        const result = await window.electronAPI.invoke('menu:resetAllAddons');
+        if (result.success) {
+          loadData();
+          window.showAlert('All assignments cleared successfully!', 'success');
+        } else {
+          window.showAlert('Reset failed: ' + result.error, 'error');
+        }
+      } catch (error) {
+        window.showAlert('Error resetting assignments: ' + error.message, 'error');
+      }
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="empty-state">
@@ -205,6 +221,9 @@ const MenuPage = () => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="btn btn-secondary" onClick={handleResetAllAddons} title="Unassign all addons from all items" style={{ color: 'var(--danger-600)', border: '1px solid var(--danger-200)' }}>
+                <RefreshCw size={18} /> Reset All Assignments
+              </button>
               <button className="btn btn-secondary" onClick={() => setShowGlobalAddonsModal(true)}>
                 <List size={18} /> Global Add-ons
               </button>
@@ -1423,11 +1442,13 @@ const AddonAssignModal = ({ assignType, addon, categories = [], menuItems = [], 
   const toggleCategory = (catId) => {
     const catKeys = [];
     (menuItems || []).filter(i => i.category_id === catId).forEach(item => {
-      catKeys.push(item.id);
       let variantsArr = [];
       try { if (item.variants) variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants; } catch(e){}
+      
       if (variantsArr && variantsArr.length > 0) {
         variantsArr.forEach((_, vIndex) => catKeys.push(`${item.id}::${vIndex}`));
+      } else {
+        catKeys.push(item.id);
       }
     });
 
@@ -1458,11 +1479,17 @@ const AddonAssignModal = ({ assignType, addon, categories = [], menuItems = [], 
 
     const allSelected = keysToToggle.every(k => selectedItemIds.includes(k));
     
+    let newSelected;
     if (allSelected) {
-      setSelectedItemIds(selectedItemIds.filter(id => !keysToToggle.includes(id)));
+      newSelected = selectedItemIds.filter(id => !keysToToggle.includes(id));
+      // If we unselected a variant, always unselect the parent item too
+      if (variantIndex !== null) {
+        newSelected = newSelected.filter(id => id !== itemId);
+      }
     } else {
-      setSelectedItemIds([...new Set([...selectedItemIds, ...keysToToggle])]);
+      newSelected = [...new Set([...selectedItemIds, ...keysToToggle])];
     }
+    setSelectedItemIds(newSelected);
   };
 
   const toggleExpand = (catId) => {

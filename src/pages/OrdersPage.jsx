@@ -29,13 +29,18 @@ const OrdersPage = () => {
   const [searchQuery, setSearchQuery] = useState(location.state?.search || '');
   const [dateFilter, setDateFilter] = useState('today');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [orderTypeFilter, setOrderTypeFilter] = useState('dine_in');
+  const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  
+  const itemsPerPage = 20;
 
   // When location state changes (global search), update query and show all dates
   useEffect(() => {
@@ -53,12 +58,12 @@ const OrdersPage = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [orders, searchQuery, statusFilter, orderTypeFilter]);
+  }, [orders, searchQuery, statusFilter, orderTypeFilter, dateFilter, customStartDate, customEndDate]);
 
   const loadOrders = async () => {
     setIsLoading(true);
     try {
-      const result = await window.electronAPI.invoke('order:getAll', {});
+      const result = await window.electronAPI.invoke('order:getAll', { limit: 5000 });
       setOrders(result || []);
     } catch (error) {
       console.error('Failed to load orders:', error);
@@ -130,9 +135,31 @@ const OrdersPage = () => {
       filtered = filtered.filter(order => 
         new Date(order.created_at) >= monthAgo
       );
+    } else if (dateFilter === 'custom') {
+      if (customStartDate) {
+        const start = new Date(customStartDate);
+        start.setHours(0, 0, 0, 0);
+        filtered = filtered.filter(order => new Date(order.created_at) >= start);
+      }
+      if (customEndDate) {
+        const end = new Date(customEndDate);
+        end.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(order => new Date(order.created_at) <= end);
+      }
     }
 
     setFilteredOrders(filtered);
+    setCurrentPage(1); // Reset to first page when filtering
+  };
+
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentOrders = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
   };
 
   const handleViewOrder = async (order) => {
@@ -324,7 +351,27 @@ const OrdersPage = () => {
             <option value="week">This Week</option>
             <option value="month">This Month</option>
             <option value="all">All Time</option>
+            <option value="custom">Custom Date</option>
           </select>
+          {dateFilter === 'custom' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
+              <input 
+                type="date" 
+                className="input" 
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                style={{ padding: '6px 10px' }}
+              />
+              <span style={{ color: 'var(--gray-500)' }}>to</span>
+              <input 
+                type="date" 
+                className="input" 
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                style={{ padding: '6px 10px' }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Status Filter */}
@@ -422,7 +469,7 @@ const OrdersPage = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.map(order => (
+            {currentOrders.map(order => (
               <tr key={order.id} className={selectedOrders.includes(order.id) ? 'row-selected' : ''}>
                 <td>
                   <input 
@@ -537,6 +584,49 @@ const OrdersPage = () => {
             <FileText size={48} />
             <p className="empty-state-title">No orders found</p>
             <p className="text-muted">Adjust your filters or create a new order</p>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e5e7eb', background: 'white' }}>
+            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+              Showing <span style={{ fontWeight: 600, color: '#111827' }}>{indexOfFirstItem + 1}</span> to <span style={{ fontWeight: 600, color: '#111827' }}>{Math.min(indexOfLastItem, filteredOrders.length)}</span> of <span style={{ fontWeight: 600, color: '#111827' }}>{filteredOrders.length}</span> orders
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </button>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages)
+                  .map((page, index, array) => (
+                  <React.Fragment key={page}>
+                    {index > 0 && array[index - 1] !== page - 1 && <span style={{ padding: '0 4px', color: '#6b7280' }}>...</span>}
+                    <button
+                      className={`btn btn-sm ${currentPage === page ? 'btn-primary' : 'btn-ghost'}`}
+                      style={{ minWidth: '32px' }}
+                      onClick={() => handlePageChange(page)}
+                    >
+                      {page}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

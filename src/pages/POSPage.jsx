@@ -1708,7 +1708,7 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
   const getAssignedMasterAddons = () => {
     let idsToFetch = [];
     
-    // 1. From item (new schema)
+    // 1. From item (common groups)
     if (item.master_addon_ids) {
       try {
         const parsed = typeof item.master_addon_ids === 'string' ? JSON.parse(item.master_addon_ids) : item.master_addon_ids;
@@ -1718,20 +1718,22 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
       }
     }
     
-    // 2. From variant (legacy fallback + new array format)
+    // 2. From variant (variant-specific groups)
     if (selectedVariant) {
+       // Check plural field (from bulk assigner)
        if (selectedVariant.master_addon_ids) {
            try {
                const parsed = typeof selectedVariant.master_addon_ids === 'string' ? JSON.parse(selectedVariant.master_addon_ids) : selectedVariant.master_addon_ids;
                if (Array.isArray(parsed)) idsToFetch = [...idsToFetch, ...parsed];
            } catch(e) {}
        }
+       // Check singular field (from dropdown in ItemModal)
        if (selectedVariant.master_addon_id) {
            idsToFetch.push(selectedVariant.master_addon_id);
        }
     }
     
-    // Deduplicate
+    // Deduplicate IDs and Filter
     idsToFetch = [...new Set(idsToFetch)];
 
     return masterAddons.filter(ma => idsToFetch.includes(ma.id)).map(ma => {
@@ -1749,15 +1751,22 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
   const assignedGroups = getAssignedMasterAddons();
 
   const getAssignedGlobalAddons = () => {
-      let combined = [...parsedAddons];
+      // Start with item-level addons
+      let baseAddons = [...parsedAddons];
+      
+      // If a variant is selected, add variant-specific addons.
+      // Variant-specific addons should OVERRIDE item-level ones with the same name.
       if (selectedVariant && selectedVariant.addons && Array.isArray(selectedVariant.addons)) {
-          selectedVariant.addons.forEach(va => {
-              if (!combined.some(a => a.name === va.name)) {
-                  combined.push(va);
-              }
-          });
+          const variantAddons = selectedVariant.addons;
+          
+          // Filter out base addons that are overridden by variant addons
+          const vNames = variantAddons.map(va => va.name);
+          baseAddons = baseAddons.filter(ba => !vNames.includes(ba.name));
+          
+          return [...baseAddons, ...variantAddons];
       }
-      return combined;
+      
+      return baseAddons;
   };
   const itemLevelAddons = getAssignedGlobalAddons();
 

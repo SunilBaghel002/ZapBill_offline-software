@@ -482,6 +482,15 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('menu:resetAllAddons', async () => {
+    try {
+      return db.resetAllAddonAssignments();
+    } catch (error) {
+      log.error('Reset addons error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // ============ ORDER OPERATIONS ============
   ipcMain.handle('order:create', async (event, { order, items, userId }) => {
     try {

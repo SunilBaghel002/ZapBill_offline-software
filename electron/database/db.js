@@ -346,8 +346,128 @@ class Database {
     // Migrate orders table to support 'due' payment method in CHECK constraint
     this.migrateOrdersTableForDuePayment();
 
+    // Ensure 'pickup' is supported and schema is latest
+    this.ensureLatestOrdersSchema();
+
     // Seed sample products with variants
     this.seedSampleProducts();
+  }
+
+  ensureLatestOrdersSchema() {
+    try {
+      const testResult = this.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='orders'");
+      if (testResult.length === 0) return;
+
+      const sql = testResult[0].sql;
+      const needsPickup = sql.includes("'takeaway'");
+      const needsHeld = !sql.includes("'held'");
+      const needsDue = !sql.includes("'due'");
+
+      if (needsPickup || needsHeld || needsDue) {
+        console.log(`Upgrading orders table schema (pickup: ${needsPickup}, held: ${needsHeld}, due: ${needsDue})...`);
+        
+        // 1. Mark existing takeaway as pickup in data before we even move it
+        // Note: This might fail if the constraint is strictly enforced, but usually it's fine for simple columns
+        try { this.db.run("UPDATE orders SET order_type = 'pickup' WHERE order_type = 'takeaway'"); } catch (e) {}
+
+        // 2. Rename old table
+        this.db.run(`ALTER TABLE orders RENAME TO orders_old_temp`);
+        
+        // 3. Create new table with absolute latest schema
+        this.db.run(`
+          CREATE TABLE orders (
+            id TEXT PRIMARY KEY,
+            order_number INTEGER NOT NULL,
+            order_type TEXT CHECK(order_type IN ('dine_in', 'pickup', 'delivery')) DEFAULT 'dine_in',
+            table_number TEXT,
+            customer_name TEXT,
+            customer_phone TEXT,
+            customer_address TEXT,
+            subtotal REAL NOT NULL,
+            tax_amount REAL DEFAULT 0,
+            discount_amount REAL DEFAULT 0,
+            discount_reason TEXT,
+            total_amount REAL NOT NULL,
+            round_off REAL DEFAULT 0,
+            delivery_charge REAL DEFAULT 0,
+            container_charge REAL DEFAULT 0,
+            customer_paid REAL DEFAULT 0,
+            payment_method TEXT CHECK(payment_method IN ('cash', 'card', 'upi', 'mixed', 'due')),
+            payment_status TEXT CHECK(payment_status IN ('pending', 'partial', 'completed')) DEFAULT 'pending',
+            status TEXT CHECK(status IN ('active', 'completed', 'cancelled', 'held')) DEFAULT 'active',
+            is_hold INTEGER DEFAULT 0,
+            notes TEXT,
+            urgency TEXT CHECK(urgency IN ('normal', 'urgent', 'critical')) DEFAULT 'normal',
+            chef_instructions TEXT,
+            cashier_id TEXT REFERENCES users(id),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT,
+            synced_at TEXT,
+            is_deleted INTEGER DEFAULT 0
+          )
+        `);
+        
+        // 4. Copy data with column mapping and safety
+        const columnsResult = this.execute("PRAGMA table_info(orders_old_temp)");
+        const existingCols = columnsResult.map(c => c.name);
+        
+        const allCols = [
+          'id', 'order_number', 'order_type', 'table_number', 'customer_name', 'customer_phone', 
+          'customer_address', 'subtotal', 'tax_amount', 'discount_amount', 'discount_reason', 
+          'total_amount', 'round_off', 'delivery_charge', 'container_charge', 'customer_paid', 
+          'payment_method', 'payment_status', 'status', 'is_hold', 'notes', 'urgency', 
+          'chef_instructions', 'cashier_id', 'created_at', 'updated_at', 'completed_at', 
+          'synced_at', 'is_deleted'
+        ];
+        
+        const selectCols = allCols.map(col => {
+          if (col === 'order_type') {
+            return "CASE WHEN order_type = 'takeaway' THEN 'pickup' ELSE order_type END";
+          }
+          if (existingCols.includes(col)) {
+            return col;
+          } else {
+            // Provide default values for columns that might be missing in very old databases
+            if (['subtotal', 'tax_amount', 'discount_amount', 'total_amount', 'round_off', 'delivery_charge', 'container_charge', 'customer_paid'].includes(col)) {
+              return "0";
+            }
+            if (['is_hold', 'is_deleted'].includes(col)) {
+              return "0";
+            }
+            if (col === 'urgency') return "'normal'";
+            if (col === 'status') return "'active'";
+            if (col === 'payment_status') return "'pending'";
+            return "NULL";
+          }
+        });
+        
+        this.db.run(`INSERT INTO orders (${allCols.join(', ')}) SELECT ${selectCols.join(', ')} FROM orders_old_temp`);
+        
+        // 5. Re-create indexes
+        this.db.run(`CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at)`);
+        this.db.run(`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`);
+        this.db.run(`CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(date(created_at))`);
+
+        // 6. Final cleanup
+        this.db.run(`DROP TABLE orders_old_temp`);
+        
+        console.log('Orders table successfully upgraded to latest schema.');
+        this.save();
+      }
+    } catch (error) {
+      console.error('Critical error in ensureLatestOrdersSchema:', error);
+      // Recovery: Attempt to restore from temp table if main table missing
+      try {
+        const checkMain = this.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='orders'");
+        if (checkMain.length === 0) {
+          console.log('Attempting to restore orders table from temp backup...');
+          this.db.run(`ALTER TABLE orders_old_temp RENAME TO orders`);
+        }
+      } catch (recoveryError) {
+        console.error('Migration recovery failed:', recoveryError);
+      }
+    }
   }
 
   migrateOrdersTableForDuePayment() {
@@ -1278,6 +1398,45 @@ class Database {
 
     this.save();
     return { success: true, successCount, errorCount, errors };
+  }
+
+  resetAllAddonAssignments() {
+    const allItems = this.execute('SELECT id, variants FROM menu_items WHERE is_deleted = 0');
+    this.db.run('BEGIN TRANSACTION');
+    try {
+      for (const item of allItems) {
+        let variantsArr = [];
+        let variantsChanged = false;
+        try {
+          if (item.variants) {
+            variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants;
+            if (Array.isArray(variantsArr)) {
+              variantsArr.forEach(v => {
+                if (v.master_addon_ids || v.master_addon_id || v.addons) {
+                  delete v.master_addon_ids;
+                  delete v.master_addon_id;
+                  delete v.addons;
+                  variantsChanged = true;
+                }
+              });
+            }
+          }
+        } catch (e) {}
+
+        const strVariants = (Array.isArray(variantsArr) && variantsArr.length > 0) ? JSON.stringify(variantsArr) : null;
+        
+        this.db.run(
+          'UPDATE menu_items SET master_addon_ids = NULL, addons = NULL, variants = ? WHERE id = ?',
+          [strVariants, item.id]
+        );
+      }
+      this.db.run('COMMIT');
+      this.save();
+      return { success: true };
+    } catch (err) {
+      try { this.db.run('ROLLBACK'); } catch (e) {}
+      throw err;
+    }
   }
 
   importInventory(items) {
