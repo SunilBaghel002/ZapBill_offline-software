@@ -154,13 +154,13 @@ class PrinterService {
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { 
           margin: 0; padding: 5px; 
-          font-family: 'Courier New', Courier, monospace;
+          font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
           font-size: 13px; 
           color: #000; 
           background: #fff;
           width: ${contentWidth}px; 
           line-height: 1.25;
-          font-weight: 700;
+          font-weight: 500;
         }
         h1, h2, h3, h4, h5, h6, p { margin: 0; padding: 0; }
         
@@ -238,6 +238,11 @@ class PrinterService {
         .kot-content .kot-table th { font-size: 12px !important; }
         .kot-content .kot-table td { font-size: 16px !important; }
         .kot-content .kot-special { font-size: 11px !important; }
+        .end-row{
+          display: flex !important;
+          justify-content: flex-end !important;
+          align-items: center !important;
+        }
       </style>
     </head>
     <body>${htmlContent}</body>
@@ -759,15 +764,15 @@ class PrinterService {
     
     if (order.tax_amount > 0) {
       const halfTax = (order.tax_amount / 2);
-      totalsHtml += `<div class="info-row"><span>CGST 2.5%</span><span>${halfTax.toFixed(2)}</span></div>`;
-      totalsHtml += `<div class="info-row"><span>SGST 2.5%</span><span>${halfTax.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row end-row"><span>CGST 2.5%: </span><span>${halfTax.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row end-row"><span>SGST 2.5%: </span><span>${halfTax.toFixed(2)}</span></div>`;
     }
     if (order.discount_amount > 0) {
-      totalsHtml += `<div class="info-row"><span>Discount:</span><span>-${order.discount_amount.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row end-row"><span>Discount: </span><span>-${order.discount_amount.toFixed(2)}</span></div>`;
     }
     
     if (order.round_off && Math.abs(order.round_off) > 0) {
-      totalsHtml += `<div class="info-row" style="font-size: 8px; color: #333;"><span>Round off</span><span>${order.round_off > 0 ? '+' : ''}${order.round_off.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row end-row" style="font-size: 8px; color: #333;"><span>Round off: </span><span>${order.round_off > 0 ? '+' : ''}${order.round_off.toFixed(2)}</span></div>`;
     }
     totalsHtml += `</div>`;
 
@@ -784,18 +789,16 @@ class PrinterService {
       
       <div class="info-row">
         <span>Date: ${dateStr}</span>
-        <span class="bold" style="font-size: 16px; border: 1px solid #000; padding: 0 4px;">${orderType}</span>
+        <span class="bold" style="font-size: 17px; border: 1px solid #000; padding: 0 4px; font-weight: 900;">${orderType}</span>
       </div>
       <div class="info-row">
         <span>${timeStr}</span>
       </div>
       
-      <div class="info-row">
-        <span>Bill No.: ${order.order_number || ''}</span>
-      </div>
-      <div class="info-row">
-        <span class="bold" style="font-size:16px;">Token No.: ${order.table_number || ''}</span>
-      </div>
+      ${order.table_number 
+        ? `<div class="info-row"><span class="bold" style="font-size:16px;">Token No.: ${order.table_number}</span></div>` 
+        : `<div class="info-row"><span class="bold" style="font-size:16px;">Bill No.: ${order.order_number || ''}</span></div>`
+      }
       
       <div class="line-solid"></div>
       ${itemsHtml}
@@ -860,7 +863,9 @@ class PrinterService {
         </tr>`;
     }).join('');
 
+    const isToken = !!order.table_number;
     const tokenDisplay = order.table_number || order.order_number || 'N/A';
+    const labelDisplay = isToken ? 'Token No:' : 'Bill No:';
     const orderType = (order.order_type === 'pickup' ? 'PickUp' : (order.order_type || 'dine_in').replace('_', ' ')).replace(/\b\w/g, l => l.toUpperCase());
 
     return `
@@ -871,7 +876,7 @@ class PrinterService {
         <span>${dateStr} ${timeStr}</span>
       </div>
       
-      <div class="kot-num text-center">Token No: ${tokenDisplay}</div>
+      <div class="kot-num text-center">${labelDisplay} ${tokenDisplay}</div>
       <div class="bold text-center" style="font-size:18px;">${orderType}</div>
       
       <table class="kot-table">
@@ -950,7 +955,7 @@ class PrinterService {
       <div class="divider"></div>
       <div class="text-center bold" style="font-size: 14px; margin-top: 10px; text-decoration: underline;">SALES BY TYPE</div>
       <div class="row"><span class="label">Dine-In:</span><span class="bold">₹${(sales.dine_in_amount || 0).toFixed(2)}</span></div>
-      <div class="row"><span class="label">Take Away:</span><span class="bold">₹${(sales.takeaway_amount || 0).toFixed(2)}</span></div>
+      <div class="row"><span class="label">Pick Up:</span><span class="bold">₹${(sales.pickup_amount || 0).toFixed(2)}</span></div>
       <div class="row"><span class="label">Delivery:</span><span class="bold">₹${(sales.delivery_amount || 0).toFixed(2)}</span></div>
       <div class="row bold" style="margin-top: 4px; border-top: 1px dotted #000;"><span class="label">Total Revenue:</span><span>₹${(sales.total_revenue || 0).toFixed(2)}</span></div>
       

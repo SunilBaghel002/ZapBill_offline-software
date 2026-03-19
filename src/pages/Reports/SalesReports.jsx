@@ -17,9 +17,11 @@ const SalesReports = () => {
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('All');
 
   useEffect(() => {
     fetchData();
+    setSelectedCategory('All'); // reset filter on tab/date change
   }, [activeTab, startDate, endDate]);
 
   const fetchData = async () => {
@@ -69,11 +71,45 @@ const SalesReports = () => {
   };
 
   const exportToExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(data);
+    const exportData = activeTab === 'item-wise' ? filteredItems : data;
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Report");
     XLSX.writeFile(wb, `Sales_${activeTab}_${startDate}.xlsx`);
   };
+
+  // --- Item-wise derived state ---
+  // Sort all items: group by category name, then by revenue desc within each category
+  const sortedItems = React.useMemo(() => {
+    if (activeTab !== 'item-wise') return data;
+    return [...data].sort((a, b) => {
+      const catA = (a.category_name || '').toLowerCase();
+      const catB = (b.category_name || '').toLowerCase();
+      if (catA !== catB) return catA.localeCompare(catB);
+      return (b.total_revenue || 0) - (a.total_revenue || 0);
+    });
+  }, [data, activeTab]);
+
+  // All unique categories from data
+  const categories = React.useMemo(() => {
+    if (activeTab !== 'item-wise') return [];
+    const cats = [...new Set(data.map(r => r.category_name).filter(Boolean))].sort();
+    return ['All', ...cats];
+  }, [data, activeTab]);
+
+  // Items filtered by selected category
+  const filteredItems = React.useMemo(() => {
+    if (activeTab !== 'item-wise') return sortedItems;
+    if (selectedCategory === 'All') return sortedItems;
+    return sortedItems.filter(r => r.category_name === selectedCategory);
+  }, [sortedItems, selectedCategory, activeTab]);
+
+  // Top items for chart (top 10 by revenue overall)
+  const chartItems = React.useMemo(() => {
+    return [...data]
+      .sort((a, b) => (b.total_revenue || 0) - (a.total_revenue || 0))
+      .slice(0, 10);
+  }, [data]);
 
   // Custom Label for Pie Chart
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, category_name }) => {
@@ -148,23 +184,49 @@ const SalesReports = () => {
         <div className="report-content">
           {/* Visualizations for specific tabs */}
           {activeTab === 'item-wise' && data.length > 0 && (
-            <div style={{ height: '400px', marginBottom: '24px', background: 'white', padding: '30px', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
-              <h4 style={{ margin: '0 0 24px 0', color: '#1e293b', fontSize: '18px', fontWeight: 700 }}>Top Items by Revenue</h4>
-              <ResponsiveContainer width="100%" height="90%">
-                <BarChart data={data.slice(0, 10)}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="displayName" tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={70} />
-                  <YAxis tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} tickFormatter={(val) => `₹${val}`} />
-                  <Tooltip 
-                    cursor={{ fill: '#f8fafc' }}
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', padding: '12px' }}
-                    labelStyle={{ fontWeight: 700, marginBottom: '4px' }}
-                    formatter={(value) => `₹${value}`} 
-                  />
-                  <Bar dataKey="total_revenue" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={65} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <>
+              <div style={{ height: '400px', marginBottom: '24px', background: 'white', padding: '30px', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
+                <h4 style={{ margin: '0 0 24px 0', color: '#1e293b', fontSize: '18px', fontWeight: 700 }}>Top Items by Revenue</h4>
+                <ResponsiveContainer width="100%" height="90%">
+                  <BarChart data={chartItems}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="displayName" tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" height={70} />
+                    <YAxis tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }} axisLine={false} tickLine={false} tickFormatter={(val) => `₹${val}`} />
+                    <Tooltip 
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', padding: '12px' }}
+                      labelStyle={{ fontWeight: 700, marginBottom: '4px' }}
+                      formatter={(value) => `₹${value}`} 
+                    />
+                    <Bar dataKey="total_revenue" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={65} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Category Filter Pills */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                {categories.map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    style={{
+                      padding: '6px 16px',
+                      borderRadius: '20px',
+                      border: selectedCategory === cat ? '2px solid #6366f1' : '2px solid #e2e8f0',
+                      background: selectedCategory === cat ? '#6366f1' : 'white',
+                      color: selectedCategory === cat ? 'white' : '#64748b',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '13px',
+                      transition: 'all 0.15s',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
 
           {activeTab === 'category-wise' && data.length > 0 && (
@@ -264,7 +326,7 @@ const SalesReports = () => {
                 </tr>
               </thead>
               <tbody>
-                {data.map((item, idx) => (
+                {(activeTab === 'item-wise' ? filteredItems : data).map((item, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }}>
                     {activeTab === 'item-wise' && (
                       <>

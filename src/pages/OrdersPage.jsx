@@ -281,13 +281,14 @@ const OrdersPage = () => {
   }
 
   return (
-    <div style={{ padding: '24px 28px', marginTop: '64px', height: 'calc(100vh - 64px)', overflowY: 'auto', background: '#f8fafc' }}>
+    <div style={{ padding: '24px 28px', marginTop: '10px', height: 'calc(100vh - 64px)', overflow: 'hidden', background: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div style={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        marginBottom: 'var(--spacing-6)'
+        marginBottom: 'var(--spacing-6)',
+        flexShrink: 0
       }}>
         <div>
           <h1>Bills & Orders</h1>
@@ -312,7 +313,8 @@ const OrdersPage = () => {
         display: 'flex', 
         gap: 'var(--spacing-4)', 
         marginBottom: 'var(--spacing-4)',
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
+        flexShrink: 0
       }}>
         {/* Search */}
         <div style={{ flex: 1, minWidth: '250px', maxWidth: '350px' }}>
@@ -413,7 +415,8 @@ const OrdersPage = () => {
         display: 'grid', 
         gridTemplateColumns: 'repeat(4, 1fr)', 
         gap: '16px',
-        marginBottom: '20px'
+        marginBottom: '20px',
+        flexShrink: 0
       }}>
         <div style={{ background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', borderRadius: '14px', padding: '20px', color: 'white', boxShadow: '0 8px 24px rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ width: 48, height: 48, borderRadius: '12px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShoppingCart size={24} /></div>
@@ -446,8 +449,9 @@ const OrdersPage = () => {
       </div>
 
       {/* Orders Table */}
-      <div className="table-container" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'auto', maxHeight: 'calc(100vh - 380px)' }}>
-        <table className="table">
+      <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <div className="table-container" style={{ overflow: 'auto', flex: 1 }}>
+          <table className="table">
           <thead>
             <tr>
               <th style={{ width: '40px' }}>
@@ -587,17 +591,20 @@ const OrdersPage = () => {
           </div>
         )}
 
+        </div>
+
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e5e7eb', background: 'white' }}>
-            <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-              Showing <span style={{ fontWeight: 600, color: '#111827' }}>{indexOfFirstItem + 1}</span> to <span style={{ fontWeight: 600, color: '#111827' }}>{Math.min(indexOfLastItem, filteredOrders.length)}</span> of <span style={{ fontWeight: 600, color: '#111827' }}>{filteredOrders.length}</span> orders
+          <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', background: '#f8fafc', borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px', flexShrink: 0 }}>
+            <div style={{ fontSize: '14px', color: '#64748b' }}>
+              Showing <span style={{ fontWeight: 600, color: '#1e293b' }}>{indexOfFirstItem + 1}</span> to <span style={{ fontWeight: 600, color: '#1e293b' }}>{Math.min(indexOfLastItem, filteredOrders.length)}</span> of <span style={{ fontWeight: 600, color: '#1e293b' }}>{filteredOrders.length}</span> orders
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
+                style={{ padding: '6px 12px', borderRadius: '8px', fontWeight: 600 }}
               >
                 Previous
               </button>
@@ -607,10 +614,22 @@ const OrdersPage = () => {
                   .filter(page => Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages)
                   .map((page, index, array) => (
                   <React.Fragment key={page}>
-                    {index > 0 && array[index - 1] !== page - 1 && <span style={{ padding: '0 4px', color: '#6b7280' }}>...</span>}
+                    {index > 0 && array[index - 1] !== page - 1 && <span style={{ padding: '0 8px', color: '#94a3b8' }}>...</span>}
                     <button
-                      className={`btn btn-sm ${currentPage === page ? 'btn-primary' : 'btn-ghost'}`}
-                      style={{ minWidth: '32px' }}
+                      style={{
+                        minWidth: '32px',
+                        height: '32px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '8px',
+                        border: currentPage === page ? 'none' : '1px solid #e2e8f0',
+                        background: currentPage === page ? '#6366f1' : 'white',
+                        color: currentPage === page ? 'white' : '#475569',
+                        fontWeight: currentPage === page ? 700 : 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s'
+                      }}
                       onClick={() => handlePageChange(page)}
                     >
                       {page}
@@ -623,6 +642,7 @@ const OrdersPage = () => {
                 className="btn btn-secondary btn-sm"
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
+                style={{ padding: '6px 12px', borderRadius: '8px', fontWeight: 600 }}
               >
                 Next
               </button>

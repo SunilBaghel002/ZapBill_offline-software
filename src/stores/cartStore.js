@@ -98,6 +98,43 @@ export const useCartStore = create(
         }
       },
 
+      // Replace item in cart (for editing)
+      replaceItem: (itemId, menuItem, quantity = 1, specialInstructions = '', variant = null, addons = []) => {
+        const { items } = get();
+        
+        // Calculate unit price based on variant and addons
+        let finalPrice = menuItem.price;
+        if (variant) finalPrice = parseFloat(variant.price);
+
+        // Apply item-level discount if present
+        let appliedDiscount = 0;
+        if (menuItem.appliedDiscount) {
+           if (menuItem.appliedDiscount.discount_type === 'percentage') {
+             appliedDiscount = finalPrice * (menuItem.appliedDiscount.discount_value / 100);
+           } else if (menuItem.appliedDiscount.discount_type === 'flat') {
+             appliedDiscount = menuItem.appliedDiscount.discount_value;
+           }
+           finalPrice -= appliedDiscount;
+           if (finalPrice < 0) finalPrice = 0;
+        }
+
+        const addonsTotal = addons.reduce((sum, addon) => sum + parseFloat(addon.price), 0);
+        finalPrice += addonsTotal;
+
+        set({
+          items: items.map(item =>
+            item.id === itemId ? {
+              ...item,
+              unitPrice: finalPrice,
+              quantity,
+              specialInstructions,
+              variant,
+              addons
+            } : item
+          )
+        });
+      },
+
       // Remove item from cart
       removeItem: (itemId) => {
         const { items } = get();

@@ -243,10 +243,11 @@ const POSPage = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [activeItemDiscounts, setActiveItemDiscounts] = useState([]);
 
-  // UI States for Add-ons and Hold Order
-  const [showAddonModal, setShowAddonModal] = useState(false);
-  const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
-  const [showHeldOrders, setShowHeldOrders] = useState(false);
+   // UI States for Add-ons and Hold Order
+   const [showAddonModal, setShowAddonModal] = useState(false);
+   const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
+   const [editingCartItemId, setEditingCartItemId] = useState(null);
+   const [showHeldOrders, setShowHeldOrders] = useState(false);
   // heldOrders are now in cart store
   const [showDiscountModal, setShowDiscountModal] = useState(false);
 
@@ -411,16 +412,48 @@ const POSPage = () => {
     // Filter by Active Menu if it exists
     if (activeMenu && item.menu_id && item.menu_id !== activeMenu.id) return false;
 
+    // If there is a search query, ignore the selected category entirely and search the whole menu
+    if (searchQuery) {
+      return item.name.toLowerCase().includes(searchQuery.toLowerCase()) && item.is_available;
+    }
+
     // Favorites Category Logic
     if (selectedCategory === 'favorites') {
-      return item.is_favorite && (!searchQuery || item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      return item.is_favorite;
     }
 
     const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
-    const matchesSearch = !searchQuery ||
-      item.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch && item.is_available;
+    return matchesCategory && item.is_available;
   });
+
+  const handleEditCartItem = (cartItem) => {
+    // Find the original menu item
+    const originalItem = menuItems.find(mi => mi.id === cartItem.menuItemId);
+    if (!originalItem) return;
+
+    const variants = originalItem.variants ? (typeof originalItem.variants === 'string' ? JSON.parse(originalItem.variants) : originalItem.variants) : [];
+    const addons = originalItem.addons ? (typeof originalItem.addons === 'string' ? JSON.parse(originalItem.addons) : originalItem.addons) : [];
+
+    // Find if there's an active discount
+    const itemDiscount = activeItemDiscounts.find(d => d.menu_item_id === originalItem.id && (!d.variant_name));
+    const itemWithPossibleDiscount = { ...originalItem, appliedDiscount: itemDiscount };
+
+    setEditingCartItemId(cartItem.id);
+    setSelectedItemForAddon({ 
+      ...itemWithPossibleDiscount, 
+      parsedVariants: variants, 
+      parsedAddons: addons, 
+      activeItemDiscounts,
+      // Provide initial values for the modal
+      initialState: {
+        quantity: cartItem.quantity,
+        variant: cartItem.variant,
+        addons: cartItem.addons,
+        specialInstructions: cartItem.specialInstructions
+      }
+    });
+    setShowAddonModal(true);
+  };
 
   const handleAddToCart = (item) => {
     // Parse variants/addons if they are strings
@@ -1209,7 +1242,23 @@ const POSPage = () => {
                         <X size={20} style={{ background: '#D32F2F', borderRadius: '50%', color: 'white', padding: '3px' }} />
                       </button>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span className="pos-cart-item-name" style={{ fontSize: '16px', lineHeight: '1.2' }}>{item.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="pos-cart-item-name" style={{ fontSize: '16px', lineHeight: '1.2' }}>{item.name}</span>
+                          <button 
+                            onClick={() => handleEditCartItem(item)}
+                            style={{ 
+                              background: 'none', 
+                              border: 'none', 
+                              color: '#0096FF', 
+                              fontSize: '11px', 
+                              fontWeight: '600', 
+                              cursor: 'pointer',
+                              padding: '2px 4px'
+                            }}
+                          >
+                            EDIT
+                          </button>
+                        </div>
                         {item.variant && item.variant.name && (
                            <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 600 }}>{item.variant.name}</span>
                         )}
@@ -1599,14 +1648,21 @@ const POSPage = () => {
           item={selectedItemForAddon}
           masterAddons={masterAddons}
           globalAddons={globalAddons}
+          initialState={selectedItemForAddon.initialState}
           onClose={() => {
             setShowAddonModal(false);
             setSelectedItemForAddon(null);
+            setEditingCartItemId(null);
           }}
           onAddToCart={(item, quantity, notes, variant, addons) => {
-            cart.addItem(item, quantity, notes, variant, addons);
+            if (editingCartItemId) {
+              cart.replaceItem(editingCartItemId, item, quantity, notes, variant, addons);
+            } else {
+              cart.addItem(item, quantity, notes, variant, addons);
+            }
             setShowAddonModal(false);
             setSelectedItemForAddon(null);
+            setEditingCartItemId(null);
           }}
         />
       )}
@@ -1692,14 +1748,41 @@ const POSPage = () => {
 };
 
 // Addon Selection Modal Component - Redesigned to match reference
-const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], globalAddons = [] }) => {
-  const [quantity, setQuantity] = useState(1);
+const AddonSelectionModal = ({ 
+  item, 
+  onClose, 
+  onAddToCart, 
+  masterAddons = [], 
+  globalAddons = [],
+  initialState = null
+}) => {
+  const [quantity, setQuantity] = useState(initialState?.quantity || 1);
   const parsedVariants = item.parsedVariants || [];
   const parsedAddons = item.parsedAddons || [];
-  const [selectedVariant, setSelectedVariant] = useState(parsedVariants.length > 0 ? parsedVariants[0] : null);
-  const [selectedAddons, setSelectedAddons] = useState([]);
+  
+  const [selectedVariant, setSelectedVariant] = useState(() => {
+    if (initialState?.variant) return initialState.variant;
+    return parsedVariants.length > 0 ? parsedVariants[0] : null;
+  });
+
+  const [selectedAddons, setSelectedAddons] = useState(() => {
+    if (!initialState?.addons) return [];
+    
+    // If addons are flattened in cart, re-group them for the selection UI
+    const grouped = [];
+    initialState.addons.forEach(a => {
+      const existing = grouped.find(x => x.name === a.name && x._groupId === a._groupId);
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        grouped.push({ ...a, quantity: 1 });
+      }
+    });
+    return grouped;
+  });
+
   const [addonSearch, setAddonSearch] = useState('');
-  const [specialInstructions, setSpecialInstructions] = useState('');
+  const [specialInstructions, setSpecialInstructions] = useState(initialState?.specialInstructions || '');
 
   // activeItemDiscounts was passed along as part of `item` object.
   const activeItemDiscounts = item.activeItemDiscounts || [];
@@ -1817,9 +1900,12 @@ const AddonSelectionModal = ({ item, onClose, onAddToCart, masterAddons = [], gl
       let newSelected = selectedAddons.filter(sa => !otherGroupAddonIds.includes(sa.id));
       
       const existing = newSelected.find(a => a.id === addon.id);
-      // Toggle off if already selected, otherwise add
+      // Instead of toggling off, we increment quantity even for single select (per user request).
+      // Deselection/reduction is handled by the dedicated minus button.
       if (existing) {
-         setSelectedAddons(newSelected.filter(a => a.id !== addon.id));
+         setSelectedAddons(newSelected.map(a => 
+           a.id === addon.id ? { ...a, quantity: (a.quantity || 1) + 1 } : a
+         ));
       } else {
          setSelectedAddons([...newSelected, { ...addon, quantity: 1, _groupId: group.id }]);
       }
