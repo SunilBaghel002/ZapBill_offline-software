@@ -1,0 +1,6 @@
+170: .bold { font-weight: 900; }
+207: font-weight: 900; font-size: 18px;
+214: .kot-num { font-size: 20px; font-weight: 900; text-align: left; margin: 4px 0; }
+637: <div style="font-size: 22px; font-weight: 900; margin-bottom: 10px;">✓ TEST PRINT</div>
+791: <span class="bold" style="font-size: 17px; border: 1px solid #000; padding: 0 4px; font-weight: 900;">${orderType}</span>
+927: ${order.table_number ? `<div style="font-size: 18px; font-weight: 900; text-align: center; margin: 6px 0;">TABLE ${order.table_number}</div>` : ''}

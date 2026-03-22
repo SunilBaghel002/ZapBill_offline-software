@@ -154,7 +154,7 @@ class PrinterService {
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { 
           margin: 0; padding: 5px; 
-          font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+          font-family: Arial, Helvetica, sans-serif;
           font-size: 13px; 
           color: #000; 
           background: #fff;
@@ -795,10 +795,14 @@ class PrinterService {
         <span>${timeStr}</span>
       </div>
       
-      ${order.table_number 
-        ? `<div class="info-row"><span class="bold" style="font-size:16px;">Token No.: ${order.table_number}</span></div>` 
-        : `<div class="info-row"><span class="bold" style="font-size:16px;">Bill No.: ${order.order_number || ''}</span></div>`
-      }
+      <div class="info-row">
+        <span class="bold" style="font-size:16px;">Bill No.: ${order.order_number || ''}</span>
+      </div>
+      ${order.table_number ? `
+        <div class="info-row">
+          <span class="bold" style="font-size:16px;">Token No.: ${order.table_number}</span>
+        </div>
+      ` : ''}
       
       <div class="line-solid"></div>
       ${itemsHtml}
@@ -876,7 +880,8 @@ class PrinterService {
         <span>${dateStr} ${timeStr}</span>
       </div>
       
-      <div class="kot-num text-center">${labelDisplay} ${tokenDisplay}</div>
+      <div class="kot-num text-center">Bill No: ${order.order_number || ''}</div>
+      ${order.table_number ? `<div class="kot-num text-center">Token No: ${order.table_number}</div>` : ''}
       <div class="bold text-center" style="font-size:18px;">${orderType}</div>
       
       <table class="kot-table">
