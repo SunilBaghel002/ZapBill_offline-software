@@ -160,7 +160,7 @@ class PrinterService {
           background: #fff;
           width: ${contentWidth}px; 
           line-height: 1.25;
-          font-weight: 500;
+          font-weight: 400;
         }
         h1, h2, h3, h4, h5, h6, p { margin: 0; padding: 0; }
         
@@ -170,8 +170,8 @@ class PrinterService {
         .text-left { text-align: left; }
         .bold { font-weight: 900; }
         .uppercase { text-transform: uppercase; }
-        .small-font { font-size: 10px; font-weight: 600; }
-        .x-small-font { font-size: 9px; font-weight: 600; }
+        .small-font { font-size: 10px; font-weight: 400; }
+        .x-small-font { font-size: 9px; font-weight: 400; }
         
         /* Professional Separators */
         .line-dashed { border-top: 1px dashed #000; margin: 4px 0; width: 100%; }
@@ -179,17 +179,17 @@ class PrinterService {
         .line-solid { border-top: 1px solid #000; margin: 4px 0; width: 100%; }
         
         /* Bill Header */
-        .restaurant-name { font-weight: 900; font-size: 17px; text-align: center; margin-bottom: 2px; }
+        .restaurant-name { font-weight: 400; font-size: 17px; text-align: center; margin-bottom: 2px; }
         .info-label { font-size: 11px; text-align: center; margin-bottom: 1px; }
         
         /* Info Grid */
         .info-section { margin: 6px 0; }
         .info-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 1px; }
-        .info-val { font-weight: 900; }
+        .info-val { font-weight: 400; }
         
         /* Table Layout */
         .receipt-table { width: 100%; border-collapse: collapse; margin: 4px 0; }
-        .receipt-table th { border-bottom: 1px solid #000; padding: 3px 0; font-size: 12px; text-align: left; font-weight: 900; }
+        .receipt-table th { border-bottom: 1px solid #000; padding: 3px 0; font-size: 12px; text-align: left; font-weight: 400; }
         .receipt-table td { padding: 3px 0; font-size: 12px; vertical-align: top; }
         
         .col-item { text-align: left; width: 50%; }
@@ -198,7 +198,7 @@ class PrinterService {
         .col-amount { text-align: right; width: 20%; }
         
         /* Sub-items */
-        .sub-item { font-size: 10px; font-weight: 600; padding-left: 8px; margin-top: 1px; }
+        .sub-item { font-size: 10px; font-weight: 400; padding-left: 8px; margin-top: 1px; }
         
         /* Totals Area */
         .total-container { margin-top: 6px; }
@@ -211,13 +211,13 @@ class PrinterService {
         }
         
         /* KOT Styles */
-        .kot-header { font-size: 18px; font-weight: 900; text-align: center; margin-bottom: 4px; }
+        .kot-header { font-size: 18px; font-weight: 400; text-align: center; margin-bottom: 4px; }
         .kot-num { font-size: 20px; font-weight: 900; text-align: left; margin: 4px 0; }
         .kot-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
-        .kot-table th { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; text-align: left; font-size: 14px; font-weight: 900; }
-        .kot-table td { padding: 6px 0; border-bottom: 1px dotted #000; font-size: 18px; font-weight: 900; vertical-align: top; }
+        .kot-table th { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; text-align: left; font-size: 14px; font-weight: 400; }
+        .kot-table td { padding: 6px 0; border-bottom: 1px dotted #000; font-size: 18px; font-weight: 400; vertical-align: top; }
         .kot-qty { width: 50px; text-align: center; border-left: 1px dashed #000; }
-        .kot-special { font-size: 12px; font-weight: 700; color: #000; }
+        .kot-special { font-size: 12px; font-weight: 400; color: #000; }
 
         /* Targeted Font Scaling */
         /* Bill: Increase overall font */
@@ -697,7 +697,7 @@ class PrinterService {
     let customerInfo = '';
     if (order.showCustomerDetails !== false) {
       if (order.customer_name) {
-        customerInfo += `<div style="font-size:14px; font-weight:900;">Name: ${order.customer_name}</div>`;
+        customerInfo += `<div style="font-size:14px; font-weight:500;">Name: ${order.customer_name}</div>`;
       }
       if (order.customer_phone) {
         customerInfo += `<div style="font-size:14px;">Mob: ${order.customer_phone}</div>`;
@@ -764,8 +764,8 @@ class PrinterService {
     
     if (order.tax_amount > 0) {
       const halfTax = (order.tax_amount / 2);
-      totalsHtml += `<div class="info-row end-row"><span>CGST 2.5%: </span><span>${halfTax.toFixed(2)}</span></div>`;
-      totalsHtml += `<div class="info-row end-row"><span>SGST 2.5%: </span><span>${halfTax.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row end-row"><span>CGST 2.5%: </span><span> ${halfTax.toFixed(2)}</span></div>`;
+      totalsHtml += `<div class="info-row end-row"><span>SGST 2.5%: </span><span> ${halfTax.toFixed(2)}</span></div>`;
     }
     if (order.discount_amount > 0) {
       totalsHtml += `<div class="info-row end-row"><span>Discount: </span><span>-${order.discount_amount.toFixed(2)}</span></div>`;
@@ -811,7 +811,7 @@ class PrinterService {
         <span>${cs}${(order.total_amount || 0).toFixed(0)}.00</span>
       </div>
       
-      <div class="text-center" style="font-size: 13px; font-weight: 900; margin-top: 5px;">Thanks</div>
+      <div class="text-center" style="font-size: 13px; font-weight: 400; margin-top: 5px;">Thanks</div>
       </div>
     `;
   }
@@ -893,7 +893,7 @@ class PrinterService {
       </table>
       
       ${order.chef_instructions ? `
-        <div style="margin-top: 5px; padding: 4px; border: 1px solid #000; font-weight: bold; font-size: 13px;">
+        <div style="margin-top: 5px; padding: 4px; border: 1px solid #000; font-weight: 400; font-size: 13px;">
           Note: ${order.chef_instructions}
         </div>
       ` : ''}
@@ -904,7 +904,7 @@ class PrinterService {
   // ─── Void KOT HTML ────────────────────────────────────────
   generateVoidKOTHtml(order, items, reason, kotNumber = null) {
     const itemsHtml = (items || []).map(item => `
-      <div style="font-size: 15px; font-weight: 900; margin-bottom: 6px; text-decoration: line-through;">
+      <div style="font-size: 15px; font-weight: 400; margin-bottom: 6px; text-decoration: line-through;">
         ${item.quantity || 1} × ${item.item_name || item.name || 'Item'}
       </div>
     `).join('');
@@ -912,11 +912,11 @@ class PrinterService {
     return `
       <div class="void-badge">❌ VOID KOT ❌</div>
       
-      ${kotNumber ? `<div style="font-size: 16px; font-weight: 900; text-align: center;">KOT #${kotNumber}</div>` : ''}
+      ${kotNumber ? `<div style="font-size: 16px; font-weight: 400; text-align: center;">KOT #${kotNumber}</div>` : ''}
       
       <div class="divider-solid"></div>
       
-      <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600;">
+      <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 400;">
         <span>Order #: ${order.order_number || 'N/A'}</span>
         <span>${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
       </div>
@@ -924,16 +924,16 @@ class PrinterService {
       
       <div class="divider-solid"></div>
       
-      <div style="font-weight: 900; margin-bottom: 8px; font-size: 14px;">CANCELLED ITEMS:</div>
+      <div style="font-weight: 400; margin-bottom: 8px; font-size: 14px;">CANCELLED ITEMS:</div>
       ${itemsHtml}
       
       ${reason ? `
         <div class="divider"></div>
-        <div style="font-weight: 900; font-size: 13px;">Reason: ${reason}</div>
+        <div style="font-weight: 400; font-size: 13px;">Reason: ${reason}</div>
       ` : ''}
       
       <div class="divider" style="margin-top: 12px;"></div>
-      <div class="text-center" style="font-size: 11px; font-weight: 600;">--- Void Copy ---</div>
+      <div class="text-center" style="font-size: 11px; font-weight: 400;">--- Void Copy ---</div>
     `;
   }
 

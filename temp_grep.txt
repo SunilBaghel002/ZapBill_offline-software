@@ -1,0 +1,49 @@
+162: font-weight: 400;
+170: .bold { font-weight: 900; }
+172: .small-font { font-size: 10px; font-weight: 400; }
+173: .x-small-font { font-size: 9px; font-weight: 400; }
+181: .restaurant-name { font-weight: 900; font-size: 17px; text-align: center; margin-bottom: 2px; }
+187: .info-val { font-weight: 900; }
+191: .receipt-table th { border-bottom: 1px solid #000; padding: 3px 0; font-size: 12px; text-align: left; font-weight: 900; }
+200: .sub-item { font-size: 10px; font-weight: 600; padding-left: 8px; margin-top: 1px; }
+207: font-weight: 900; font-size: 18px;
+213: .kot-header { font-size: 18px; font-weight: 900; text-align: center; margin-bottom: 4px; }
+214: .kot-num { font-size: 20px; font-weight: 900; text-align: left; margin: 4px 0; }
+216: .kot-table th { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0; text-align: left; font-size: 14px; font-weight: 900; }
+217: .kot-table td { padding: 6px 0; border-bottom: 1px dotted #000; font-size: 18px; font-weight: 900; vertical-align: top; }
+219: .kot-special { font-size: 12px; font-weight: 700; color: #000; }
+637: <div style="font-size: 22px; font-weight: 900; margin-bottom: 10px;">✓ TEST PRINT</div>
+639: <p style="font-size: 14px; margin: 10px 0; font-weight: 700;">Printer is working correctly!</p>
+679: ? '<div style="background:#000;color:#fff;text-align:center;font-weight:bold;margin-bottom:5px;">*** REPRINT ***</div>' : '';
+699: customerInfo += `<div style="font-size:14px; font-weight:500;">Name: ${order.customer_name}</div>`;
+791: <span class="bold" style="font-size: 17px; border: 1px solid #000; padding: 0 4px; font-weight: 900;">${orderType}</span>
+798: ? `<div class="info-row"><span class="bold" style="font-size:16px;">Token No.: ${order.table_number}</span></div>`
+799: : `<div class="info-row"><span class="bold" style="font-size:16px;">Bill No.: ${order.order_number || ''}</span></div>`
+813: <div class="text-center" style="font-size: 13px; font-weight: 900; margin-top: 5px;">Thanks</div>
+821: ? '<div style="background:#000;color:#fff;text-align:center;font-weight:bold;margin-bottom:5px;">*** REPRINT KOT ***</div>' : '';
+879: <div class="bold text-center" style="font-size:18px;">${orderType}</div>
+895: <div style="margin-top: 5px; padding: 4px; border: 1px solid #000; font-weight: bold; font-size: 13px;">
+906: <div style="font-size: 15px; font-weight: 900; margin-bottom: 6px; text-decoration: line-through;">
+914: ${kotNumber ? `<div style="font-size: 16px; font-weight: 900; text-align: center;">KOT #${kotNumber}</div>` : ''}
+918: <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600;">
+922: ${order.table_number ? `<div style="font-size: 18px; font-weight: 900; text-align: center; margin: 6px 0;">TABLE ${order.table_number}</div>` : ''}
+926: <div style="font-weight: 900; margin-bottom: 8px; font-size: 14px;">CANCELLED ITEMS:</div>
+931: <div style="font-weight: 900; font-size: 13px;">Reason: ${reason}</div>
+935: <div class="text-center" style="font-size: 11px; font-weight: 600;">--- Void Copy ---</div>
+948: <div class="text-center bold" style="margin-bottom: 10px;">Date: ${formattedDate}</div>
+952: <div class="row"><span class="label">Opening Balance:</span><span class="bold">₹${(sales.opening_balance || 0).toFixed(2)}</span></div>
+955: <div class="text-center bold" style="font-size: 14px; margin-top: 10px; text-decoration: underline;">SALES BY TYPE</div>
+956: <div class="row"><span class="label">Dine-In:</span><span class="bold">₹${(sales.dine_in_amount || 0).toFixed(2)}</span></div>
+957: <div class="row"><span class="label">Pick Up:</span><span class="bold">₹${(sales.pickup_amount || 0).toFixed(2)}</span></div>
+958: <div class="row"><span class="label">Delivery:</span><span class="bold">₹${(sales.delivery_amount || 0).toFixed(2)}</span></div>
+959: <div class="row bold" style="margin-top: 4px; border-top: 1px dotted #000;"><span class="label">Total Revenue:</span><span>₹${(sales.total_revenue || 0).toFixed(2)}</span></div>
+962: <div class="text-center bold" style="font-size: 14px; margin-top: 5px; text-decoration: underline;">PAYMENT METHODS</div>
+963: <div class="row"><span class="label">Cash:</span><span class="bold">₹${(sales.cash_amount || 0).toFixed(2)}</span></div>
+964: <div class="row"><span class="label">UPI:</span><span class="bold">₹${(sales.upi_amount || 0).toFixed(2)}</span></div>
+965: <div class="row"><span class="label">Card:</span><span class="bold">₹${(sales.card_amount || 0).toFixed(2)}</span></div>
+966: <div class="row"><span class="label">Due (Unpaid):</span><span class="bold">₹${(sales.due_amount || 0).toFixed(2)}</span></div>
+969: <div class="text-center bold" style="font-size: 14px; margin-top: 5px; text-decoration: underline;">EXPENSES & DRAWER</div>
+970: <div class="row"><span class="label">Staff Advance:</span><span class="bold">₹${(sales.staff_advance_total || 0).toFixed(2)}</span></div>
+971: <div class="row"><span class="label">Cash Withdrawal:</span><span class="bold">₹${(sales.withdrawal_total || 0).toFixed(2)}</span></div>
+972: <div class="row"><span class="label">Other Expenses:</span><span class="bold">₹${((sales.total_expenses || 0) - (sales.staff_advance_total || 0) - (sales.withdrawal_total || 0)).toFixed(2)}</span></div>
+973: <div class="row bold" style="margin-top: 4px; border-top: 1px dotted #000;"><span class="label">Total Expenses:</span><span>₹${((sales.total_expenses || 0)).toFixed(2)}</span></div>

@@ -158,6 +158,34 @@ class AuthService {
     }
   }
 
+  async verifyAdminPassword({ password }) {
+    try {
+      // Search for any active administrator in the database
+      const admins = this.db.execute("SELECT * FROM users WHERE role = 'admin' AND is_active = 1 AND is_deleted = 0");
+      log.info(`Verifying admin password. Found ${admins.length} active admins: ${admins.map(a => a.username).join(', ')}`);
+      
+      if (admins.length === 0) {
+        log.error('No active administrator user found for verification');
+        return { success: false, error: 'Administrator user not found' };
+      }
+      
+      // Try to compare the password against every admin account until a match is found
+      for (const admin of admins) {
+        const isValid = await bcrypt.compare(password, admin.password_hash);
+        if (isValid) {
+          log.info(`Admin password verified successfully for user: ${admin.username}`);
+          return { success: true };
+        }
+      }
+      
+      log.warn('Incorrect administrator password attempt');
+      return { success: false, error: 'Invalid administrator password' };
+    } catch (error) {
+      log.error('Verify admin password fatal error:', error);
+      return { success: false, error: 'Password verification failed' };
+    }
+  }
+
   getDeviceInfo() {
     return JSON.stringify({
       platform: process.platform,

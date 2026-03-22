@@ -13,8 +13,11 @@ import {
   Layers, // New icon
   ArrowLeft,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Lock,
+  ShieldAlert
 } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
 import './MenuPage.css'; // Added import
 
 const MenuPage = () => {
@@ -40,6 +43,10 @@ const MenuPage = () => {
   const [showMenuManager, setShowMenuManager] = useState(false);
   const [assigningAddon, setAssigningAddon] = useState(null); // { type: 'global' | 'master', data: addon }
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showVerifyAdminModal, setShowVerifyAdminModal] = useState(false);
+  const [verifyAction, setVerifyAction] = useState(null);
+
+  const { isAdmin } = useAuthStore();
 
   const handleAssignAddon = (type, addon) => {
     setAssigningAddon({ type, data: addon });
@@ -142,20 +149,29 @@ const MenuPage = () => {
     });
   };
 
-  const handleResetAllAddons = async () => {
-    window.showAlert('This will clear ALL add-on and master add-on assignments from ALL items and variants. This cannot be undone. Are you sure?', 'confirm', async () => {
-      try {
-        const result = await window.electronAPI.invoke('menu:resetAllAddons');
-        if (result.success) {
-          loadData();
-          window.showAlert('All assignments cleared successfully!', 'success');
-        } else {
-          window.showAlert('Reset failed: ' + result.error, 'error');
+  const handleResetAllAddons = () => {
+    // Check if the user is an admin first (optional but good UI)
+    if (!isAdmin()) {
+      window.showAlert('Only administrators can perform this action.', 'error');
+      return;
+    }
+
+    setVerifyAction(() => async () => {
+      window.showAlert('This will clear ALL add-on and master add-on assignments from ALL items and variants. This cannot be undone. Are you sure?', 'confirm', async () => {
+        try {
+          const result = await window.electronAPI.invoke('menu:resetAllAddons');
+          if (result.success) {
+            loadData();
+            window.showAlert('All assignments cleared successfully!', 'success');
+          } else {
+            window.showAlert('Reset failed: ' + result.error, 'error');
+          }
+        } catch (error) {
+          window.showAlert('Error resetting assignments: ' + error.message, 'error');
         }
-      } catch (error) {
-        window.showAlert('Error resetting assignments: ' + error.message, 'error');
-      }
+      });
     });
+    setShowVerifyAdminModal(true);
   };
 
   if (isLoading) {
@@ -405,6 +421,19 @@ const MenuPage = () => {
             onSave={() => { setShowAssignModal(false); setAssigningAddon(null); loadData(); }}
           />
         )}
+
+        {showVerifyAdminModal && (
+          <VerifyAdminModal
+            onClose={() => { setShowVerifyAdminModal(false); setVerifyAction(null); }}
+            onVerified={(success) => {
+              if (success && verifyAction) {
+                verifyAction();
+              }
+              setShowVerifyAdminModal(false);
+              setVerifyAction(null);
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -515,15 +544,19 @@ const CategoryModal = ({ category, onClose, onSave }) => {
     e.preventDefault();
     setIsSaving(true);
     try {
+      let result;
       if (category?.id) {
-        await window.electronAPI.invoke('menu:saveCategory', { category: { id: category.id, name } });
+        result = await window.electronAPI.invoke('menu:saveCategory', { category: { id: category.id, name } });
       } else {
-        await window.electronAPI.invoke('menu:saveCategory', { category: { name } });
+        result = await window.electronAPI.invoke('menu:saveCategory', { category: { name } });
+      }
+      if (result && result.success === false) {
+        throw new Error(result.error || 'Check result failed');
       }
       onSave();
     } catch (error) {
       console.error(error);
-      window.showAlert('Failed to save category');
+      window.showAlert(error.message || 'Failed to save category', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -2436,3 +2469,98 @@ const MasterAddonEditModal = ({ masterAddon, globalAddons, onClose, onSave }) =>
     </div>
   );
 };
+
+const VerifyAdminModal = ({ onClose, onVerified }) => {
+  const [password, setPassword] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!password) return;
+    
+    setIsVerifying(true);
+    setError('');
+    try {
+      const result = await window.electronAPI.invoke('auth:verifyAdminPassword', { password });
+      if (result.success) {
+        onVerified(true);
+      } else {
+        setError(result.error || 'Invalid administrator password');
+        setPassword('');
+      }
+    } catch (err) {
+      setError('Verification failed');
+      setPassword('');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: '#FFF4E5',
+              color: '#F59E0B',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Lock size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>Admin Verification</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Password authorization required</div>
+            </div>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={20} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            {error && (
+              <div style={{ 
+                background: '#FEE2E2', 
+                color: '#B91C1C', 
+                padding: '10px', 
+                borderRadius: '8px', 
+                marginBottom: '16px',
+                fontSize: '0.875rem',
+                textAlign: 'center'
+              }}>
+                {error}
+              </div>
+            )}
+
+            <div className="input-group">
+              <label className="input-label">Administrator Password</label>
+              <input
+                type="password"
+                className="input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter admin password"
+                autoFocus
+                required
+              />
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary w-full" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary w-full" disabled={isVerifying}>
+              {isVerifying ? 'Verifying...' : 'Authorize Reset'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+

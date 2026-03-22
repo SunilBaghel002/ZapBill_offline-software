@@ -977,22 +977,22 @@ class Database {
 
   saveCategory(category) {
     const activeMenu = this.getActiveMenu();
-    if (!activeMenu) return null;
+    if (!activeMenu) return { success: false, error: 'No active menu available' };
 
     if (category.id) {
       this.update('categories', {
         name: category.name,
-        description: category.description,
+        description: category.description || null,
         display_order: category.display_order || 0,
         updated_at: new Date().toISOString(),
       }, { id: category.id });
-      return category.id;
+      return { success: true, id: category.id };
     } else {
       const id = uuidv4();
       this.insert('categories', {
         id,
         name: category.name,
-        description: category.description,
+        description: category.description || null,
         display_order: category.display_order || 0,
         menu_id: activeMenu.id,
         created_at: new Date().toISOString(),
@@ -1001,7 +1001,7 @@ class Database {
         is_active: 1
       });
       this.addToSyncQueue('category', id, 'create', category);
-      return id;
+      return { success: true, id };
     }
   }
 

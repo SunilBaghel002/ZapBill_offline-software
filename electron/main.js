@@ -167,6 +167,15 @@ function setupIpcHandlers() {
     return authService.getCurrentUser();
   });
 
+  ipcMain.handle('auth:verifyAdminPassword', async (event, { password }) => {
+    try {
+      return await authService.verifyAdminPassword({ password });
+    } catch (e) {
+      log.error('Verify admin logic error:', e);
+      return { success: false, error: e.message };
+    }
+  });
+
   // ============ DATABASE OPERATIONS ============
   ipcMain.handle('db:query', async (event, { table, action, data, where }) => {
     try {

@@ -99,23 +99,8 @@ const OrdersPage = () => {
       filtered = filtered.filter(order => order.order_type === orderTypeFilter);
     }
 
-    // Sort by type: dine_in > delivery > pickup
-    const typePriority = {
-      'dine_in': 1,
-      'delivery': 2,
-      'pickup': 3,
-      'takeaway': 3 // legacy support
-    };
-
-    filtered.sort((a, b) => {
-      const priorityA = typePriority[a.order_type] || 99;
-      const priorityB = typePriority[b.order_type] || 99;
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-      // If same type, sort by date descending (newest first)
-      return new Date(b.created_at) - new Date(a.created_at);
-    });
+    // Sort orders sequentially by date (newest first)
+    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     // Apply date filter
     const today = new Date().toISOString().split('T')[0];
