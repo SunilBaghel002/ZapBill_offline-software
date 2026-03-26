@@ -757,54 +757,112 @@ const BillViewModal = ({ order, onClose, onPrint }) => {
         </div>
 
         {/* Bill Content — scrollable */}
-        <div style={{ overflowY: 'auto', padding: '16px 20px', flex: '1 1 auto' }}>
-          <div style={{ background: '#fafafa', padding: '20px', border: '1px dashed #d1d5db', borderRadius: '10px', fontFamily: "'Courier New', monospace", fontSize: '13px' }}>
-            {/* Restaurant header */}
-            <div style={{ textAlign: 'center', marginBottom: '14px', paddingBottom: '14px', borderBottom: '1px dashed #9ca3af' }}>
-              <div style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '1px' }}>Restaurant POS</div>
-              <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '4px' }}>{formatDate(order.created_at)}</div>
+        <div style={{ overflowY: 'auto', padding: '16px 20px', flex: '1 1 auto', background: '#f1f5f9' }}>
+          <div style={{ background: '#fff', padding: '15px', border: '1px solid #d1d5db', margin: '0 auto', width: '100%', maxWidth: '300px', fontFamily: 'Arial, Helvetica, sans-serif', color: '#000', fontSize: '13px', lineHeight: '1.25' }}>
+            {/* Content exactly replicating thermal receipt */}
+            <div style={{ textAlign: 'center', marginBottom: '4px' }}>
+              <div style={{ fontWeight: 400, fontSize: '17px' }}>RESTAURANT</div>
+              <div style={{ fontSize: '11px', fontWeight: 400 }}>Receipt Preview</div>
             </div>
 
-            {/* Order details */}
-            <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px dashed #d1d5db', lineHeight: 1.8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Bill No:</span><strong>#{order.order_number}</strong></div>
-              {order.table_number && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Table:</span><span>{order.table_number}</span></div>}
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Type:</span><span>{order.order_type?.replace('_', ' ').toUpperCase()}</span></div>
-              {order.customer_name && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Customer:</span><span>{order.customer_name}</span></div>}
-              {order.customer_phone && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Phone:</span><span>{order.customer_phone}</span></div>}
+            <div style={{ borderTop: '1px dashed #000', margin: '4px 0', width: '100%' }}></div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '1px' }}>
+              <span>Date: {formatDate(order.created_at).split(',')[0]}</span>
+              <span style={{ fontWeight: 900, fontSize: '15px', border: '1px solid #000', padding: '0 4px', textTransform: 'uppercase' }}>
+                {order.order_type?.replace('_', ' ')}
+              </span>
+            </div>
+            
+            <div style={{ fontSize: '12px', marginBottom: '1px' }}>
+              <span>{formatDate(order.created_at).split(',')[1]?.trim()}</span>
             </div>
 
-            {/* Items */}
-            <div style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px dashed #d1d5db' }}>
-              {order.items?.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', lineHeight: 1.4 }}>
-                  <span>{item.item_name} × {item.quantity}</span>
-                  <span style={{ fontWeight: 600 }}>₹{(item.item_total || 0).toFixed(2)}</span>
-                </div>
-              ))}
+            <div style={{ fontSize: '12px', marginBottom: '1px', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 900, fontSize: '16px' }}>Bill No.: {order.order_number || ''}</span>
             </div>
-
-            {/* Totals */}
-            <div style={{ lineHeight: 1.8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Subtotal:</span><span>₹{(order.subtotal || 0).toFixed(2)}</span></div>
-              {order.tax_amount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#6b7280' }}>Tax:</span><span>₹{(order.tax_amount || 0).toFixed(2)}</span></div>}
-              {order.discount_amount > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a' }}><span>Discount:</span><span>-₹{(order.discount_amount || 0).toFixed(2)}</span></div>}
-              {order.round_off && Math.abs(order.round_off) > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#6b7280' }}>Round Off:</span>
-                  <span>{order.round_off > 0 ? '+' : ''}₹{order.round_off.toFixed(2)}</span>
-                </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '17px', marginTop: '8px', paddingTop: '10px', borderTop: '2px solid #111827' }}>
-                <span>TOTAL:</span><span>₹{(order.total_amount || 0).toFixed(2)}</span>
-              </div>
-            </div>
-
-            {order.payment_method && (
-              <div style={{ textAlign: 'center', marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed #d1d5db', color: '#6b7280', fontSize: '12px', letterSpacing: '0.5px' }}>
-                Paid via <strong style={{ color: '#1e293b' }}>{order.payment_method.toUpperCase()}</strong>
+            
+            {order.table_number && (
+              <div style={{ fontSize: '12px', marginBottom: '1px', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 900, fontSize: '16px' }}>Token No.: {order.table_number}</span>
               </div>
             )}
+
+            {order.customer_name && (
+              <div style={{ fontSize: '12px', marginBottom: '1px' }}>Customer: {order.customer_name}</div>
+            )}
+            {order.customer_phone && (
+              <div style={{ fontSize: '12px', marginBottom: '1px' }}>Phone: {order.customer_phone}</div>
+            )}
+
+            <div style={{ borderTop: '1px dashed #000', margin: '4px 0', width: '100%' }}></div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', margin: '4px 0' }}>
+              <thead>
+                <tr>
+                  <th style={{ borderBottom: '1px solid #000', padding: '3px 0', fontSize: '12px', textAlign: 'left', fontWeight: 400 }}>Item</th>
+                  <th style={{ borderBottom: '1px solid #000', padding: '3px 0', fontSize: '12px', textAlign: 'center', fontWeight: 400 }}>Qty</th>
+                  <th style={{ borderBottom: '1px solid #000', padding: '3px 0', fontSize: '12px', textAlign: 'right', fontWeight: 400 }}>Price</th>
+                  <th style={{ borderBottom: '1px solid #000', padding: '3px 0', fontSize: '12px', textAlign: 'right', fontWeight: 400 }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.items?.map((item, idx) => (
+                  <tr key={idx}>
+                    <td style={{ textAlign: 'left', width: '50%', padding: '3px 0', fontSize: '12px', verticalAlign: 'top' }}>
+                      {item.item_name}
+                      {item.variant && item.variant !== 'null' && (
+                        <div style={{ fontSize: '10px', paddingLeft: '8px', marginTop: '1px' }}>[ {JSON.parse(item.variant).name} ]</div>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center', width: '12%', padding: '3px 0', fontSize: '12px', verticalAlign: 'top' }}>{item.quantity}</td>
+                    <td style={{ textAlign: 'right', width: '18%', padding: '3px 0', fontSize: '12px', verticalAlign: 'top' }}>{(item.unit_price || 0).toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', width: '20%', padding: '3px 0', fontSize: '12px', verticalAlign: 'top' }}>{(item.item_total || 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div style={{ borderTop: '1px dashed #000', margin: '4px 0', width: '100%' }}></div>
+
+            <div style={{ marginTop: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px', fontSize: '13px' }}>
+                <span>Total Qty: {order.items?.reduce((sum, i) => sum + i.quantity, 0)}</span>
+                <span>Sub Total: {(order.subtotal || 0).toFixed(2)}</span>
+              </div>
+              
+              {order.tax_amount > 0 && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2px', fontSize: '13px' }}>
+                    <span>CGST 2.5%: {(order.tax_amount / 2).toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2px', fontSize: '13px' }}>
+                    <span>SGST 2.5%: {(order.tax_amount / 2).toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+              
+              {order.discount_amount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2px', fontSize: '13px' }}>
+                  <span>Discount: -{(order.discount_amount || 0).toFixed(2)}</span>
+                </div>
+              )}
+              
+              {order.round_off && Math.abs(order.round_off) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2px', fontSize: '13px' }}>
+                  <span>Round off: {order.round_off > 0 ? '+' : ''}{order.round_off.toFixed(2)}</span>
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '18px', margin: '6px 0', padding: '6px 0', borderTop: '1px solid #000', borderBottom: '1px solid #000' }}>
+                <span>Grand Total</span>
+                <span>₹{(order.total_amount || 0).toFixed(0)}.00</span>
+              </div>
+              
+              <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '11px' }}>
+                Paid via {order.payment_method?.toUpperCase()}
+              </div>
+            </div>
           </div>
         </div>
 

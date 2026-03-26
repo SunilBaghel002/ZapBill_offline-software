@@ -243,11 +243,11 @@ const POSPage = () => {
   const [recentOrders, setRecentOrders] = useState([]);
   const [activeItemDiscounts, setActiveItemDiscounts] = useState([]);
 
-   // UI States for Add-ons and Hold Order
    const [showAddonModal, setShowAddonModal] = useState(false);
    const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
    const [editingCartItemId, setEditingCartItemId] = useState(null);
    const [showHeldOrders, setShowHeldOrders] = useState(false);
+   const [isProcessing, setIsProcessing] = useState(false);
   // heldOrders are now in cart store
   const [showDiscountModal, setShowDiscountModal] = useState(false);
 
@@ -495,6 +495,8 @@ const POSPage = () => {
 
   const handleCheckout = async () => {
     if (!validatePhone()) return;
+    if (isProcessing) return;
+    setIsProcessing(true);
     // IMMEDIATE ACTION: Create Order -> KOT -> Print
     try {
       const result = await cart.createOrder(user?.id);
@@ -513,6 +515,8 @@ const POSPage = () => {
     } catch (error) {
       console.error(error);
       showAlert('Error processing order', "error");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -615,7 +619,9 @@ const POSPage = () => {
   const handleSaveAndKOT = async () => {
     if (cart.items.length === 0) return;
     if (!validatePhone()) return;
-
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
     try {
       const pm = cart.paymentMethod;
       const pd = cart.paymentDetails;
