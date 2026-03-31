@@ -3445,7 +3445,7 @@ class Database {
   // --- SALES REPORTS ---
   getAddonSales(startDate, endDate) {
     const items = this.execute(`
-      SELECT oi.addons
+      SELECT oi.addons, oi.quantity
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE o.is_deleted = 0 
@@ -3461,17 +3461,19 @@ class Database {
     for (const item of items) {
       try {
         const addons = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
+        const itemQuantity = item.quantity || 1;
         if (Array.isArray(addons)) {
           for (const addon of addons) {
             const name = addon.name || addon.addon_name;
             const price = parseFloat(addon.price || addon.addon_price || 0);
+            const addonQuantity = (addon.quantity || 1) * itemQuantity;
             
             if (name) {
               if (!addonStats[name]) {
                 addonStats[name] = { name, quantity: 0, revenue: 0 };
               }
-              addonStats[name].quantity += 1; // Assuming 1 per item, or check if qty is in addon object
-              addonStats[name].revenue += price;
+              addonStats[name].quantity += addonQuantity;
+              addonStats[name].revenue += (price * addonQuantity);
             }
           }
         }
