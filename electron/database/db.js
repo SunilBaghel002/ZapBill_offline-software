@@ -349,6 +349,9 @@ class Database {
     // Ensure 'pickup' is supported and schema is latest
     this.ensureLatestOrdersSchema();
 
+    // Create QR order tables
+    this.migrateQROrderTables();
+
     // Seed sample products with variants
     this.seedSampleProducts();
   }
@@ -4035,6 +4038,305 @@ class Database {
 
   getItemDiscount(id) {
     return this.execute('SELECT * FROM item_discounts WHERE id = ?', [id])[0];
+  }
+
+  // ===== QR Order Tables Migration =====
+  migrateQROrderTables() {
+    try {
+      this.db.run(`CREATE TABLE IF NOT EXISTS qr_orders (
+        id TEXT PRIMARY KEY,
+        order_number INTEGER NOT NULL,
+        table_number TEXT,
+        customer_name TEXT,
+        status TEXT CHECK(status IN ('pending','confirmed','rejected','expired')) DEFAULT 'pending',
+        subtotal REAL DEFAULT 0,
+        tax_amount REAL DEFAULT 0,
+        total_amount REAL DEFAULT 0,
+        notes TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        confirmed_at TEXT,
+        confirmed_by TEXT
+      )`);
+
+      this.db.run(`CREATE TABLE IF NOT EXISTS qr_order_items (
+        id TEXT PRIMARY KEY,
+        order_id TEXT REFERENCES qr_orders(id),
+        menu_item_id TEXT,
+        item_name TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        item_total REAL NOT NULL,
+        tax_rate REAL DEFAULT 0,
+        variant TEXT,
+        addons TEXT,
+        special_instructions TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      // QR order number sequence
+      this.db.run(`INSERT OR IGNORE INTO sequences (sequence_name, current_value, date) VALUES ('qr_order_number', 0, date('now'))`);
+
+      this.db.run(`CREATE INDEX IF NOT EXISTS idx_qr_orders_status ON qr_orders(status)`);
+      this.db.run(`CREATE INDEX IF NOT EXISTS idx_qr_orders_created ON qr_orders(created_at)`);
+      this.db.run(`CREATE INDEX IF NOT EXISTS idx_qr_order_items_order ON qr_order_items(order_id)`);
+
+      this.save();
+    } catch (error) {
+      console.log('QR tables migration note:', error.message);
+    }
+  }
+
+  // ===== QR Order Operations =====
+
+  getNextQROrderNumber() {
+    const today = new Date().toLocaleDateString('en-CA');
+    const results = this.execute(
+      `SELECT current_value, date FROM sequences WHERE sequence_name = 'qr_order_number'`
+    );
+
+    if (results.length > 0) {
+      if (results[0].date !== today) {
+        this.run(
+          `UPDATE sequences SET current_value = 1, date = ? WHERE sequence_name = 'qr_order_number'`,
+          [today]
+        );
+        return 1;
+      } else {
+        const nextValue = results[0].current_value + 1;
+        this.run(
+          `UPDATE sequences SET current_value = ? WHERE sequence_name = 'qr_order_number'`,
+          [nextValue]
+        );
+        return nextValue;
+      }
+    } else {
+      this.run(
+        `INSERT OR REPLACE INTO sequences (sequence_name, current_value, date) VALUES ('qr_order_number', 1, ?)`,
+        [today]
+      );
+      return 1;
+    }
+  }
+
+  /**
+   * Get menu data for QR customer app (read-only, active menu only)
+   */
+  getMenuForQR() {
+    const activeMenu = this.getActiveMenu();
+    if (!activeMenu) return { categories: [], items: [] };
+
+    const categories = this.execute(
+      `SELECT id, name, display_order FROM categories 
+       WHERE menu_id = ? AND is_deleted = 0 AND is_active = 1 
+       ORDER BY display_order, name`,
+      [activeMenu.id]
+    );
+
+    const items = this.execute(
+      `SELECT m.id, m.category_id, m.name, m.description, m.price, m.tax_rate,
+              m.is_vegetarian, m.variants, m.addons
+       FROM menu_items m
+       WHERE m.menu_id = ? AND m.is_deleted = 0 AND m.is_available = 1
+       ORDER BY m.display_order, m.name`,
+      [activeMenu.id]
+    );
+
+    return { categories, items };
+  }
+
+  /**
+   * Create a QR order from customer submission
+   */
+  createQROrder(orderData, items) {
+    const orderId = uuidv4();
+    const seqNum = this.getNextQROrderNumber();
+    const now = new Date();
+    const isoNow = now.toISOString();
+
+    // Calculate totals
+    let subtotal = 0;
+    let taxAmount = 0;
+
+    const processedItems = items.map((item) => {
+      const unitPrice = parseFloat(item.price) || 0;
+      const qty = parseInt(item.quantity) || 1;
+      const itemTotal = unitPrice * qty;
+      const taxRate = parseFloat(item.tax_rate) || 0;
+      const itemTax = itemTotal * (taxRate / 100);
+      subtotal += itemTotal;
+      taxAmount += itemTax;
+
+      return {
+        id: uuidv4(),
+        order_id: orderId,
+        menu_item_id: item.menu_item_id || item.id || '',
+        item_name: item.name || 'Unknown Item',
+        quantity: qty,
+        unit_price: unitPrice,
+        item_total: itemTotal,
+        tax_rate: taxRate,
+        variant: item.variant ? (typeof item.variant === 'string' ? item.variant : JSON.stringify(item.variant)) : null,
+        addons: item.addons ? (typeof item.addons === 'string' ? item.addons : JSON.stringify(item.addons)) : null,
+        special_instructions: item.special_instructions || '',
+        created_at: isoNow,
+      };
+    });
+
+    const totalAmount = subtotal + taxAmount;
+
+    // Insert QR order
+    this.db.run('BEGIN TRANSACTION');
+    try {
+      const orderInsert = `INSERT INTO qr_orders (id, order_number, table_number, customer_name, status, subtotal, tax_amount, total_amount, notes, created_at) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`;
+      this.db.run(orderInsert, [
+        orderId, seqNum, orderData.table_number || '', orderData.customer_name || '',
+        subtotal, taxAmount, totalAmount, orderData.notes || '', isoNow
+      ]);
+
+      // Insert items
+      for (const item of processedItems) {
+        this.db.run(
+          `INSERT INTO qr_order_items (id, order_id, menu_item_id, item_name, quantity, unit_price, item_total, tax_rate, variant, addons, special_instructions, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [item.id, item.order_id, item.menu_item_id, item.item_name, item.quantity, item.unit_price, item.item_total, item.tax_rate, item.variant, item.addons, item.special_instructions, item.created_at]
+        );
+      }
+
+      this.db.run('COMMIT');
+      this.save();
+
+      return { id: orderId, orderNumber: seqNum, totalAmount };
+    } catch (error) {
+      try { this.db.run('ROLLBACK'); } catch (e) {}
+      console.error('Create QR order error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all pending QR orders with their items
+   */
+  getPendingQROrders() {
+    const orders = this.execute(
+      `SELECT * FROM qr_orders WHERE status = 'pending' ORDER BY created_at ASC`
+    );
+
+    for (const order of orders) {
+      order.items = this.execute(
+        `SELECT * FROM qr_order_items WHERE order_id = ?`,
+        [order.id]
+      );
+    }
+
+    return orders;
+  }
+
+  /**
+   * Get all QR orders (recent, any status)
+   */
+  getAllQROrders(limit = 50) {
+    const orders = this.execute(
+      `SELECT * FROM qr_orders ORDER BY created_at DESC LIMIT ?`,
+      [limit]
+    );
+
+    for (const order of orders) {
+      order.items = this.execute(
+        `SELECT * FROM qr_order_items WHERE order_id = ?`,
+        [order.id]
+      );
+    }
+
+    return orders;
+  }
+
+  /**
+   * Get a single QR order by ID with items
+   */
+  getQROrderById(id) {
+    const orders = this.execute(`SELECT * FROM qr_orders WHERE id = ?`, [id]);
+    if (orders.length === 0) return null;
+
+    const order = orders[0];
+    order.items = this.execute(
+      `SELECT * FROM qr_order_items WHERE order_id = ?`,
+      [order.id]
+    );
+
+    return order;
+  }
+
+  /**
+   * Confirm a QR order: mark as confirmed and create a real order
+   */
+  confirmQROrder(qrOrderId, userId) {
+    const qrOrder = this.getQROrderById(qrOrderId);
+    if (!qrOrder) return { success: false, error: 'QR order not found' };
+    if (qrOrder.status !== 'pending') return { success: false, error: 'Order already processed' };
+
+    try {
+      // Mark QR order as confirmed
+      this.run(
+        `UPDATE qr_orders SET status = 'confirmed', confirmed_at = ?, confirmed_by = ? WHERE id = ?`,
+        [new Date().toISOString(), userId || null, qrOrderId]
+      );
+
+      // Convert to real order using existing createOrder method
+      const orderData = {
+        order_type: 'dine_in',
+        table_number: qrOrder.table_number || '',
+        customer_name: qrOrder.customer_name || '',
+        subtotal: qrOrder.subtotal,
+        tax_amount: qrOrder.tax_amount,
+        total_amount: qrOrder.total_amount,
+        notes: qrOrder.notes || `QR Order #${qrOrder.order_number}`,
+        status: 'active',
+        payment_status: 'pending',
+      };
+
+      const orderItems = (qrOrder.items || []).map((item) => ({
+        menu_item_id: item.menu_item_id,
+        name: item.item_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        tax_rate: item.tax_rate || 0,
+        variant: item.variant || null,
+        addons: item.addons || null,
+        special_instructions: item.special_instructions || '',
+      }));
+
+      const realOrder = this.createOrder(orderData, orderItems, userId);
+
+      return {
+        success: true,
+        qr_order_id: qrOrderId,
+        real_order_id: realOrder.id,
+        real_order_number: realOrder.orderNumber,
+      };
+    } catch (error) {
+      console.error('Confirm QR order error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Reject a QR order
+   */
+  rejectQROrder(id) {
+    try {
+      const qrOrder = this.getQROrderById(id);
+      if (!qrOrder) return { success: false, error: 'QR order not found' };
+      if (qrOrder.status !== 'pending') return { success: false, error: 'Order already processed' };
+
+      this.run(
+        `UPDATE qr_orders SET status = 'rejected', confirmed_at = ? WHERE id = ?`,
+        [new Date().toISOString(), id]
+      );
+
+      return { success: true };
+    } catch (error) {
+      console.error('Reject QR order error:', error);
+      return { success: false, error: error.message };
+    }
   }
 
 }

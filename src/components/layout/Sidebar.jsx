@@ -14,8 +14,10 @@ import {
   ChefHat,
   RefreshCw,
   Wallet,
-  Tag
+  Tag,
+  QrCode
 } from 'lucide-react';
+import { useQROrderStore } from '../../stores/qrOrderStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useShift } from '../../context/ShiftContext';
 import ShiftModal from '../common/ShiftModal';
@@ -24,6 +26,7 @@ import logoImg from '../../assets/logo.png';
 const Sidebar = () => {
   const { user, logout } = useAuthStore();
   const { endShift } = useShift();
+  const { pendingCount } = useQROrderStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [showEndShiftModal, setShowEndShiftModal] = React.useState(false);
@@ -40,6 +43,7 @@ const Sidebar = () => {
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
     { path: '/pos', icon: ShoppingCart, label: 'POS / Billing', adminOnly: false },
     { path: '/orders', icon: ClipboardList, label: 'Orders', badge: activeOrdersCount > 0 ? activeOrdersCount : null, adminOnly: false },
+    { path: '/qr-orders', icon: QrCode, label: 'QR Orders', badge: pendingCount > 0 ? pendingCount : null, adminOnly: false },
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu', adminOnly: true },
     { path: '/kot', icon: ChefHat, label: 'Kitchen (KOT)', adminOnly: false },
     { path: '/inventory', icon: Package, label: 'Inventory', adminOnly: false },

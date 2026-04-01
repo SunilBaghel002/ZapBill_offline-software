@@ -17,6 +17,7 @@ import SettingsPage from './pages/SettingsPage';
 import PrintersPage from './pages/PrintersPage';
 import ExpensesPage from './pages/ExpensesPage';
 import DiscountsPage from './pages/DiscountsPage';
+import QROrdersPage from './pages/QROrdersPage';
 
 // Components
 import Layout from './components/common/Layout';
@@ -130,6 +131,7 @@ function App() {
                 </ProtectedRoute>
               } />
               <Route path="orders" element={<OrdersPage />} />
+              <Route path="qr-orders" element={<QROrdersPage />} />
               <Route path="kot" element={<KOTPage />} />
               <Route path="reports" element={
                 <ProtectedRoute allowedRoles={['admin', 'biller', 'cashier']}>

@@ -1299,7 +1299,7 @@ const POSPage = () => {
 
           {/* 3. Bill Breakdown (Standard View) */}
           <div className="pos-bill-breakdown" style={{ background: 'white', borderTop: '1px solid #ddd' }}>
-            <div className="pos-bill-row">
+            {/* <div className="pos-bill-row">
               <span className="pos-bill-label">Sub Total</span>
               <span className="pos-bill-value">₹{cart.getSubtotal().toFixed(2)}</span>
             </div>
@@ -1328,7 +1328,7 @@ const POSPage = () => {
               </div>
             )}
 
-            <div className="pos-bill-divider"></div>
+            <div className="pos-bill-divider"></div> */}
 
             <div className="pos-bill-total-row">
               <span className="pos-bill-total-label">Grand Total</span>

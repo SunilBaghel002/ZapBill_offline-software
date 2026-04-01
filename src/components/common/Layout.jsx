@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from '../layout/Sidebar';
 import TopNav from '../layout/TopNav';
+import QROrderNotification from './QROrderNotification';
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -19,8 +20,10 @@ const Layout = () => {
           <Outlet />
         </main>
       </div>
+      <QROrderNotification />
     </div>
   );
 };
 
 export default Layout;
+

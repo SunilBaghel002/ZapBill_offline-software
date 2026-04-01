@@ -145,11 +145,20 @@ const validInvokeChannels = [
   'discounts:add',
   'discounts:update',
   'discounts:delete',
+  // QR Orders
+  'qr:getServerStatus',
+  'qr:getPendingOrders',
+  'qr:getAllOrders',
+  'qr:confirmOrder',
+  'qr:rejectOrder',
+  'qr:generateQR',
+  'qr:getNetworkInfo',
 ];
 
 const validOnChannels = [
   'update:available',
   'update:downloaded',
+  'qr:newOrder',
 ];
 
 // Expose protected APIs to renderer

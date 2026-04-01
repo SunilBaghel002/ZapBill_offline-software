@@ -7,6 +7,8 @@ const AuthService = require('./services/auth.service');
 const PrinterService = require('./services/printer.service');
 const dataImporter = require('./services/dataImporter');
 const SyncService = require('./services/sync.service');
+const QRServerService = require('./services/qr-server.service');
+const NetworkService = require('./services/network.service');
 const fs = require('fs');
 
 // Configure logging
@@ -20,6 +22,7 @@ let db = null;
 let authService = null;
 let printerService = null;
 let syncService = null;
+let qrServerService = null;
 
 
 // Determine if in development mode
@@ -130,6 +133,9 @@ async function initializeServices() {
   printerService = new PrinterService();
   syncService = new SyncService(db);
   syncService.initialize();
+
+  // QR Server will be started after window is created
+  qrServerService = new QRServerService(db, null);
   
   log.info('Services initialized successfully');
 }
@@ -1518,6 +1524,81 @@ function setupIpcHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // ============ QR ORDER OPERATIONS ============
+  ipcMain.handle('qr:getServerStatus', async () => {
+    try {
+      return qrServerService ? qrServerService.getStatus() : { running: false };
+    } catch (error) {
+      log.error('QR server status error:', error);
+      return { running: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('qr:getPendingOrders', async () => {
+    try {
+      return db.getPendingQROrders();
+    } catch (error) {
+      log.error('QR get pending orders error:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('qr:getAllOrders', async (event, { limit } = {}) => {
+    try {
+      return db.getAllQROrders(limit || 50);
+    } catch (error) {
+      log.error('QR get all orders error:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle('qr:confirmOrder', async (event, { id, userId }) => {
+    try {
+      return db.confirmQROrder(id, userId);
+    } catch (error) {
+      log.error('QR confirm order error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('qr:rejectOrder', async (event, { id }) => {
+    try {
+      return db.rejectQROrder(id);
+    } catch (error) {
+      log.error('QR reject order error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('qr:generateQR', async (event, { tableNumber }) => {
+    try {
+      const QRCode = require('qrcode');
+      const status = qrServerService ? qrServerService.getStatus() : { ip: '127.0.0.1', port: 3000 };
+      const url = `http://${status.ip}:${status.port}/menu?table=${tableNumber}`;
+      const dataUrl = await QRCode.toDataURL(url, {
+        width: 400,
+        margin: 2,
+        color: { dark: '#000000', light: '#ffffff' },
+      });
+      return { success: true, dataUrl, url };
+    } catch (error) {
+      log.error('QR generate error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('qr:getNetworkInfo', async () => {
+    try {
+      return {
+        ip: NetworkService.getLocalIP(),
+        interfaces: NetworkService.getAllInterfaces(),
+      };
+    } catch (error) {
+      log.error('QR network info error:', error);
+      return { ip: '127.0.0.1', interfaces: [] };
+    }
+  });
 }
 
 // App event handlers
@@ -1526,6 +1607,17 @@ app.whenReady().then(async () => {
   setupIpcHandlers();
   createWindow();
   createTray();
+
+  // Start QR Server after window is created
+  if (qrServerService && mainWindow) {
+    qrServerService.setMainWindow(mainWindow);
+    const result = await qrServerService.start();
+    if (result.success) {
+      log.info(`QR Server running at http://${result.ip}:${result.port}`);
+    } else {
+      log.warn('QR Server failed to start:', result.error);
+    }
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -1547,7 +1639,15 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
+  // Stop QR server
+  if (qrServerService) {
+    try {
+      await qrServerService.stop();
+    } catch (e) {
+      log.error('Error stopping QR server:', e);
+    }
+  }
   // Cleanup
   if (db) {
     db.close();
