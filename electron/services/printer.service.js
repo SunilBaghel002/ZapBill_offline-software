@@ -630,6 +630,29 @@ class PrinterService {
     }
   }
 
+  // ─── Print QR Code ──────────────────────────────────────────
+  async printQRCode(qrData, tableName, copies = 1, printerName = null) {
+    try {
+      if (!printerName) return { success: false, error: 'No printer configured' };
+      const html = this.generateQRCodeHtml(qrData, tableName);
+      const queue = this._getQueue(printerName);
+      if (!queue) return { success: false, error: 'Could not create printer queue' };
+
+      const results = [];
+      for (let i = 0; i < copies; i++) {
+        const result = await queue.enqueue(
+          { type: 'QR_CODE', htmlContent: html, paperWidth: '80', orderNumber: 'QR' },
+          this.printHtml.bind(this)
+        );
+        results.push(result);
+      }
+      return results[0]; // Return the first result as a representative
+    } catch (error) {
+      log.error('Print QR Code error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // ─── Test Print ────────────────────────────────────────────
   async testPrint(printerName = null) {
     try {
@@ -939,6 +962,30 @@ class PrinterService {
       
       <div class="divider" style="margin-top: 12px;"></div>
       <div class="text-center" style="font-size: 11px; font-weight: 400;">--- Void Copy ---</div>
+    `;
+  }
+
+  // ─── QR Code HTML ──────────────────────────────────────────
+  generateQRCodeHtml(qrData, tableName) {
+    return `
+      <div style="text-align: center; padding: 15px 0;">
+        <div style="font-size: 20px; font-weight: 800; margin-bottom: 15px; text-transform: uppercase;">SCAN FOR MENU</div>
+        
+        ${tableName ? `
+          <div style="font-size: 24px; font-weight: 900; margin-bottom: 10px; padding: 5px; border: 2px solid #000;">
+            TABLE: ${tableName}
+          </div>
+        ` : ''}
+        
+        <div style="margin: 20px auto; width: 140px; height: 140px; padding: 10px; background: #fff; border: 1px solid #000;">
+          <img src="${qrData}" style="width: 100%; height: 100%;" />
+        </div>
+        
+        <div style="font-size: 14px; font-weight: 600; margin-top: 15px;">ZapBill Digital POS</div>
+        <div style="font-size: 11px; margin-top: 5px;">Scan to view menu & order</div>
+        
+        <div class="line-dashed" style="margin-top: 20px;"></div>
+      </div>
     `;
   }
 

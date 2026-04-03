@@ -234,6 +234,30 @@ CREATE INDEX IF NOT EXISTS idx_menu_items_category ON menu_items(category_id);
 CREATE INDEX IF NOT EXISTS idx_menu_items_available ON menu_items(is_available);
 CREATE INDEX IF NOT EXISTS idx_inventory_stock ON inventory(current_stock);
 
+-- Email Configuration
+CREATE TABLE IF NOT EXISTS email_config (
+    id TEXT PRIMARY KEY DEFAULT '1',
+    service TEXT DEFAULT 'gmail',
+    sender_email TEXT,
+    app_password TEXT,
+    owner_email TEXT,
+    auto_send_time TEXT DEFAULT '23:00',
+    is_active INTEGER DEFAULT 1,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Email Queue for Offline Fallback
+CREATE TABLE IF NOT EXISTS email_queue (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    html_content TEXT NOT NULL,
+    attachment_path TEXT,
+    status TEXT CHECK(status IN ('pending', 'sent', 'failed')) DEFAULT 'pending',
+    retry_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    last_retry_at TEXT
+);
+
 -- Insert default admin user (password: admin123)
 INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, pin_code, is_active)
 VALUES (

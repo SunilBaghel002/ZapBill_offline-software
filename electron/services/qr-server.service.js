@@ -135,14 +135,25 @@ class QRServerService {
    * Setup Express routes
    */
   _setupRoutes() {
+    // Enable CORS for local network access
+    this.app.use((req, res, next) => {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type');
+      if (req.method === 'OPTIONS') return res.sendStatus(200);
+      next();
+    });
+
     // Serve static mobile menu app
     const menuDir = path.join(__dirname, '..', 'qr-menu');
-    this.app.use('/menu', express.static(menuDir));
 
-    // Redirect /menu to /menu/index.html
+    // Serve /menu — send index.html explicitly
     this.app.get('/menu', (req, res) => {
       res.sendFile(path.join(menuDir, 'index.html'));
     });
+
+    // Serve static assets from qr-menu directory (CSS, JS, images, etc.)
+    this.app.use('/menu', express.static(menuDir));
 
     // ---- API Routes ----
 
@@ -187,12 +198,8 @@ class QRServerService {
           return res.status(400).json({ success: false, error: 'No items in order' });
         }
 
-        if (!table_number) {
-          return res.status(400).json({ success: false, error: 'Table number is required' });
-        }
-
         const result = this.db.createQROrder(
-          { table_number, customer_name: customer_name || '', notes: notes || '' },
+          { table_number: table_number || '', customer_name: customer_name || '', notes: notes || '' },
           items
         );
 

@@ -82,7 +82,7 @@ export const useCartStore = create(
           // Add new item
           set({
             items: [...items, {
-              id: Date.now().toString(),
+              id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
               menuItemId: menuItem.id,
               name: menuItem.name,
               categoryId: menuItem.category_id,
@@ -480,6 +480,19 @@ export const useCartStore = create(
 
         // Remove from held orders list
         get().removeHeldOrder(heldOrder.id);
+      },
+
+      loadQROrder: (qrOrder, resolvedItems) => {
+        get().clearCart();
+        set({
+          items: resolvedItems,
+          orderType: 'dine_in',
+          tableNumber: qrOrder.table_number || '',
+          customerName: qrOrder.customer_name || '',
+          customerPhone: qrOrder.customer_phone || '',
+          notes: qrOrder.notes || '',
+          urgency: 'normal'
+        });
       },
     }),
     {

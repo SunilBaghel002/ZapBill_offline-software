@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useAlertStore } from '../stores/alertStore';
 import {
   QrCode, Wifi, WifiOff, RefreshCw, Check, X, Clock,
-  Printer, Download, ChevronDown, ChevronUp, Hash, MapPin,
+  Printer, Download, ChevronDown, ChevronUp, Hash,
   ShoppingBag, AlertCircle, Monitor
 } from 'lucide-react';
 
@@ -16,18 +16,18 @@ const QROrdersPage = () => {
     fetchPendingOrders, fetchServerStatus, confirmOrder, rejectOrder
   } = useQROrderStore();
 
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'qr'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'history' | 'qr'
   const [allOrders, setAllOrders] = useState([]);
-  const [tableNumber, setTableNumber] = useState('1');
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [qrUrl, setQrUrl] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [confirmingId, setConfirmingId] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
   const [expandedOrder, setExpandedOrder] = useState(null);
-  const [bulkRange, setBulkRange] = useState({ from: 1, to: 10 });
-  const [bulkQRs, setBulkQRs] = useState([]);
-  const [showBulk, setShowBulk] = useState(false);
+  
+  // Print Modal States
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printCopies, setPrintCopies] = useState(1);
 
   // Initial fetch
   useEffect(() => {
@@ -67,12 +67,24 @@ const QROrdersPage = () => {
       try {
         if (result.real_order_id) {
           const orderData = await window.electronAPI.invoke('order:getById', { id: result.real_order_id });
-          await window.electronAPI.invoke('print:kotRouted', { 
-            order: orderData, 
-            items: orderData.items, 
-            printBill: true 
-          });
-          showAlert('Order confirmed. Bill & KOT printed!', 'success');
+          
+          let itemsToPrint = orderData.items;
+          // Sub-filter KOT print items if merged
+          if (result.is_merged && result.new_item_ids && Array.isArray(result.new_item_ids)) {
+            itemsToPrint = orderData.items.filter(i => result.new_item_ids.includes(i.id));
+          }
+
+          // Only print if there are items
+          if (itemsToPrint.length > 0) {
+            await window.electronAPI.invoke('print:kotRouted', { 
+              order: orderData, 
+              items: itemsToPrint, 
+              printBill: true 
+            });
+            showAlert('Order confirmed. Bill & KOT printed!', 'success');
+          } else {
+            showAlert('Order confirmed, but no items to print.', 'success');
+          }
         } else {
           showAlert('Order confirmed but couldnt print (Missing ID).', 'warning');
         }
@@ -95,9 +107,9 @@ const QROrdersPage = () => {
     setRejectingId(null);
   };
 
-  const generateQR = async (table) => {
+  const generateQR = async () => {
     try {
-      const result = await window.electronAPI.invoke('qr:generateQR', { tableNumber: table || tableNumber });
+      const result = await window.electronAPI.invoke('qr:generateQR', { tableNumber: '' });
       if (result.success) {
         setQrDataUrl(result.dataUrl);
         setQrUrl(result.url);
@@ -107,52 +119,28 @@ const QROrdersPage = () => {
     }
   };
 
-  const generateBulkQR = async () => {
-    const qrs = [];
-    for (let t = bulkRange.from; t <= bulkRange.to; t++) {
-      try {
-        const result = await window.electronAPI.invoke('qr:generateQR', { tableNumber: t.toString() });
-        if (result.success) {
-          qrs.push({ table: t, dataUrl: result.dataUrl, url: result.url });
-        }
-      } catch (e) {
-        console.error(`Failed to generate QR for table ${t}:`, e);
-      }
-    }
-    setBulkQRs(qrs);
+  const printQR = () => {
+    if (!qrDataUrl) return;
+    setPrintCopies(1);
+    setIsPrintModalOpen(true);
   };
 
-  const printQR = () => {
-    const printWindow = window.open('', '_blank', 'width=800,height=800');
-    if (!printWindow) return;
-    
-    let content = '';
-    if (bulkQRs.length > 0) {
-      content = bulkQRs.map(q => `
-        <div style="text-align:center; page-break-after:always; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:40px; box-sizing:border-box;">
-          <h1 style="font-size:3rem; margin-bottom:30px; color:#111827;">Table ${q.table}</h1>
-          <img src="${q.dataUrl}" style="width:60vmin; height:60vmin; max-width:500px; max-height:500px; margin-bottom:30px;" />
-          <p style="font-size:1.5rem; color:#4b5563; font-weight:600;">Scan to view menu & order</p>
-        </div>
-      `).join('');
-    } else if (qrDataUrl) {
-      content = `
-        <div style="text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:40px; box-sizing:border-box;">
-          <h1 style="font-size:3rem; margin-bottom:30px; color:#111827;">Table ${tableNumber}</h1>
-          <img src="${qrDataUrl}" style="width:60vmin; height:60vmin; max-width:500px; max-height:500px; margin-bottom:30px;" />
-          <p style="font-size:1.5rem; color:#4b5563; font-weight:600;">Scan to view menu & order</p>
-        </div>
-      `;
+  const handlePrintConfirm = async () => {
+    if (!qrDataUrl) return;
+
+    try {
+      await window.electronAPI.invoke('print:qr', {
+        dataUrl: qrDataUrl,
+        tableName: '',
+        copies: printCopies
+      });
+      showAlert(`Printed ${printCopies} QR code(s) successfully`, 'success');
+    } catch (e) {
+      console.error('Print failed:', e);
+      showAlert('Print command failed. Check printer settings.', 'error');
+    } finally {
+      setIsPrintModalOpen(false);
     }
-    
-    printWindow.document.write(`
-      <html><head><title>Print QR Codes</title>
-      <style>body{font-family:Arial,sans-serif;margin:0}@media print{.no-print{display:none}}</style>
-      </head><body>${content}
-      <script>setTimeout(()=>window.print(),300)<\/script>
-      </body></html>
-    `);
-    printWindow.document.close();
   };
 
   const timeAgo = (dateStr) => {
@@ -308,7 +296,9 @@ const QROrdersPage = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <Hash size={16} color="#0096FF" />
                     <span style={{ fontWeight: 700, color: '#111827' }}>#{order.order_number}</span>
-                    <span style={{ fontSize: '12px', color: '#6b7280' }}>Table {order.table_number || '?'}</span>
+                    <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <QrCode size={12} /> Digital Order
+                    </span>
                     <span style={{
                       fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '6px',
                       background: `${statusColor(order.status)}22`, color: statusColor(order.status),
@@ -373,107 +363,103 @@ const QROrdersPage = () => {
           <div style={S.qrSection}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
               <QrCode size={20} color="#0096FF" />
-              <span style={{ fontWeight: 700, fontSize: '16px', color: '#111827' }}>Generate QR Code</span>
+              <span style={{ fontWeight: 700, fontSize: '16px', color: '#111827' }}>Restaurant Menu QR Code</span>
             </div>
 
-            {/* Single Table QR */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 600 }}>Table Number:</span>
-              <input
-                type="number"
-                min="1"
-                max="999"
-                value={tableNumber}
-                onChange={(e) => setTableNumber(e.target.value)}
-                style={S.input}
-              />
-              <button onClick={() => generateQR()} style={S.btn('#0096FF', false)}>
-                <QrCode size={15} /> Generate
+              <p style={{ fontSize: '14px', color: '#64748b', margin: 0, flex: 1 }}>
+                Generate a QR code for your restaurant menu. Customers scan this to view your menu and place orders. 
+                Table assignment is done by the cashier when confirming orders in the POS.
+              </p>
+              <button 
+                onClick={generateQR} 
+                style={{ ...S.btn('#0096FF', false), padding: '12px 24px' }}
+              >
+                <QrCode size={18} /> Generate Menu QR
               </button>
-              {qrDataUrl && (
-                <button onClick={printQR} style={S.btn('#34d399', false)}>
-                  <Printer size={15} /> Print
-                </button>
-              )}
             </div>
 
             {/* QR Display */}
             {qrDataUrl && (
               <div style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                background: 'white', borderRadius: '16px', padding: '30px',
-                maxWidth: '300px', margin: '0 auto 24px',
+                background: '#f8fafc', borderRadius: '16px', padding: '30px',
+                maxWidth: '400px', margin: '0 auto', border: '1px dashed #cbd5e1'
               }}>
-                <img src={qrDataUrl} alt="QR Code" style={{ width: '220px', height: '220px' }} />
-                <div style={{ marginTop: '12px', fontWeight: 800, fontSize: '22px', color: 'white' }}>
-                  Table {tableNumber}
+                <img src={qrDataUrl} alt="QR Code" style={{ width: '250px', height: '250px', background: 'white', padding: '10px', borderRadius: '8px' }} />
+                <div style={{ marginTop: '20px', display: 'flex', gap: '10px', width: '100%' }}>
+                   <button onClick={printQR} style={{ ...S.btn('#34d399', false), flex: 1 }}>
+                    <Printer size={16} /> Print QR Code
+                  </button>
                 </div>
-                <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
-                  Scan to view menu & order
-                </div>
-                <div style={{ fontSize: '9px', color: '#999', marginTop: '8px', wordBreak: 'break-all', textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '16px', wordBreak: 'break-all', textAlign: 'center', opacity: 0.7 }}>
                   {qrUrl}
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
 
-            {/* Bulk Generation */}
-            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '20px' }}>
-              <button onClick={() => setShowBulk(!showBulk)} style={{ ...S.btn('#e5e7eb', false), marginBottom: '16px' }}>
-                {showBulk ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                Bulk Generate QR Codes
+      {/* Print Copies Modal */}
+      {isPrintModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'white', borderRadius: '16px', padding: '24px',
+            width: '100%', maxWidth: '380px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Printer size={20} color="#0096FF" />
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>Print QR Code</h3>
+              </div>
+              <button onClick={() => setIsPrintModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+                <X size={20} />
               </button>
+            </div>
 
-              {showBulk && (
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: 600 }}>Tables</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={bulkRange.from}
-                      onChange={(e) => setBulkRange({ ...bulkRange, from: parseInt(e.target.value) || 1 })}
-                      style={S.input}
-                    />
-                    <span style={{ color: '#6b7280' }}>to</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={bulkRange.to}
-                      onChange={(e) => setBulkRange({ ...bulkRange, to: parseInt(e.target.value) || 10 })}
-                      style={S.input}
-                    />
-                    <button onClick={generateBulkQR} style={S.btn('#0096FF', false)}>
-                      <QrCode size={15} /> Generate All
-                    </button>
-                    {bulkQRs.length > 0 && (
-                      <button onClick={printQR} style={S.btn('#34d399', false)}>
-                        <Printer size={15} /> Print All
-                      </button>
-                    )}
-                  </div>
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '13px', color: '#64748b', marginBottom: '8px', fontWeight: 600 }}>
+                How many copies do you want?
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <button 
+                  onClick={() => setPrintCopies(Math.max(1, printCopies - 1))}
+                  style={{ 
+                    width: '40px', height: '40px', borderRadius: '10px', border: '1px solid #e5e7eb',
+                    background: 'white', fontSize: '20px', cursor: 'pointer'
+                  }}
+                >-</button>
+                <input 
+                  type="number" 
+                  value={printCopies} 
+                  onChange={(e) => setPrintCopies(Math.max(1, parseInt(e.target.value) || 1))}
+                  style={{ ...S.input, width: '100px', fontSize: '18px', fontWeight: 700 }} 
+                />
+                <button 
+                  onClick={() => setPrintCopies(printCopies + 1)}
+                  style={{ 
+                    width: '40px', height: '40px', borderRadius: '10px', border: '1px solid #e5e7eb',
+                    background: 'white', fontSize: '20px', cursor: 'pointer'
+                  }}
+                >+</button>
+              </div>
+              <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '12px' }}>
+                Printing Menu QR code...
+              </p>
+            </div>
 
-                  {bulkQRs.length > 0 && (
-                    <div style={{
-                      display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                      gap: '24px',
-                    }}>
-                      {bulkQRs.map(q => (
-                        <div key={q.table} style={{
-                          background: 'white', borderRadius: '12px', padding: '16px',
-                          textAlign: 'center', border: '1px solid #e5e7eb',
-                          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-                        }}>
-                          <img src={q.dataUrl} alt={`Table ${q.table}`} style={{ width: '100%', height: 'auto', aspectRatio: '1/1', objectFit: 'contain' }} />
-                          <div style={{ fontWeight: 700, color: '#111827', marginTop: '12px', fontSize: '16px' }}>
-                            Table {q.table}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => setIsPrintModalOpen(false)} style={{ ...S.btn('#e5e7eb', false), flex: 1 }}>
+                Cancel
+              </button>
+              <button onClick={handlePrintConfirm} style={{ ...S.btn('#0096FF', false), flex: 1 }}>
+                Print Now
+              </button>
             </div>
           </div>
         </div>
@@ -482,6 +468,7 @@ const QROrdersPage = () => {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .spin { animation: spin 1s linear infinite; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
       `}</style>
     </div>
   );
@@ -508,10 +495,10 @@ const OrderCard = ({ order, expanded, onToggle, onConfirm, onReject, confirming,
             <div style={{ fontWeight: 700, fontSize: '16px', color: '#111827' }}>
               Order #{order.order_number}
             </div>
-            <div style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-              <MapPin size={12} /> Table {order.table_number || '?'}
-              {order.customer_name && <span>· {order.customer_name}</span>}
-              <span>· {timeAgo(order.created_at)}</span>
+            <div style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', fontWeight: 600 }}>
+              <QrCode size={12} /> Digital Order
+              {order.customer_name && <span style={{ color: '#6b7280', fontWeight: 400 }}>· {order.customer_name}</span>}
+              <span style={{ color: '#6b7280', fontWeight: 400 }}>· {timeAgo(order.created_at)}</span>
             </div>
           </div>
         </div>

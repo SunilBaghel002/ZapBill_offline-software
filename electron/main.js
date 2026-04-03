@@ -9,6 +9,7 @@ const dataImporter = require('./services/dataImporter');
 const SyncService = require('./services/sync.service');
 const QRServerService = require('./services/qr-server.service');
 const NetworkService = require('./services/network.service');
+const EmailService = require('./services/email.service');
 const fs = require('fs');
 
 // Configure logging
@@ -23,6 +24,7 @@ let authService = null;
 let printerService = null;
 let syncService = null;
 let qrServerService = null;
+let emailService = null;
 
 
 // Determine if in development mode
@@ -60,6 +62,11 @@ function createWindow() {
     mainWindow.maximize();
     mainWindow.show();
     mainWindow.focus();
+
+    // Initialize email service
+    if (db && !emailService) {
+      emailService = new EmailService(db, mainWindow);
+    }
   });
 
   // Handle window closed
@@ -268,6 +275,18 @@ function setupIpcHandlers() {
     }
   });
 
+  // Email Config IPCs
+  ipcMain.handle('email:getConfig', async () => db.getEmailConfig());
+  ipcMain.handle('email:saveConfig', async (event, config) => db.saveEmailConfig(config));
+  ipcMain.handle('email:checkInternet', async () => {
+    if (emailService) return await emailService.checkInternet();
+    return false;
+  });
+  ipcMain.handle('email:sendReportNow', async () => {
+    if (emailService) return await emailService.generateAndSendDailyReport();
+    return { success: false, error: 'Email service not initialized' };
+  });
+
   ipcMain.handle('print:summaryReport', async (event, { date }) => {
     try {
       const reportData = db.getDailyReport(date);
@@ -279,6 +298,20 @@ function setupIpcHandlers() {
       return await printerService.printSummaryReport(reportData, date, printerName);
     } catch (error) {
       log.error('Print summary report error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('print:qr', async (event, { dataUrl, tableName, copies }) => {
+    try {
+      const settingsResult = db.getSettings();
+      const settingsObj = {};
+      settingsResult.forEach(row => { settingsObj[row.key] = row.value; });
+      
+      const printerName = settingsObj.printer_qr || settingsObj.printer_bill || null;
+      return await printerService.printQRCode(dataUrl, tableName, copies, printerName);
+    } catch (error) {
+      log.error('Print QR error:', error);
       return { success: false, error: error.message };
     }
   });
@@ -1562,6 +1595,15 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.handle('qr:confirmOnly', async (event, { id, userId }) => {
+    try {
+      return db.confirmQROrderStatus(id, userId);
+    } catch (error) {
+      log.error('QR confirm status error:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('qr:rejectOrder', async (event, { id }) => {
     try {
       return db.rejectQROrder(id);
@@ -1575,7 +1617,7 @@ function setupIpcHandlers() {
     try {
       const QRCode = require('qrcode');
       const status = qrServerService ? qrServerService.getStatus() : { ip: '127.0.0.1', port: 3000 };
-      const url = `http://${status.ip}:${status.port}/menu?table=${tableNumber}`;
+      const url = tableNumber ? `http://${status.ip}:${status.port}/menu?table=${tableNumber}` : `http://${status.ip}:${status.port}/menu`;
       const dataUrl = await QRCode.toDataURL(url, {
         width: 400,
         margin: 2,

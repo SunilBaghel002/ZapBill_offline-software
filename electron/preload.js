@@ -108,6 +108,7 @@ const validInvokeChannels = [
   'print:reprint',
   'print:selectLogo',
   'print:summaryReport',
+  'print:qr',
   // Printer Stations & KOT
   'printer:getStations',
   'printer:saveStation',
@@ -150,9 +151,15 @@ const validInvokeChannels = [
   'qr:getPendingOrders',
   'qr:getAllOrders',
   'qr:confirmOrder',
+  'qr:confirmOnly',
   'qr:rejectOrder',
   'qr:generateQR',
   'qr:getNetworkInfo',
+  // Email Reports
+  'email:getConfig',
+  'email:saveConfig',
+  'email:checkInternet',
+  'email:sendReportNow',
 ];
 
 const validOnChannels = [

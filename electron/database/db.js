@@ -4123,7 +4123,7 @@ class Database {
    */
   getMenuForQR() {
     const activeMenu = this.getActiveMenu();
-    if (!activeMenu) return { categories: [], items: [] };
+    if (!activeMenu) return { categories: [], items: [], masterAddonGroups: [], globalAddons: [] };
 
     const categories = this.execute(
       `SELECT id, name, display_order FROM categories 
@@ -4134,14 +4134,23 @@ class Database {
 
     const items = this.execute(
       `SELECT m.id, m.category_id, m.name, m.description, m.price, m.tax_rate,
-              m.is_vegetarian, m.variants, m.addons
+              m.is_vegetarian, m.variants, m.addons, m.master_addon_ids
        FROM menu_items m
        WHERE m.menu_id = ? AND m.is_deleted = 0 AND m.is_available = 1
        ORDER BY m.display_order, m.name`,
       [activeMenu.id]
     );
 
-    return { categories, items };
+    // Fetch master addon groups and global addons for the QR menu
+    const masterAddonGroups = this.execute(
+      `SELECT id, name, addon_ids, is_mandatory, selection_type FROM master_addons WHERE is_deleted = 0`
+    );
+
+    const globalAddons = this.execute(
+      `SELECT id, name, price, type FROM addons WHERE is_deleted = 0 AND is_available = 1`
+    );
+
+    return { categories, items, masterAddonGroups, globalAddons };
   }
 
   /**
@@ -4280,40 +4289,136 @@ class Database {
         [new Date().toISOString(), userId || null, qrOrderId]
       );
 
-      // Convert to real order using existing createOrder method
-      const orderData = {
-        order_type: 'dine_in',
-        table_number: qrOrder.table_number || '',
-        customer_name: qrOrder.customer_name || '',
-        subtotal: qrOrder.subtotal,
-        tax_amount: qrOrder.tax_amount,
-        total_amount: qrOrder.total_amount,
-        notes: qrOrder.notes || `QR Order #${qrOrder.order_number}`,
-        status: 'active',
-        payment_status: 'pending',
-      };
+      // Check if there is an active order for this table
+      let activeOrder = null;
+      if (qrOrder.table_number) {
+        const activeOrders = this.execute(
+          `SELECT * FROM orders WHERE table_number = ? AND status = 'active' AND is_deleted = 0 LIMIT 1`,
+          [qrOrder.table_number]
+        );
+        if (activeOrders.length > 0) activeOrder = activeOrders[0];
+      }
 
-      const orderItems = (qrOrder.items || []).map((item) => ({
-        menu_item_id: item.menu_item_id,
-        name: item.item_name,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        tax_rate: item.tax_rate || 0,
-        variant: item.variant || null,
-        addons: item.addons || null,
-        special_instructions: item.special_instructions || '',
-      }));
+      let realOrderId;
+      let realOrderNumber;
+      let isMerged = false;
+      const newItemIds = [];
 
-      const realOrder = this.createOrder(orderData, orderItems, userId);
+      const isoNow = new Date().toISOString();
+
+      if (activeOrder) {
+        // Merge into existing active order
+        const additionalSubtotal = qrOrder.subtotal || 0;
+        const additionalTax = qrOrder.tax_amount || 0;
+        const additionalTotal = qrOrder.total_amount || 0;
+        const existingNotes = activeOrder.notes ? activeOrder.notes + ' | ' : '';
+        const newNotes = qrOrder.notes ? existingNotes + qrOrder.notes : activeOrder.notes;
+
+        this.run(
+          `UPDATE orders SET subtotal = subtotal + ?, tax_amount = tax_amount + ?, total_amount = total_amount + ?, notes = ? WHERE id = ?`,
+          [additionalSubtotal, additionalTax, additionalTotal, newNotes, activeOrder.id]
+        );
+
+        // Insert new items
+        for (const item of (qrOrder.items || [])) {
+          const itemId = uuidv4();
+          newItemIds.push(itemId);
+          this.insert('order_items', {
+            id: itemId,
+            order_id: activeOrder.id,
+            menu_item_id: item.menu_item_id,
+            item_name: item.item_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            item_total: item.unit_price * item.quantity,
+            tax_rate: item.tax_rate || 0,
+            special_instructions: item.special_instructions || '',
+            variant: item.variant || null,
+            addons: item.addons || null,
+            kot_status: 'pending',
+            created_at: isoNow,
+            is_deleted: 0
+          });
+        }
+        
+        realOrderId = activeOrder.id;
+        realOrderNumber = activeOrder.order_number;
+        isMerged = true;
+      } else {
+        // Convert to real order using existing createOrder method (new bill)
+        const orderData = {
+          order_type: 'dine_in',
+          table_number: qrOrder.table_number || '',
+          customer_name: qrOrder.customer_name || '',
+          subtotal: qrOrder.subtotal,
+          tax_amount: qrOrder.tax_amount,
+          total_amount: qrOrder.total_amount,
+          notes: qrOrder.notes || `QR Order #${qrOrder.order_number}`,
+          status: 'active',
+          payment_status: 'pending',
+        };
+
+        const orderItems = (qrOrder.items || []).map((item) => ({
+          menu_item_id: item.menu_item_id,
+          name: item.item_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          tax_rate: item.tax_rate || 0,
+          variant: item.variant || null,
+          addons: item.addons || null,
+          special_instructions: item.special_instructions || '',
+        }));
+
+        const realOrder = this.createOrder(orderData, orderItems, userId);
+        realOrderId = realOrder.id;
+        realOrderNumber = realOrder.orderNumber;
+        
+        // Return item IDs conceptually if we need them, though printing all is fine here
+        // The frontend will re-fetch the order and print all items
+      }
 
       return {
         success: true,
         qr_order_id: qrOrderId,
-        real_order_id: realOrder.id,
-        real_order_number: realOrder.orderNumber,
+        real_order_id: realOrderId,
+        real_order_number: realOrderNumber,
+        is_merged: isMerged,
+        new_item_ids: newItemIds
       };
     } catch (error) {
       console.error('Confirm QR order error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Confirm a QR order status only (mark as confirmed without creating a real order)
+   */
+  confirmQROrderStatus(qrOrderId, userId) {
+    try {
+      this.run(
+        `UPDATE qr_orders SET status = 'qr:confirmOnly', confirmed_at = ?, confirmed_by = ? WHERE id = ?`,
+        [new Date().toISOString(), userId || null, qrOrderId]
+      );
+      return { success: true };
+    } catch (error) {
+      console.error('Confirm QR order status error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Confirm a QR order status only (mark as confirmed without creating a real order)
+   */
+  confirmQROrderStatus(qrOrderId, userId) {
+    try {
+      this.run(
+        `UPDATE qr_orders SET status = 'confirmed', confirmed_at = ?, confirmed_by = ? WHERE id = ?`,
+        [new Date().toISOString(), userId || null, qrOrderId]
+      );
+      return { success: true };
+    } catch (error) {
+      console.error('Confirm QR order status error:', error);
       return { success: false, error: error.message };
     }
   }
@@ -4339,6 +4444,83 @@ class Database {
     }
   }
 
+  // ==========================================
+  // EMAIL CONFIGURATION & QUEUE (Added Feature)
+  // ==========================================
+
+  getEmailConfig() {
+    try {
+      const result = this.execute('SELECT * FROM email_config LIMIT 1');
+      if (result.length > 0) return result[0];
+      return { service: 'gmail', sender_email: '', app_password: '', owner_email: '', auto_send_time: '23:00', is_active: 1 };
+    } catch (e) {
+      console.error('Error fetching email config:', e);
+      return { service: 'gmail', sender_email: '', app_password: '', owner_email: '', auto_send_time: '23:00', is_active: 1 };
+    }
+  }
+
+  saveEmailConfig(config) {
+    try {
+      const existing = this.execute('SELECT id FROM email_config LIMIT 1');
+      if (existing.length > 0) {
+        this.run(`
+          UPDATE email_config 
+          SET service = ?, sender_email = ?, app_password = ?, owner_email = ?, auto_send_time = ?, is_active = ?, updated_at = ?
+          WHERE id = ?`,
+          [config.service, config.sender_email, config.app_password, config.owner_email, config.auto_send_time, config.is_active ? 1 : 0, new Date().toISOString(), existing[0].id]
+        );
+      } else {
+        this.run(`
+          INSERT INTO email_config (id, service, sender_email, app_password, owner_email, auto_send_time, is_active)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [uuidv4(), config.service || 'gmail', config.sender_email, config.app_password, config.owner_email, config.auto_send_time || '23:00', config.is_active ? 1 : 0]
+        );
+      }
+      // Return a standard response format used in other db methods
+      return { success: true };
+    } catch (e) {
+      console.error('Error saving email config:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  addEmailToQueue(subject, htmlContent, attachmentPath = null) {
+    try {
+      const id = uuidv4();
+      this.run(`
+        INSERT INTO email_queue (id, subject, html_content, attachment_path, status)
+        VALUES (?, ?, ?, ?, 'pending')`,
+        [id, subject, htmlContent, attachmentPath]
+      );
+      this.save();
+      return { success: true, id };
+    } catch (e) {
+      console.error('Error queuing email:', e);
+      return { success: false, error: e.message };
+    }
+  }
+
+  getPendingEmails() {
+    try {
+      return this.execute("SELECT * FROM email_queue WHERE status = 'pending' OR status = 'failed' ORDER BY created_at ASC");
+    } catch (e) {
+      console.error('Error getting pending emails:', e);
+      return [];
+    }
+  }
+
+  updateEmailStatus(id, status) {
+    try {
+      this.run("UPDATE email_queue SET status = ?, retry_count = retry_count + 1, last_retry_at = ? WHERE id = ?",
+        [status, new Date().toISOString(), id]
+      );
+      this.save();
+      return { success: true };
+    } catch (e) {
+      console.error('Error updating email status:', e);
+      return { success: false, error: e.message };
+    }
+  }
 }
 
 module.exports = { Database };

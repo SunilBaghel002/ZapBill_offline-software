@@ -18,7 +18,8 @@ import {
   X,
   Package,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  QrCode
 } from 'lucide-react';
 import { useAlertStore } from '../stores/alertStore';
 
@@ -280,6 +281,7 @@ const PrintersPage = () => {
     { id: 'stations', label: 'Kitchen Stations', icon: Store, desc: 'Station routing & printers', color: 'var(--info-500)', bg: 'var(--info-50)' },
     { id: 'format', label: 'Bill Format', icon: FileText, desc: 'Logo, QR & invoice options', color: 'var(--gray-600)', bg: 'var(--gray-100)' },
     { id: 'kotitems', label: 'KOT Items', icon: Package, desc: 'Exclude items from KOT', color: '#D32F2F', bg: '#FFEBEE' },
+    { id: 'qr', label: 'QR Codes', icon: QrCode, desc: 'QR code printer settings', color: '#8E44AD', bg: '#F5EEF8' },
     { id: 'flow', label: 'Print Flow', icon: Workflow, desc: 'How printing works', color: 'var(--primary-500)', bg: 'var(--primary-50)' }
   ];
 
@@ -1012,7 +1014,7 @@ const PrintersPage = () => {
               </div>
             )}
 
-            {/* ═══════════ TAB: Print Flow ═══════════ */}
+            {/* ═══════════ TAB: KOT Items ═══════════ */}
             {printerTab === 'kotitems' && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -1068,8 +1070,7 @@ const PrintersPage = () => {
                                 if (next.has(cat.id)) next.delete(cat.id);
                                 else next.add(cat.id);
                                 return next;
-                              });
-                              if (!isExpanded && kotMenuData.length > 0) { /* already loaded */ }
+                                });
                             }}
                           >
                             {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
@@ -1136,6 +1137,54 @@ const PrintersPage = () => {
                     })}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ═══════════ TAB: QR Codes ═══════════ */}
+            {printerTab === 'qr' && (
+              <div style={{ display: 'grid', gap: '28px' }}>
+                {/* Info Banner */}
+                <div style={{ 
+                  display: 'flex', gap: '14px', padding: '16px 20px', 
+                  background: 'var(--primary-50)', borderRadius: '12px', 
+                  border: '1px solid var(--primary-200)', alignItems: 'flex-start' 
+                }}>
+                  <QrCode size={22} style={{ color: 'var(--primary-600)', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong style={{ color: 'var(--primary-700)', fontSize: '14px' }}>QR Code Printer</strong>
+                    <p style={{ color: 'var(--primary-600)', fontSize: '13px', marginTop: '4px', lineHeight: '1.5' }}>
+                      Configure the printer used for printing digital menu QR codes. If not set, the bill printer will be used.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Printer Selection */}
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: 'var(--gray-800)' }}>QR Printer Configuration</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div className="input-group">
+                      <label className="input-label">Select QR Printer</label>
+                      <select className="input select" value={settings.printer_qr || ''} onChange={(e) => updateSetting('printer_qr', e.target.value)}>
+                        <option value="">-- Use Bill Printer (Default) --</option>
+                        {printers.map(p => <option key={p.name} value={p.name}>{p.displayName || p.name} {p.isDefault ? '(Default)' : ''}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                      <button 
+                        className="btn btn-primary"
+                        onClick={() => handleTestPrint(settings.printer_qr || settings.printer_bill)}
+                        disabled={(!settings.printer_qr && !settings.printer_bill) || testingPrinter === (settings.printer_qr || settings.printer_bill)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '42px' }}
+                      >
+                        <Printer size={16} />
+                        {testingPrinter === (settings.printer_qr || settings.printer_bill) ? 'Printing...' : 'Test Print'}
+                      </button>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '8px' }}>
+                    Leave empty to automatically use the customer bill printer.
+                  </p>
+                </div>
               </div>
             )}
 

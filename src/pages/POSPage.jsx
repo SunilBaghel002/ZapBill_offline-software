@@ -46,7 +46,8 @@ import {
   AlertTriangle,
   UtensilsCrossed,
   MapPin,
-  Star
+  Star,
+  QrCode
 } from 'lucide-react';
 import MainSidebar from '../components/layout/MainSidebar';
 import logoImg from '../assets/logo.png';
@@ -248,24 +249,23 @@ const POSPage = () => {
    const [editingCartItemId, setEditingCartItemId] = useState(null);
    const [showHeldOrders, setShowHeldOrders] = useState(false);
    const [isProcessing, setIsProcessing] = useState(false);
+   const [pendingQROrders, setPendingQROrders] = useState([]);
+   const [showQROrdersModal, setShowQROrdersModal] = useState(false);
   // heldOrders are now in cart store
   const [showDiscountModal, setShowDiscountModal] = useState(false);
 
-  // Strict Design Match State
-  const [showCustomerForm, setShowCustomerForm] = useState(false);
-  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
-  const [showBillSheet, setShowBillSheet] = useState(false);
-  const [showMainSidebar, setShowMainSidebar] = useState(false);
+   // Strict Design State
+   const [showMainSidebar, setShowMainSidebar] = useState(false);
+   const [showBillSheet, setShowBillSheet] = useState(false);
+   const [showSplitPaymentSheet, setShowSplitPaymentSheet] = useState(false);
 
   // Customer Autocomplete & History
   const [customerSuggestions, setCustomerSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [customerDue, setCustomerDue] = useState({ hasDue: false, totalDue: 0 });
-  const [showTableDropdown, setShowTableDropdown] = useState(false);
-  const [showOrderInfo, setShowOrderInfo] = useState(false);
-
   const [activeCartTab, setActiveCartTab] = useState(null); // 'table', 'user', 'chef', 'summary'
   const [activeMenu, setActiveMenu] = useState(null);
   
@@ -279,7 +279,6 @@ const POSPage = () => {
   };
 
   // Split Payment State
-  const [showSplitPaymentSheet, setShowSplitPaymentSheet] = useState(false);
   const [splitPayments, setSplitPayments] = useState([{ method: 'cash', amount: '' }, { method: 'upi', amount: '' }]);
 
   const handleSplitPaymentChange = (index, field, value) => {
@@ -386,6 +385,91 @@ const POSPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchPendingQROrders = async () => {
+    try {
+      const orders = await window.electronAPI.invoke('qr:getPendingOrders');
+      setPendingQROrders(Array.isArray(orders) ? orders : []);
+    } catch (e) {
+      console.error('Failed to fetch pending QR orders:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingQROrders();
+    const interval = setInterval(fetchPendingQROrders, 10000); // Poll every 10s
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleApplyQROrder = (qrOrder) => {
+    // Collect specific item details without touching the cart Store incrementally
+    let resolvedItems = [];
+    if (qrOrder.items && qrOrder.items.length > 0) {
+      qrOrder.items.forEach((item) => {
+        try {
+          const menuItem = menuItems.find(mi => mi.id === item.menu_item_id) || {
+            id: item.menu_item_id,
+            name: item.item_name,
+            price: item.unit_price,
+            tax_rate: item.tax_rate
+          };
+
+          let variant = null;
+          try {
+            if (item.variant) {
+              variant = typeof item.variant === 'string' ? JSON.parse(item.variant) : item.variant;
+            }
+          } catch (e) {
+            variant = { name: item.variant, price: 0 };
+          }
+
+          let addons = [];
+          try {
+            if (item.addons) {
+              addons = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
+            }
+          } catch (e) {
+            addons = [];
+          }
+
+          // Compute Price
+          let variantPrice = variant ? parseFloat(variant.price || 0) : null;
+          let basePrice = variantPrice !== null ? variantPrice : parseFloat(menuItem.price || 0);
+
+          let addonsTotal = 0;
+          addons.forEach(addon => {
+             addonsTotal += parseFloat(addon.price || 0);
+          });
+          const finalPrice = basePrice + addonsTotal;
+
+          resolvedItems.push({
+            id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
+            menuItemId: item.menu_item_id,
+            name: item.item_name,
+            categoryId: menuItem.category_id || null,
+            unitPrice: finalPrice,
+            quantity: item.quantity,
+            taxRate: menuItem.tax_rate || 0,
+            isVegetarian: menuItem.is_vegetarian,
+            specialInstructions: item.special_instructions || '',
+            variant: variant,
+            addons: addons
+          });
+        } catch (err) {
+          console.error('Failed to add QR order item to resolved items:', err);
+        }
+      });
+    }
+
+    // Load entirely into the cart in ONE atomic state update, clearing anything previous!
+    cart.loadQROrder(qrOrder, resolvedItems);
+    
+    // Mark as confirmed so it disappears from pending list
+    window.electronAPI.invoke('qr:confirmOnly', { id: qrOrder.id });
+    
+    setShowQROrdersModal(false);
+    showAlert('QR Order loaded into cart!', 'success');
   };
 
   const toggleFavorite = async (e, item) => {
@@ -650,7 +734,6 @@ const POSPage = () => {
         }
 
         showAlert(`Order #${result.orderNumber} Saved & Sent to KOT!`, "success");
-        setShowBillSheet(false);
       } else {
         throw new Error(result.error || 'Failed to create order');
       }
@@ -824,6 +907,25 @@ const POSPage = () => {
           </div>
 
           <div className="pos-header-actions">
+            {/* QR Orders Icon */}
+            <button 
+              className="pos-header-icon-btn" 
+              title="QR Orders" 
+              onClick={() => setShowQROrdersModal(true)}
+              style={{ position: 'relative', color: pendingQROrders.length > 0 ? '#0096FF' : '#546E7A' }}
+            >
+              <QrCode size={20} />
+              {pendingQROrders.length > 0 && (
+                <span style={{
+                  position: 'absolute', top: '-4px', right: '-4px',
+                  background: '#f44336', color: 'white', fontSize: '10px',
+                  padding: '2px 5px', borderRadius: '10px', fontWeight: 700,
+                  border: '2px solid white'
+                }}>
+                  {pendingQROrders.length}
+                </span>
+              )}
+            </button>
             <button className="pos-header-icon-btn" title="Refresh App" onClick={() => window.location.reload()}>
               <RefreshCw size={20} />
             </button>
@@ -1299,37 +1401,6 @@ const POSPage = () => {
 
           {/* 3. Bill Breakdown (Standard View) */}
           <div className="pos-bill-breakdown" style={{ background: 'white', borderTop: '1px solid #ddd' }}>
-            {/* <div className="pos-bill-row">
-              <span className="pos-bill-label">Sub Total</span>
-              <span className="pos-bill-value">₹{cart.getSubtotal().toFixed(2)}</span>
-            </div>
-
-            <div className="pos-bill-row">
-              <span className="pos-bill-label">SGST 2.5%</span>
-              <span className="pos-bill-value">₹{cart.getTaxBreakdown().sgst.toFixed(2)}</span>
-            </div>
-
-            <div className="pos-bill-row">
-              <span className="pos-bill-label">CGST 2.5%</span>
-              <span className="pos-bill-value">₹{cart.getTaxBreakdown().cgst.toFixed(2)}</span>
-            </div>
-
-            {cart.getServiceCharge() > 0 && (
-              <div className="pos-bill-row">
-                <span className="pos-bill-label">Service Charge ({cart.serviceChargePercent}%)</span>
-                <span className="pos-bill-value">₹{cart.getServiceCharge().toFixed(2)}</span>
-              </div>
-            )}
-
-            {Math.abs(cart.getRoundOff()) > 0 && (
-              <div className="pos-bill-row">
-                <span className="pos-bill-label">Round Off</span>
-                <span className="pos-bill-value">{cart.getRoundOff() > 0 ? '+' : ''}{cart.getRoundOff().toFixed(2)}</span>
-              </div>
-            )}
-
-            <div className="pos-bill-divider"></div> */}
-
             <div className="pos-bill-total-row">
               <span className="pos-bill-total-label">Grand Total</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1462,8 +1533,6 @@ const POSPage = () => {
                   </span>
                 </div>
               </div>
-
-              {/* Save & Send to KOT Button REMOVED as per request */}
             </div>
           </div>
 
@@ -1673,6 +1742,14 @@ const POSPage = () => {
         />
       )}
 
+      {showQROrdersModal && (
+        <QROrdersModal
+          orders={pendingQROrders}
+          onClose={() => setShowQROrdersModal(false)}
+          onApply={handleApplyQROrder}
+        />
+      )}
+
       {showHeldOrders && (
         <HeldOrdersModal
           orders={cart.heldOrders}
@@ -1714,28 +1791,6 @@ const POSPage = () => {
       )}
 
 
-      {/* Strict Design: Customer History Drawer */}
-      <div className={`pos-drawer-overlay ${showHistoryDrawer ? 'active' : ''}`} onClick={() => setShowHistoryDrawer(false)}></div>
-      <div className={`pos-right-drawer ${showHistoryDrawer ? 'active' : ''}`}>
-        <div className="drawer-header" style={{ padding: '16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#37474F', color: 'white' }}>
-          <h3 style={{ margin: 0, fontSize: '16px' }}>Customer History</h3>
-          <button onClick={() => setShowHistoryDrawer(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20} /></button>
-        </div>
-        <div className="drawer-body" style={{ padding: '16px' }}>
-          <div className="history-search">
-            <input type="text" placeholder="Search orders..." style={{ width: '100%', padding: '8px', marginBottom: '16px', border: '1px solid #ddd', borderRadius: '4px' }} />
-          </div>
-          <div className="history-list">
-            <p style={{ textAlign: 'center', color: '#999', marginTop: '20px' }}>
-              <Clock size={32} style={{ marginBottom: '8px', opacity: 0.5 }} /><br />
-              No history found for {cart.customerPhone || 'this customer'}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Strict Design: Bill Breakdown Sheet - Moved to Cart Panel */ }
-
       {/* Main Sidebar Overlay */}
       <MainSidebar isOpen={showMainSidebar} onClose={() => setShowMainSidebar(false)} />
 
@@ -1767,7 +1822,11 @@ const AddonSelectionModal = ({
   const parsedAddons = item.parsedAddons || [];
   
   const [selectedVariant, setSelectedVariant] = useState(() => {
-    if (initialState?.variant) return initialState.variant;
+    if (initialState?.variant) {
+      // Find the matching variant from parsedVariants by name for correct reference equality
+      const match = parsedVariants.find(v => v.name === initialState.variant.name);
+      return match || initialState.variant;
+    }
     return parsedVariants.length > 0 ? parsedVariants[0] : null;
   });
 
@@ -1959,10 +2018,8 @@ const AddonSelectionModal = ({
     return true;
   };
 
-  // Sync selected addons when variant changes
-  useEffect(() => {
-    setSelectedAddons([]);
-  }, [selectedVariant]);
+  // NOTE: Addon clearing on variant change is handled directly in the variant tab onClick below.
+  // This avoids the useEffect firing on mount and wiping out restored addons during edit.
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1050 }}>
@@ -2024,7 +2081,7 @@ const AddonSelectionModal = ({
               <button
                 key={idx}
                 className={`addon-variant-tab ${selectedVariant === variant ? 'active' : ''}`}
-                onClick={() => setSelectedVariant(variant)}
+                onClick={() => { setSelectedVariant(variant); setSelectedAddons([]); }}
                 style={{ position: 'relative' }}
               >
                 {appliedDiscount && (
@@ -3231,6 +3288,99 @@ const DiscountModal = ({ onClose, onApply, onClear, currentType, currentValue, s
           >
             Apply Discount
           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const QROrdersModal = ({ orders, onClose, onApply }) => {
+  return (
+    <div 
+      className={`pos-drawer-overlay ${orders.length > -1 ? 'active' : ''}`} 
+      style={{ 
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'flex-end' 
+      }} 
+      onClick={onClose}
+    >
+      <div
+        className="pos-right-drawer active"
+        style={{
+          background: 'white', width: '500px', height: '100%',
+          display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 15px rgba(0,0,0,0.1)',
+          animation: 'slideInRight 0.3s ease-out'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ padding: '20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#0096FF', color: 'white' }}>
+          <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <QrCode size={20} /> QR Orders ({orders.length})
+          </h3>
+          <button onClick={onClose} style={{ border: 'none', background: 'rgba(255,255,255,0.2)', color: 'white', cursor: 'pointer', padding: '6px', borderRadius: '50%', display: 'flex' }}><X size={20} /></button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {orders.length === 0 ? (
+            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#94a3b8' }}>
+              <QrCode size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
+              <p>No new QR orders</p>
+            </div>
+          ) : (
+            orders.map(order => (
+              <div 
+                key={order.id} 
+                onClick={() => onApply(order)}
+                style={{ 
+                  padding: '16px 20px', 
+                  borderBottom: '1px solid #f1f5f9', 
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }} 
+                onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
+                onMouseOut={e => e.currentTarget.style.background = 'white'}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontWeight: '800', fontSize: '16px', color: '#10b981' }}>
+                      {order.table_number ? `Table ${order.table_number}` : 'Digital Order'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                      #{order.order_number} • {order.customer_name || 'Walk-in'}
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: '900', fontSize: '16px', color: '#1e293b' }}>
+                    ₹{order.total_amount?.toFixed(2)}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '10px' }}>
+                  {order.items?.map((item, idx) => (
+                    <span key={idx} style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                      {item.quantity}× {item.item_name}
+                    </span>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    style={{ 
+                      padding: '6px 12px', 
+                      fontSize: '12px', 
+                      fontWeight: '700',
+                      background: '#0096FF',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Proceed to Cart
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -15,15 +15,18 @@ import {
   RefreshCw,
   Wallet,
   Printer,
-  Tag
+  Tag,
+  QrCode
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import { useQROrderStore } from '../../stores/qrOrderStore';
 import { useShift } from '../../context/ShiftContext';
 import ShiftModal from '../common/ShiftModal';
 import logoImg from '../../assets/logo.png';
 
 const MainSidebar = ({ isOpen, onClose }) => {
   const { user, logout } = useAuthStore();
+  const { pendingCount } = useQROrderStore();
   const { endShift } = useShift();
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,8 +60,8 @@ const MainSidebar = ({ isOpen, onClose }) => {
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
     { path: '/pos', icon: ShoppingCart, label: 'POS / Billing', adminOnly: false },
     { path: '/orders', icon: ClipboardList, label: 'Orders', badge: activeOrdersCount > 0 ? activeOrdersCount : null, adminOnly: false },
+    { path: '/qr-orders', icon: QrCode, label: 'QR Orders', badge: pendingCount > 0 ? pendingCount : null, adminOnly: false },
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu', adminOnly: true },
-    
     { path: '/kot', icon: ChefHat, label: 'Kitchen (KOT)', adminOnly: false },
     { path: '/inventory', icon: Package, label: 'Inventory', adminOnly: false },
     { 

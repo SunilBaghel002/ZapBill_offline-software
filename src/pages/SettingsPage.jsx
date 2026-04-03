@@ -15,7 +15,9 @@ import {
   Monitor,
   Plus,
   Minus,
-  Check
+  Check,
+  Mail,
+  Send
 } from 'lucide-react';
 import { useAlertStore } from '../stores/alertStore';
 
@@ -31,6 +33,19 @@ const SettingsPage = () => {
   const [dbPath, setDbPath] = useState('');
   const [isMovingDb, setIsMovingDb] = useState(false);
   const [importMenuName, setImportMenuName] = useState('');
+  const [emailConfig, setEmailConfig] = useState({});
+  const [isSendingReport, setIsSendingReport] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+
+  // Helper to check internet status for emails
+  const checkInternetConnection = async () => {
+    try {
+      const status = await window.electronAPI.invoke('email:checkInternet');
+      setIsOnline(status);
+    } catch (e) {
+      setIsOnline(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -45,6 +60,9 @@ const SettingsPage = () => {
         setSettings(settingsObj);
       }
       window.electronAPI.invoke('db:getPath').then(setDbPath).catch(console.error);
+      const emailResult = await window.electronAPI.invoke('email:getConfig');
+      if (emailResult) setEmailConfig(emailResult);
+      checkInternetConnection();
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -59,6 +77,7 @@ const SettingsPage = () => {
       for (const [key, value] of Object.entries(settings)) {
         await window.electronAPI.invoke('settings:update', { key, value });
       }
+      await window.electronAPI.invoke('email:saveConfig', emailConfig);
       setSaveMessage('success');
       setTimeout(() => setSaveMessage(''), 3000);
     } catch (error) {
@@ -71,6 +90,26 @@ const SettingsPage = () => {
 
   const updateSetting = (key, value) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateEmailSetting = (key, value) => {
+    setEmailConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSendReportNow = async () => {
+    setIsSendingReport(true);
+    try {
+      const result = await window.electronAPI.invoke('email:sendReportNow');
+      if (result.success) {
+        showAlert('Daily report sent successfully!', 'success');
+      } else {
+        showAlert('Failed to send report: ' + result.error, 'error');
+      }
+    } catch (error) {
+      showAlert('Error sending report: ' + error.message, 'error');
+    } finally {
+      setIsSendingReport(false);
+    }
   };
 
   const handleImport = async (type) => {
@@ -161,6 +200,7 @@ const SettingsPage = () => {
     { id: 'restaurant', label: 'Restaurant Info', icon: Store, desc: 'Name, address & details', color: 'var(--primary-500)', bg: 'var(--primary-50)' },
     { id: 'tax', label: 'Tax Settings', icon: IndianRupee, desc: 'Tax rates & configuration', color: 'var(--success-500)', bg: 'var(--success-50)' },
     { id: 'display', label: 'Display', icon: Monitor, desc: 'Visual & zoom settings', color: '#6366f1', bg: '#eef2ff' },
+    { id: 'email', label: 'Email Reports', icon: Mail, desc: 'Automated daily reports', color: '#0ea5e9', bg: '#e0f2fe' },
     { id: 'import', label: 'Data Import', icon: Upload, desc: 'Import menu & inventory', color: 'var(--warning-600)', bg: 'var(--warning-50)' },
     { id: 'database', label: 'Database', icon: Database, desc: 'Storage & backup', color: 'var(--info-500)', bg: 'var(--info-50)' },
     { id: 'about', label: 'About', icon: Info, desc: 'System information', color: 'var(--gray-500)', bg: 'var(--gray-100)' }
@@ -381,6 +421,107 @@ const SettingsPage = () => {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══════════ TAB: Email Reports ═══════════ */}
+            {activeTab === 'email' && (
+              <div style={{ display: 'grid', gap: '28px' }}>
+                <div style={{ display: 'flex', gap: '14px', padding: '16px 20px', background: '#e0f2fe', borderRadius: '12px', border: '1px solid #bae6fd', alignItems: 'flex-start' }}>
+                  <Mail size={22} style={{ color: '#0ea5e9', flexShrink: 0, marginTop: '2px' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ color: '#0369a1', fontSize: '14px' }}>Automated Daily Reports</strong>
+                      <div style={{
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        fontSize: '12px', 
+                        fontWeight: '600', 
+                        padding: '4px 10px', 
+                        background: isOnline ? 'var(--success-50)' : 'var(--danger-50)', 
+                        color: isOnline ? 'var(--success-700)' : 'var(--danger-700)', 
+                        borderRadius: '20px', 
+                        border: isOnline ? '1px solid var(--success-200)' : '1px solid var(--danger-200)'
+                      }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isOnline ? 'var(--success-500)' : 'var(--danger-500)' }} />
+                        {isOnline ? 'Internet Online' : 'No Internet (Queued)'}
+                      </div>
+                    </div>
+                    <p style={{ color: '#0284c7', fontSize: '13px', marginTop: '4px', lineHeight: '1.5' }}>
+                      ZapBill will automatically email a full sales summary at the scheduled time. 
+                      If offline, emails will be queued and sent when internet is restored.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: 'var(--gray-800)' }}>Email Configuration</h4>
+                  <div style={{ display: 'grid', gap: '12px', marginBottom: '20px' }}>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '18px 20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)'
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--gray-800)' }}>Enable Automated Reports</div>
+                        <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '3px' }}>
+                          Send daily sales report to the owner's email automatically.
+                        </div>
+                      </div>
+                      <Toggle checked={emailConfig.is_active === 1} onChange={(v) => updateEmailSetting('is_active', v ? 1 : 0)} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                    <div className="input-group">
+                      <label className="input-label">Email Provider</label>
+                      <select className="input" value={emailConfig.service || 'gmail'} onChange={(e) => updateEmailSetting('service', e.target.value)}>
+                        <option value="gmail">Gmail</option>
+                        <option value="outlook">Outlook</option>
+                        <option value="yahoo">Yahoo</option>
+                      </select>
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label">Auto Send Time</label>
+                      <input type="time" className="input" value={emailConfig.auto_send_time || '23:00'} onChange={(e) => updateEmailSetting('auto_send_time', e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                    <div className="input-group">
+                      <label className="input-label">Sender Email</label>
+                      <input type="email" className="input" placeholder="e.g. restaurant@gmail.com" value={emailConfig.sender_email || ''} onChange={(e) => updateEmailSetting('sender_email', e.target.value)} />
+                    </div>
+                    <div className="input-group">
+                      <label className="input-label">App Password (Not login password)</label>
+                      <input type="password" className="input" placeholder="16-digit app password" value={emailConfig.app_password || ''} onChange={(e) => updateEmailSetting('app_password', e.target.value)} />
+                      <p style={{ fontSize: '11px', color: 'var(--primary-600)', marginTop: '4px' }}>
+                        <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>Get Gmail App Password</a>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="input-group" style={{ marginBottom: '20px' }}>
+                    <label className="input-label">Owner Email (Recipient)</label>
+                    <input type="email" className="input" placeholder="Owner's personal email to receive reports" value={emailConfig.owner_email || ''} onChange={(e) => updateEmailSetting('owner_email', e.target.value)} />
+                  </div>
+
+                  <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h4 style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-800)', margin: '0 0 4px' }}>Test Configuration</h4>
+                      <p style={{ fontSize: '13px', color: 'var(--gray-500)', margin: 0 }}>Send a snapshot of today's sales immediately.</p>
+                    </div>
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={handleSendReportNow} 
+                      disabled={isSendingReport || !isOnline}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      <Send size={16} />
+                      {isSendingReport ? 'Sending...' : 'Send Report Now'}
+                    </button>
                   </div>
                 </div>
               </div>
