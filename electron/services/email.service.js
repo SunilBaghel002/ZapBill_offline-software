@@ -179,6 +179,11 @@ class EmailService {
         LIMIT 10`
       );
 
+      // Top 10 selling add-ons
+      const topAddons = this.db.getAddonSales(todayDate, todayDate)
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 10);
+
       // 3. Format HTML
       let html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
@@ -215,6 +220,24 @@ class EmailService {
                   <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${item.qty}</td>
                 </tr>
               `).join('') : '<tr><td colspan="2" style="padding: 8px; text-align: center; color: #94a3b8;">No items sold today</td></tr>'}
+            </tbody>
+          </table>
+
+          <h3 style="color: #334155; margin-top: 30px;">Top Selling Add-ons (Today)</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background: #e2e8f0; text-align: left;">
+                <th style="padding: 8px; border: 1px solid #cbd5e1;">Add-on Name</th>
+                <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">Quantity Sold</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${topAddons.length > 0 ? topAddons.map(addon => `
+                <tr>
+                  <td style="padding: 8px; border: 1px solid #cbd5e1;">${addon.name}</td>
+                  <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${addon.quantity}</td>
+                </tr>
+              `).join('') : '<tr><td colspan="2" style="padding: 8px; text-align: center; color: #94a3b8;">No add-ons sold today</td></tr>'}
             </tbody>
           </table>
 
