@@ -287,6 +287,50 @@ function setupIpcHandlers() {
     return { success: false, error: 'Email service not initialized' };
   });
 
+  // Fetch menu items for report settings picker — from ACTIVE MENU only
+  ipcMain.handle('email:getMenuItemsForPicker', async () => {
+    try {
+      const activeMenu = db.getActiveMenu();
+      if (!activeMenu) return [];
+      return db.execute(`
+        SELECT mi.id, mi.name, mi.category_id, c.name as category_name 
+        FROM menu_items mi 
+        LEFT JOIN categories c ON mi.category_id = c.id
+        WHERE mi.is_deleted = 0 AND mi.is_available = 1 AND mi.menu_id = ?
+        ORDER BY c.display_order, c.name, mi.display_order, mi.name
+      `, [activeMenu.id]);
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Fetch categories for report settings picker — from ACTIVE MENU only
+  ipcMain.handle('email:getCategoriesForPicker', async () => {
+    try {
+      const activeMenu = db.getActiveMenu();
+      if (!activeMenu) return [];
+      return db.execute(`
+        SELECT c.id, c.name, COUNT(mi.id) as item_count
+        FROM categories c
+        LEFT JOIN menu_items mi ON mi.category_id = c.id AND mi.is_deleted = 0 AND mi.is_available = 1 AND mi.menu_id = ?
+        WHERE c.is_deleted = 0 AND c.menu_id = ?
+        GROUP BY c.id, c.name
+        ORDER BY c.display_order, c.name
+      `, [activeMenu.id, activeMenu.id]);
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Fetch addons for report settings picker
+  ipcMain.handle('email:getAddonsForPicker', async () => {
+    try {
+      return db.execute(`SELECT id, name, price FROM addons WHERE is_deleted = 0 AND is_available = 1 ORDER BY name`);
+    } catch (e) {
+      return [];
+    }
+  });
+
   ipcMain.handle('print:summaryReport', async (event, { date }) => {
     try {
       const reportData = db.getDailyReport(date);

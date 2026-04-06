@@ -17,7 +17,10 @@ import {
   Minus,
   Check,
   Mail,
-  Send
+  Send,
+  Search,
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { useAlertStore } from '../stores/alertStore';
 
@@ -36,6 +39,11 @@ const SettingsPage = () => {
   const [emailConfig, setEmailConfig] = useState({});
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
+  const [pickerItems, setPickerItems] = useState([]);
+  const [pickerAddons, setPickerAddons] = useState([]);
+  const [pickerCategories, setPickerCategories] = useState([]);
+  const [itemSearch, setItemSearch] = useState('');
+  const [addonSearch, setAddonSearch] = useState('');
 
   // Helper to check internet status for emails
   const checkInternetConnection = async () => {
@@ -95,6 +103,35 @@ const SettingsPage = () => {
   const updateEmailSetting = (key, value) => {
     setEmailConfig(prev => ({ ...prev, [key]: value }));
   };
+
+  const updateReportSetting = (key, value) => {
+    setEmailConfig(prev => ({
+      ...prev,
+      report_settings: {
+        ...(prev.report_settings || {}),
+        [key]: value
+      }
+    }));
+  };
+
+  const loadPickerData = async () => {
+    try {
+      const items = await window.electronAPI.invoke('email:getMenuItemsForPicker');
+      if (Array.isArray(items)) setPickerItems(items);
+      const cats = await window.electronAPI.invoke('email:getCategoriesForPicker');
+      if (Array.isArray(cats)) setPickerCategories(cats);
+      const addons = await window.electronAPI.invoke('email:getAddonsForPicker');
+      if (Array.isArray(addons)) setPickerAddons(addons);
+    } catch (e) {
+      console.error('Failed to load picker data:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'email') {
+      loadPickerData();
+    }
+  }, [activeTab]);
 
   const handleSendReportNow = async () => {
     setIsSendingReport(true);
@@ -427,53 +464,61 @@ const SettingsPage = () => {
             )}
 
             {/* ═══════════ TAB: Email Reports ═══════════ */}
-            {activeTab === 'email' && (
+            {activeTab === 'email' && (() => {
+              const rs = emailConfig.report_settings || { items_mode: 'top', items_top_count: 20, items_custom_ids: [], addons_mode: 'top', addons_top_count: 10, addons_custom_names: [], bills_count: 20 };
+              const filteredItems = pickerItems.filter(i => i.name.toLowerCase().includes(itemSearch.toLowerCase()) || (i.category_name || '').toLowerCase().includes(itemSearch.toLowerCase()));
+              const filteredAddons = pickerAddons.filter(a => a.name.toLowerCase().includes(addonSearch.toLowerCase()));
+
+              const ModeSelector = ({ value, onChange, label }) => (
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                  {[{ v: 'top', l: 'Top Selling' }, { v: 'custom', l: 'Custom Only' }, { v: 'mixed', l: 'Custom + Top' }].map(opt => (
+                    <button key={opt.v} onClick={() => onChange(opt.v)} style={{
+                      flex: 1, padding: '10px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                      border: value === opt.v ? '2px solid #0ea5e9' : '1px solid var(--gray-200)',
+                      background: value === opt.v ? '#e0f2fe' : 'white',
+                      color: value === opt.v ? '#0369a1' : 'var(--gray-600)',
+                      transition: 'all 0.2s'
+                    }}>{opt.l}</button>
+                  ))}
+                </div>
+              );
+
+              return (
               <div style={{ display: 'grid', gap: '28px' }}>
                 <div style={{ display: 'flex', gap: '14px', padding: '16px 20px', background: '#e0f2fe', borderRadius: '12px', border: '1px solid #bae6fd', alignItems: 'flex-start' }}>
                   <Mail size={22} style={{ color: '#0ea5e9', flexShrink: 0, marginTop: '2px' }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ color: '#0369a1', fontSize: '14px' }}>Automated Daily Reports</strong>
+                      <strong style={{ color: '#0369a1', fontSize: '14px' }}>Automated Hourly Reports</strong>
                       <div style={{
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '6px', 
-                        fontSize: '12px', 
-                        fontWeight: '600', 
-                        padding: '4px 10px', 
-                        background: isOnline ? 'var(--success-50)' : 'var(--danger-50)', 
-                        color: isOnline ? 'var(--success-700)' : 'var(--danger-700)', 
-                        borderRadius: '20px', 
-                        border: isOnline ? '1px solid var(--success-200)' : '1px solid var(--danger-200)'
+                        display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', padding: '4px 10px',
+                        background: isOnline ? 'var(--success-50)' : 'var(--danger-50)',
+                        color: isOnline ? 'var(--success-700)' : 'var(--danger-700)',
+                        borderRadius: '20px', border: isOnline ? '1px solid var(--success-200)' : '1px solid var(--danger-200)'
                       }}>
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: isOnline ? 'var(--success-500)' : 'var(--danger-500)' }} />
                         {isOnline ? 'Internet Online' : 'No Internet (Queued)'}
                       </div>
                     </div>
                     <p style={{ color: '#0284c7', fontSize: '13px', marginTop: '4px', lineHeight: '1.5' }}>
-                      ZapBill will automatically email a full sales summary at the scheduled time. 
-                      If offline, emails will be queued and sent when internet is restored.
+                      ZapBill sends <strong>one consolidated email per hour</strong> with sales, items, add-ons, and a screenshot.
+                      Customize what appears in each section below.
                     </p>
                   </div>
                 </div>
 
+                {/* Email Credentials */}
                 <div>
                   <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: 'var(--gray-800)' }}>Email Configuration</h4>
                   <div style={{ display: 'grid', gap: '12px', marginBottom: '20px' }}>
-                    <div style={{
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      padding: '18px 20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)'
-                    }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)' }}>
                       <div>
                         <div style={{ fontWeight: '600', fontSize: '14px', color: 'var(--gray-800)' }}>Enable Automated Reports</div>
-                        <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '3px' }}>
-                          Send daily sales report to the owner's email automatically.
-                        </div>
+                        <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '3px' }}>Send hourly sales report to the owner's email automatically.</div>
                       </div>
                       <Toggle checked={emailConfig.is_active === 1} onChange={(v) => updateEmailSetting('is_active', v ? 1 : 0)} />
                     </div>
                   </div>
-
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                     <div className="input-group">
                       <label className="input-label">Email Provider</label>
@@ -484,16 +529,11 @@ const SettingsPage = () => {
                       </select>
                     </div>
                     <div className="input-group">
-                      <label className="input-label">Auto Send Time</label>
-                      <input type="time" className="input" value={emailConfig.auto_send_time || '23:00'} onChange={(e) => updateEmailSetting('auto_send_time', e.target.value)} />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                    <div className="input-group">
                       <label className="input-label">Sender Email</label>
                       <input type="email" className="input" placeholder="e.g. restaurant@gmail.com" value={emailConfig.sender_email || ''} onChange={(e) => updateEmailSetting('sender_email', e.target.value)} />
                     </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                     <div className="input-group">
                       <label className="input-label">App Password (Not login password)</label>
                       <input type="password" className="input" placeholder="16-digit app password" value={emailConfig.app_password || ''} onChange={(e) => updateEmailSetting('app_password', e.target.value)} />
@@ -501,31 +541,266 @@ const SettingsPage = () => {
                         <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>Get Gmail App Password</a>
                       </p>
                     </div>
-                  </div>
-
-                  <div className="input-group" style={{ marginBottom: '20px' }}>
-                    <label className="input-label">Owner Email (Recipient)</label>
-                    <input type="email" className="input" placeholder="Owner's personal email to receive reports" value={emailConfig.owner_email || ''} onChange={(e) => updateEmailSetting('owner_email', e.target.value)} />
-                  </div>
-
-                  <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <h4 style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-800)', margin: '0 0 4px' }}>Test Configuration</h4>
-                      <p style={{ fontSize: '13px', color: 'var(--gray-500)', margin: 0 }}>Send a snapshot of today's sales immediately.</p>
+                    <div className="input-group">
+                      <label className="input-label">Owner Email (Recipient)</label>
+                      <input type="email" className="input" placeholder="Owner's personal email" value={emailConfig.owner_email || ''} onChange={(e) => updateEmailSetting('owner_email', e.target.value)} />
                     </div>
-                    <button 
-                      className="btn btn-secondary" 
-                      onClick={handleSendReportNow} 
-                      disabled={isSendingReport || !isOnline}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-                    >
-                      <Send size={16} />
-                      {isSendingReport ? 'Sending...' : 'Send Report Now'}
-                    </button>
                   </div>
                 </div>
+
+                {/* ── Report Content Configuration ── */}
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '6px', color: 'var(--gray-800)' }}>Report Content</h4>
+                  <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '20px' }}>Configure what items, add-ons, and bills appear in each hourly email.</p>
+
+                  {/* Items Sales Section */}
+                  <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-800)', margin: 0 }}>📦 Items Sales Report</h4>
+                      {(rs.items_mode === 'top' || rs.items_mode === 'mixed') && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <label style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Show top</label>
+                          <input type="number" min="1" max="100" value={rs.items_top_count || 20}
+                            onChange={(e) => updateReportSetting('items_top_count', parseInt(e.target.value) || 20)}
+                            style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--gray-300)', fontSize: '13px', textAlign: 'center' }} />
+                          <label style={{ fontSize: '12px', color: 'var(--gray-500)' }}>items</label>
+                        </div>
+                      )}
+                    </div>
+                    <ModeSelector value={rs.items_mode || 'top'} onChange={(v) => updateReportSetting('items_mode', v)} />
+
+                    {(rs.items_mode === 'custom' || rs.items_mode === 'mixed') && (() => {
+                      const selectedIds = new Set(rs.items_custom_ids || []);
+                      // Group items by category
+                      const categorizedItems = {};
+                      filteredItems.forEach(item => {
+                        const catName = item.category_name || 'Uncategorized';
+                        if (!categorizedItems[catName]) categorizedItems[catName] = [];
+                        categorizedItems[catName].push(item);
+                      });
+
+                      const toggleCategory = (catItems) => {
+                        const catItemIds = catItems.map(i => i.id);
+                        const allSelected = catItemIds.every(id => selectedIds.has(id));
+                        if (allSelected) {
+                          // Deselect all in this category
+                          updateReportSetting('items_custom_ids', (rs.items_custom_ids || []).filter(id => !catItemIds.includes(id)));
+                        } else {
+                          // Select all in this category
+                          const newIds = [...(rs.items_custom_ids || [])];
+                          catItemIds.forEach(id => { if (!newIds.includes(id)) newIds.push(id); });
+                          updateReportSetting('items_custom_ids', newIds);
+                        }
+                      };
+
+                      return (
+                      <div style={{ marginTop: '12px' }}>
+                        <div style={{ position: 'relative', marginBottom: '10px' }}>
+                          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)' }} />
+                          <input type="text" placeholder="Search items or categories..." value={itemSearch} onChange={(e) => setItemSearch(e.target.value)}
+                            style={{ width: '100%', padding: '8px 8px 8px 32px', borderRadius: '8px', border: '1px solid var(--gray-300)', fontSize: '12px', boxSizing: 'border-box' }} />
+                        </div>
+
+                        {/* Selected items chips */}
+                        {(rs.items_custom_ids || []).length > 0 && (
+                          <div style={{ marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--gray-500)', fontWeight: '600' }}>{(rs.items_custom_ids || []).length} items selected</span>
+                              <button onClick={() => updateReportSetting('items_custom_ids', [])}
+                                style={{ fontSize: '11px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500' }}>Clear All</button>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                              {(rs.items_custom_ids || []).map(id => {
+                                const item = pickerItems.find(i => i.id === id);
+                                return item ? (
+                                  <span key={id} style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 8px',
+                                    background: '#dbeafe', color: '#1d4ed8', borderRadius: '14px', fontSize: '11px', fontWeight: '500'
+                                  }}>
+                                    {item.name}
+                                    <X size={11} style={{ cursor: 'pointer', opacity: 0.7 }} onClick={() => {
+                                      updateReportSetting('items_custom_ids', (rs.items_custom_ids || []).filter(i => i !== id));
+                                    }} />
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Category-grouped items list */}
+                        <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: '8px', background: 'white' }}>
+                          {Object.entries(categorizedItems).map(([catName, catItems]) => {
+                            const allCatSelected = catItems.every(i => selectedIds.has(i.id));
+                            const someCatSelected = catItems.some(i => selectedIds.has(i.id));
+                            return (
+                              <div key={catName}>
+                                {/* Category header with Select All */}
+                                <div onClick={() => toggleCategory(catItems)} style={{
+                                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                  padding: '8px 12px', background: '#f1f5f9', borderBottom: '1px solid var(--gray-200)',
+                                  cursor: 'pointer', position: 'sticky', top: 0, zIndex: 1
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{
+                                      width: '16px', height: '16px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                      border: allCatSelected ? '2px solid #2563eb' : someCatSelected ? '2px solid #93c5fd' : '2px solid #cbd5e1',
+                                      background: allCatSelected ? '#2563eb' : someCatSelected ? '#bfdbfe' : 'white',
+                                      transition: 'all 0.15s'
+                                    }}>
+                                      {(allCatSelected || someCatSelected) && <Check size={10} style={{ color: allCatSelected ? 'white' : '#2563eb' }} />}
+                                    </div>
+                                    <span style={{ fontWeight: '600', fontSize: '12px', color: 'var(--gray-700)' }}>{catName}</span>
+                                  </div>
+                                  <span style={{ fontSize: '10px', color: 'var(--gray-400)', fontWeight: '500' }}>{catItems.length} items</span>
+                                </div>
+                                {/* Individual items */}
+                                {catItems.map(item => {
+                                  const isSelected = selectedIds.has(item.id);
+                                  return (
+                                    <div key={item.id} onClick={() => {
+                                      if (isSelected) {
+                                        updateReportSetting('items_custom_ids', (rs.items_custom_ids || []).filter(i => i !== item.id));
+                                      } else {
+                                        updateReportSetting('items_custom_ids', [...(rs.items_custom_ids || []), item.id]);
+                                      }
+                                    }} style={{
+                                      display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 12px 7px 28px',
+                                      cursor: 'pointer', borderBottom: '1px solid var(--gray-50)', fontSize: '12px',
+                                      background: isSelected ? '#eff6ff' : 'white', transition: 'background 0.12s'
+                                    }}
+                                    onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = '#f8fafc'; }}
+                                    onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'white'; }}
+                                    >
+                                      <div style={{
+                                        width: '14px', height: '14px', borderRadius: '3px', flexShrink: 0,
+                                        border: isSelected ? '2px solid #2563eb' : '1.5px solid #cbd5e1',
+                                        background: isSelected ? '#2563eb' : 'white',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s'
+                                      }}>
+                                        {isSelected && <Check size={9} style={{ color: 'white' }} />}
+                                      </div>
+                                      <span style={{ fontWeight: '500', color: isSelected ? '#1d4ed8' : 'var(--gray-700)' }}>{item.name}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                          {Object.keys(categorizedItems).length === 0 && (
+                            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--gray-400)', fontSize: '12px' }}>No items found in active menu</div>
+                          )}
+                        </div>
+                      </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Add-ons Sales Section */}
+                  <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-800)', margin: 0 }}>🧩 Add-ons Sales Report</h4>
+                      {(rs.addons_mode === 'top' || rs.addons_mode === 'mixed') && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <label style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Show top</label>
+                          <input type="number" min="1" max="100" value={rs.addons_top_count || 10}
+                            onChange={(e) => updateReportSetting('addons_top_count', parseInt(e.target.value) || 10)}
+                            style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--gray-300)', fontSize: '13px', textAlign: 'center' }} />
+                          <label style={{ fontSize: '12px', color: 'var(--gray-500)' }}>add-ons</label>
+                        </div>
+                      )}
+                    </div>
+                    <ModeSelector value={rs.addons_mode || 'top'} onChange={(v) => updateReportSetting('addons_mode', v)} />
+
+                    {(rs.addons_mode === 'custom' || rs.addons_mode === 'mixed') && (
+                      <div style={{ marginTop: '12px' }}>
+                        <div style={{ position: 'relative', marginBottom: '8px' }}>
+                          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)' }} />
+                          <input type="text" placeholder="Search add-ons..." value={addonSearch} onChange={(e) => setAddonSearch(e.target.value)}
+                            style={{ width: '100%', padding: '8px 8px 8px 32px', borderRadius: '8px', border: '1px solid var(--gray-300)', fontSize: '12px', boxSizing: 'border-box' }} />
+                        </div>
+
+                        {(rs.addons_custom_names || []).length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                            {(rs.addons_custom_names || []).map(name => (
+                              <span key={name} style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px',
+                                background: '#fce7f3', color: '#be185d', borderRadius: '16px', fontSize: '11px', fontWeight: '500'
+                              }}>
+                                {name}
+                                <X size={12} style={{ cursor: 'pointer', opacity: 0.7 }} onClick={() => {
+                                  updateReportSetting('addons_custom_names', (rs.addons_custom_names || []).filter(n => n !== name));
+                                }} />
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: '8px', background: 'white' }}>
+                          {filteredAddons.filter(a => !(rs.addons_custom_names || []).includes(a.name)).slice(0, 50).map(addon => (
+                            <div key={addon.id} onClick={() => {
+                              updateReportSetting('addons_custom_names', [...(rs.addons_custom_names || []), addon.name]);
+                            }} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px',
+                              cursor: 'pointer', borderBottom: '1px solid var(--gray-100)', fontSize: '12px',
+                              transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#fdf2f8'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                            >
+                              <span style={{ fontWeight: '500', color: 'var(--gray-800)' }}>{addon.name}</span>
+                              <span style={{ color: 'var(--gray-400)', fontSize: '11px' }}>₹{addon.price}</span>
+                            </div>
+                          ))}
+                          {filteredAddons.filter(a => !(rs.addons_custom_names || []).includes(a.name)).length === 0 && (
+                            <div style={{ padding: '12px', textAlign: 'center', color: 'var(--gray-400)', fontSize: '12px' }}>No add-ons found</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bills Count Section */}
+                  <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <h4 style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-800)', margin: '0 0 4px' }}>🧾 Recent Bills Summary</h4>
+                        <p style={{ fontSize: '12px', color: 'var(--gray-500)', margin: 0 }}>Number of recent bills to include in the report.</p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <label style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Show last</label>
+                        <input type="number" min="1" max="100" value={rs.bills_count || 20}
+                          onChange={(e) => updateReportSetting('bills_count', parseInt(e.target.value) || 20)}
+                          style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--gray-300)', fontSize: '13px', textAlign: 'center' }} />
+                        <label style={{ fontSize: '12px', color: 'var(--gray-500)' }}>bills</label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Screenshot info */}
+                  <div style={{ padding: '14px 20px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0', display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
+                    <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+                    <span style={{ fontSize: '12px', color: '#15803d' }}>
+                      <strong>Screenshot:</strong> The currently opened tab will always be captured and attached to every email.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Test Send */}
+                <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h4 style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-800)', margin: '0 0 4px' }}>Test Configuration</h4>
+                    <p style={{ fontSize: '13px', color: 'var(--gray-500)', margin: 0 }}>Send a snapshot of today's sales immediately.</p>
+                  </div>
+                  <button className="btn btn-secondary" onClick={handleSendReportNow} disabled={isSendingReport || !isOnline}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Send size={16} />
+                    {isSendingReport ? 'Sending...' : 'Send Report Now'}
+                  </button>
+                </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* ═══════════ TAB: Data Import ═══════════ */}
             {activeTab === 'import' && (

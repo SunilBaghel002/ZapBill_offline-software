@@ -160,6 +160,9 @@ const validInvokeChannels = [
   'email:saveConfig',
   'email:checkInternet',
   'email:sendReportNow',
+  'email:getMenuItemsForPicker',
+  'email:getCategoriesForPicker',
+  'email:getAddonsForPicker',
 ];
 
 const validOnChannels = [

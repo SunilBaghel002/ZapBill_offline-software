@@ -352,6 +352,9 @@ class Database {
     // Create QR order tables
     this.migrateQROrderTables();
 
+    // Add report_settings to email_config
+    try { this.db.run("ALTER TABLE email_config ADD COLUMN report_settings TEXT"); } catch (e) {}
+
     // Seed sample products with variants
     this.seedSampleProducts();
   }
@@ -4451,32 +4454,55 @@ class Database {
   getEmailConfig() {
     try {
       const result = this.execute('SELECT * FROM email_config LIMIT 1');
-      if (result.length > 0) return result[0];
-      return { service: 'gmail', sender_email: '', app_password: '', owner_email: '', auto_send_time: '23:00', is_active: 1 };
+      if (result.length > 0) {
+        const config = result[0];
+        // Parse report_settings JSON
+        if (config.report_settings) {
+          try { config.report_settings = JSON.parse(config.report_settings); } catch (e) { config.report_settings = null; }
+        }
+        if (!config.report_settings) {
+          config.report_settings = this._defaultReportSettings();
+        }
+        return config;
+      }
+      return { service: 'gmail', sender_email: '', app_password: '', owner_email: '', auto_send_time: '23:00', is_active: 1, report_settings: this._defaultReportSettings() };
     } catch (e) {
       console.error('Error fetching email config:', e);
-      return { service: 'gmail', sender_email: '', app_password: '', owner_email: '', auto_send_time: '23:00', is_active: 1 };
+      return { service: 'gmail', sender_email: '', app_password: '', owner_email: '', auto_send_time: '23:00', is_active: 1, report_settings: this._defaultReportSettings() };
     }
+  }
+
+  _defaultReportSettings() {
+    return {
+      items_mode: 'top',
+      items_top_count: 20,
+      items_custom_ids: [],
+      addons_mode: 'top',
+      addons_top_count: 10,
+      addons_custom_names: [],
+      bills_count: 20
+    };
   }
 
   saveEmailConfig(config) {
     try {
+      const reportSettingsStr = config.report_settings ? JSON.stringify(config.report_settings) : null;
       const existing = this.execute('SELECT id FROM email_config LIMIT 1');
       if (existing.length > 0) {
         this.run(`
           UPDATE email_config 
-          SET service = ?, sender_email = ?, app_password = ?, owner_email = ?, auto_send_time = ?, is_active = ?, updated_at = ?
+          SET service = ?, sender_email = ?, app_password = ?, owner_email = ?, auto_send_time = ?, is_active = ?, report_settings = ?, updated_at = ?
           WHERE id = ?`,
-          [config.service, config.sender_email, config.app_password, config.owner_email, config.auto_send_time, config.is_active ? 1 : 0, new Date().toISOString(), existing[0].id]
+          [config.service, config.sender_email, config.app_password, config.owner_email, config.auto_send_time, config.is_active ? 1 : 0, reportSettingsStr, new Date().toISOString(), existing[0].id]
         );
       } else {
         this.run(`
-          INSERT INTO email_config (id, service, sender_email, app_password, owner_email, auto_send_time, is_active)
-          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [uuidv4(), config.service || 'gmail', config.sender_email, config.app_password, config.owner_email, config.auto_send_time || '23:00', config.is_active ? 1 : 0]
+          INSERT INTO email_config (id, service, sender_email, app_password, owner_email, auto_send_time, is_active, report_settings)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uuidv4(), config.service || 'gmail', config.sender_email, config.app_password, config.owner_email, config.auto_send_time || '23:00', config.is_active ? 1 : 0, reportSettingsStr]
         );
       }
-      // Return a standard response format used in other db methods
+      this.save();
       return { success: true };
     } catch (e) {
       console.error('Error saving email config:', e);
