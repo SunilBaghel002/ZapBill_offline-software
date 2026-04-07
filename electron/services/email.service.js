@@ -211,17 +211,20 @@ class EmailService {
     const mode = rs.items_mode || 'top';
     const topCount = rs.items_top_count || 20;
     const customIds = rs.items_custom_ids || [];
+    const showZeroQty = rs.items_show_zero_qty ?? true; // fallback to true
 
     // Always fetch top selling items
     const allTopItems = this.db.execute(`
-      SELECT oi.item_name, oi.menu_item_id, SUM(oi.quantity) as qty
+      SELECT oi.item_name, oi.menu_item_id, SUM(oi.quantity) as qty, c.name as category_name
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
+      LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
+      LEFT JOIN categories c ON mi.category_id = c.id
       WHERE date(o.created_at) = date('now') 
         AND o.status != 'cancelled' 
         AND o.is_deleted = 0
         AND (oi.is_deleted = 0 OR oi.is_deleted IS NULL)
-      GROUP BY oi.item_name, oi.menu_item_id
+      GROUP BY oi.item_name, oi.menu_item_id, c.name
       ORDER BY qty DESC
     `);
 
@@ -232,17 +235,21 @@ class EmailService {
     if (mode === 'custom') {
       if (customIds.length === 0) return allTopItems.slice(0, topCount);
       
-      // Get custom items — show them even if qty is 0
       const customItems = [];
       for (const itemId of customIds) {
         const found = allTopItems.find(i => i.menu_item_id === itemId);
         if (found) {
           customItems.push(found);
-        } else {
-          // Item not sold today, fetch name from menu
-          const menuItem = this.db.execute('SELECT name FROM menu_items WHERE id = ?', [itemId]);
+        } else if (showZeroQty) {
+          // Item not sold today, fetch name and category from menu
+          const menuItem = this.db.execute(`
+            SELECT mi.name, c.name as category_name 
+            FROM menu_items mi 
+            LEFT JOIN categories c ON mi.category_id = c.id
+            WHERE mi.id = ?
+          `, [itemId]);
           if (menuItem.length > 0) {
-            customItems.push({ item_name: menuItem[0].name, menu_item_id: itemId, qty: 0 });
+            customItems.push({ item_name: menuItem[0].name, menu_item_id: itemId, qty: 0, category_name: menuItem[0].category_name });
           }
         }
       }
@@ -250,16 +257,20 @@ class EmailService {
     }
 
     if (mode === 'mixed') {
-      // Custom items first, then fill remaining slots with top items not in custom list
       const customItems = [];
       for (const itemId of customIds) {
         const found = allTopItems.find(i => i.menu_item_id === itemId);
         if (found) {
           customItems.push(found);
-        } else {
-          const menuItem = this.db.execute('SELECT name FROM menu_items WHERE id = ?', [itemId]);
+        } else if (showZeroQty) {
+          const menuItem = this.db.execute(`
+            SELECT mi.name, c.name as category_name 
+            FROM menu_items mi 
+            LEFT JOIN categories c ON mi.category_id = c.id
+            WHERE mi.id = ?
+          `, [itemId]);
           if (menuItem.length > 0) {
-            customItems.push({ item_name: menuItem[0].name, menu_item_id: itemId, qty: 0 });
+            customItems.push({ item_name: menuItem[0].name, menu_item_id: itemId, qty: 0, category_name: menuItem[0].category_name });
           }
         }
       }
@@ -366,6 +377,7 @@ class EmailService {
           <thead>
             <tr style="background: #e2e8f0; text-align: left;">
               <th style="padding: 8px; border: 1px solid #cbd5e1;">Item Name</th>
+              <th style="padding: 8px; border: 1px solid #cbd5e1;">Category</th>
               <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">Quantity Sold</th>
             </tr>
           </thead>
@@ -373,9 +385,10 @@ class EmailService {
             ${topItems.length > 0 ? topItems.map(item => `
               <tr>
                 <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.item_name}</td>
+                <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.category_name || '-'}</td>
                 <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${item.qty}</td>
               </tr>
-            `).join('') : '<tr><td colspan="2" style="padding: 8px; text-align: center; color: #94a3b8;">No items sold today</td></tr>'}
+            `).join('') : '<tr><td colspan="3" style="padding: 8px; text-align: center; color: #94a3b8;">No items sold today</td></tr>'}
           </tbody>
         </table>
 

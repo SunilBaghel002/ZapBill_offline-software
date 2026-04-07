@@ -4477,6 +4477,7 @@ class Database {
       items_mode: 'top',
       items_top_count: 20,
       items_custom_ids: [],
+      items_show_zero_qty: true,
       addons_mode: 'top',
       addons_top_count: 10,
       addons_custom_names: [],

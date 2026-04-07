@@ -595,6 +595,14 @@ const SettingsPage = () => {
 
                       return (
                       <div style={{ marginTop: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid var(--gray-200)' }}>
+                          <div>
+                            <div style={{ fontWeight: '600', fontSize: '13px', color: 'var(--gray-700)' }}>Show items with zero quantity</div>
+                            <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>Include selected items in the email report even if they had 0 sales today.</div>
+                          </div>
+                          <Toggle checked={rs.items_show_zero_qty ?? true} onChange={(v) => updateReportSetting('items_show_zero_qty', v)} />
+                        </div>
+
                         <div style={{ position: 'relative', marginBottom: '10px' }}>
                           <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)' }} />
                           <input type="text" placeholder="Search items or categories..." value={itemSearch} onChange={(e) => setItemSearch(e.target.value)}
