@@ -139,16 +139,7 @@ class EmailService {
 
   async generateAndSendDailyReport() {
     try {
-      // 1. Always capture screen (opened tab screenshot)
-      let screenshotPath = null;
-      if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-        const image = await this.mainWindow.webContents.capturePage();
-        const userDataPath = app.getPath('userData');
-        screenshotPath = path.join(userDataPath, `billing_screen_${Date.now()}.png`);
-        fs.writeFileSync(screenshotPath, image.toPNG());
-      }
-
-      // 2. Fetch config and report settings
+      // 1. Fetch config and report settings
       const config = this.db.getEmailConfig();
       const rs = config.report_settings || {
         items_mode: 'top',
@@ -190,14 +181,7 @@ class EmailService {
       });
 
       const subject = `Sales Report - ${todayDate} ${timeStr} - ZapBill`;
-      const result = await this.sendEmail(subject, html, screenshotPath);
-
-      // Clean up the screenshot file after trying to send
-      if (screenshotPath && fs.existsSync(screenshotPath)) {
-        setTimeout(() => {
-          try { fs.unlinkSync(screenshotPath); } catch(e) {}
-        }, 60000);
-      }
+      const result = await this.sendEmail(subject, html);
 
       return result;
     } catch (e) {
@@ -215,7 +199,8 @@ class EmailService {
 
     // Always fetch top selling items
     const allTopItems = this.db.execute(`
-      SELECT oi.item_name, oi.menu_item_id, SUM(oi.quantity) as qty, c.name as category_name
+      SELECT oi.item_name, oi.menu_item_id, SUM(oi.quantity) as qty, 
+             SUM(oi.item_total) as total_price, c.name as category_name
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       LEFT JOIN menu_items mi ON oi.menu_item_id = mi.id
@@ -249,7 +234,13 @@ class EmailService {
             WHERE mi.id = ?
           `, [itemId]);
           if (menuItem.length > 0) {
-            customItems.push({ item_name: menuItem[0].name, menu_item_id: itemId, qty: 0, category_name: menuItem[0].category_name });
+            customItems.push({ 
+              item_name: menuItem[0].name, 
+              menu_item_id: itemId, 
+              qty: 0, 
+              total_price: 0,
+              category_name: menuItem[0].category_name 
+            });
           }
         }
       }
@@ -270,7 +261,13 @@ class EmailService {
             WHERE mi.id = ?
           `, [itemId]);
           if (menuItem.length > 0) {
-            customItems.push({ item_name: menuItem[0].name, menu_item_id: itemId, qty: 0, category_name: menuItem[0].category_name });
+            customItems.push({ 
+              item_name: menuItem[0].name, 
+              menu_item_id: itemId, 
+              qty: 0, 
+              total_price: 0,
+              category_name: menuItem[0].category_name 
+            });
           }
         }
       }
@@ -378,17 +375,47 @@ class EmailService {
             <tr style="background: #e2e8f0; text-align: left;">
               <th style="padding: 8px; border: 1px solid #cbd5e1;">Item Name</th>
               <th style="padding: 8px; border: 1px solid #cbd5e1;">Category</th>
-              <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">Quantity Sold</th>
+              <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">Qty Sold</th>
+              <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: right;">Total Sale</th>
             </tr>
           </thead>
           <tbody>
-            ${topItems.length > 0 ? topItems.map(item => `
-              <tr>
-                <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.item_name}</td>
-                <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.category_name || '-'}</td>
-                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${item.qty}</td>
-              </tr>
-            `).join('') : '<tr><td colspan="3" style="padding: 8px; text-align: center; color: #94a3b8;">No items sold today</td></tr>'}
+            ${(() => {
+              if (topItems.length === 0) {
+                return '<tr><td colspan="4" style="padding: 8px; text-align: center; color: #94a3b8;">No items sold today</td></tr>';
+              }
+
+              // Group by category
+              const groups = {};
+              topItems.forEach(item => {
+                const cat = item.category_name || 'Others';
+                if (!groups[cat]) groups[cat] = { items: [], totalQty: 0, totalSale: 0 };
+                groups[cat].items.push(item);
+                groups[cat].totalQty += (item.qty || 0);
+                groups[cat].totalSale += (item.total_price || 0);
+              });
+
+              return Object.entries(groups).map(([catName, data]) => {
+                const itemRows = data.items.map(item => `
+                  <tr>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.item_name}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; font-size: 11px;">${catName}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${item.qty}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right;">₹${(item.total_price || 0).toFixed(2)}</td>
+                  </tr>
+                `).join('');
+
+                const subtotalRow = `
+                  <tr style="background: #f8fafc; font-weight: bold;">
+                    <td colspan="2" style="padding: 8px; border: 1px solid #cbd5e1; text-align: right;">Total for ${catName}:</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; color: #3b82f6;">${data.totalQty}</td>
+                    <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; color: #10b981;">₹${data.totalSale.toFixed(2)}</td>
+                  </tr>
+                `;
+
+                return itemRows + subtotalRow;
+              }).join('');
+            })()}
           </tbody>
         </table>
 
@@ -397,16 +424,20 @@ class EmailService {
           <thead>
             <tr style="background: #e2e8f0; text-align: left;">
               <th style="padding: 8px; border: 1px solid #cbd5e1;">Add-on Name</th>
-              <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">Quantity Sold</th>
+              <th style="padding: 8px; border: 1px solid #cbd5e1;">Master Group</th>
+              <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">Qty Sold</th>
+              <th style="padding: 8px; border: 1px solid #cbd5e1; text-align: right;">Total Sale</th>
             </tr>
           </thead>
           <tbody>
             ${topAddons.length > 0 ? topAddons.map(addon => `
               <tr>
                 <td style="padding: 8px; border: 1px solid #cbd5e1;">${addon.name}</td>
+                <td style="padding: 8px; border: 1px solid #cbd5e1; font-size: 11px;">${addon.groupName || 'Extra'}</td>
                 <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${addon.quantity}</td>
+                <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: right; font-weight: bold;">₹${(addon.revenue || 0).toFixed(2)}</td>
               </tr>
-            `).join('') : '<tr><td colspan="2" style="padding: 8px; text-align: center; color: #94a3b8;">No add-ons sold today</td></tr>'}
+            `).join('') : '<tr><td colspan="4" style="padding: 8px; text-align: center; color: #94a3b8;">No add-ons sold today</td></tr>'}
           </tbody>
         </table>
 
@@ -433,8 +464,7 @@ class EmailService {
         </table>
         
         <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 40px;">
-          This is an automated hourly report generated by ZapBill Offline POS. 
-          A screenshot of the billing interface at the time of generation is attached.
+          This is an automated hourly report generated by ZapBill Offline POS.
         </p>
       </div>
     `;

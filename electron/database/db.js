@@ -3471,15 +3471,17 @@ class Database {
         if (Array.isArray(addons)) {
           for (const addon of addons) {
             const name = addon.name || addon.addon_name;
+            const groupName = addon._groupName || addon.groupName || 'Extra';
             const price = parseFloat(addon.price || addon.addon_price || 0);
             const addonQuantity = (addon.quantity || 1) * itemQuantity;
             
             if (name) {
-              if (!addonStats[name]) {
-                addonStats[name] = { name, quantity: 0, revenue: 0 };
+              const key = `${name}|${groupName}`;
+              if (!addonStats[key]) {
+                addonStats[key] = { name, groupName, quantity: 0, revenue: 0 };
               }
-              addonStats[name].quantity += addonQuantity;
-              addonStats[name].revenue += (price * addonQuantity);
+              addonStats[key].quantity += addonQuantity;
+              addonStats[key].revenue += (price * addonQuantity);
             }
           }
         }
