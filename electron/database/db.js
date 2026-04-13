@@ -3450,6 +3450,13 @@ class Database {
 
   // --- SALES REPORTS ---
   getAddonSales(startDate, endDate) {
+    // 1. Fetch master addons to map IDs to Names
+    const masterAddonsList = this.execute('SELECT id, name FROM master_addons');
+    const masterMap = {};
+    for (const m of masterAddonsList) {
+      masterMap[m.id] = m.name;
+    }
+
     const items = this.execute(`
       SELECT oi.addons, oi.quantity
       FROM order_items oi
@@ -3471,14 +3478,15 @@ class Database {
         if (Array.isArray(addons)) {
           for (const addon of addons) {
             const name = addon.name || addon.addon_name;
-            const groupName = addon._groupName || addon.groupName || 'Extra';
             const price = parseFloat(addon.price || addon.addon_price || 0);
             const addonQuantity = (addon.quantity || 1) * itemQuantity;
+            const groupName = (addon._groupId && masterMap[addon._groupId]) ? masterMap[addon._groupId] : 'Extra Add-ons';
             
             if (name) {
-              const key = `${name}|${groupName}`;
+              // Create a unique key so identical names in different categories remain separate
+              const key = `${groupName}_${name}`;
               if (!addonStats[key]) {
-                addonStats[key] = { name, groupName, quantity: 0, revenue: 0 };
+                addonStats[key] = { group_name: groupName, name, quantity: 0, revenue: 0 };
               }
               addonStats[key].quantity += addonQuantity;
               addonStats[key].revenue += (price * addonQuantity);
@@ -4479,11 +4487,11 @@ class Database {
       items_mode: 'top',
       items_top_count: 20,
       items_custom_ids: [],
-      items_show_zero_qty: true,
       addons_mode: 'top',
       addons_top_count: 10,
       addons_custom_names: [],
-      bills_count: 20
+      bills_count: 20,
+      hide_zero_qty: false
     };
   }
 

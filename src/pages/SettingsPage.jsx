@@ -595,14 +595,6 @@ const SettingsPage = () => {
 
                       return (
                       <div style={{ marginTop: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: '1px solid var(--gray-200)' }}>
-                          <div>
-                            <div style={{ fontWeight: '600', fontSize: '13px', color: 'var(--gray-700)' }}>Show items with zero quantity</div>
-                            <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>Include selected items in the email report even if they had 0 sales today.</div>
-                          </div>
-                          <Toggle checked={rs.items_show_zero_qty ?? true} onChange={(v) => updateReportSetting('items_show_zero_qty', v)} />
-                        </div>
-
                         <div style={{ position: 'relative', marginBottom: '10px' }}>
                           <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)' }} />
                           <input type="text" placeholder="Search items or categories..." value={itemSearch} onChange={(e) => setItemSearch(e.target.value)}
@@ -704,6 +696,21 @@ const SettingsPage = () => {
                     })()}
                   </div>
 
+                  {/* Hide zero quantity toggle */}
+                  <div style={{ 
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '16px 20px', background: 'var(--gray-50)', borderRadius: '12px', 
+                    border: '1px solid var(--gray-200)', marginBottom: '16px'
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: '600', fontSize: '13px', color: 'var(--gray-800)' }}>Hide Zero Quantity Items</div>
+                      <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                        Don't show items with 0 sales in the email report
+                      </div>
+                    </div>
+                    <Toggle checked={rs.hide_zero_qty || false} onChange={(v) => updateReportSetting('hide_zero_qty', v)} />
+                  </div>
+
                   {/* Add-ons Sales Section */}
                   <div style={{ padding: '20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)', marginBottom: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -783,14 +790,6 @@ const SettingsPage = () => {
                         <label style={{ fontSize: '12px', color: 'var(--gray-500)' }}>bills</label>
                       </div>
                     </div>
-                  </div>
-
-                  {/* Screenshot info */}
-                  <div style={{ padding: '14px 20px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d0', display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '16px' }}>
-                    <CheckCircle2 size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
-                    <span style={{ fontSize: '12px', color: '#15803d' }}>
-                      <strong>Screenshot:</strong> The currently opened tab will always be captured and attached to every email.
-                    </span>
                   </div>
                 </div>
 

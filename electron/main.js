@@ -26,6 +26,21 @@ let syncService = null;
 let qrServerService = null;
 let emailService = null;
 
+// Enforce single instance to prevent duplicate cron jobs (e.g. multiple emails sent per hour)
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, focus our window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 
 // Determine if in development mode
 const isDev = !app.isPackaged;

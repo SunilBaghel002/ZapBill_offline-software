@@ -1972,7 +1972,7 @@ const AddonSelectionModal = ({
            a.id === addon.id ? { ...a, quantity: (a.quantity || 1) + 1 } : a
          ));
       } else {
-         setSelectedAddons([...newSelected, { ...addon, quantity: 1, _groupId: group.id, _groupName: group.name }]);
+         setSelectedAddons([...newSelected, { ...addon, quantity: 1, _groupId: group.id }]);
       }
     } else {
       // Multi select - allow multiple quantity
@@ -1987,7 +1987,7 @@ const AddonSelectionModal = ({
         (a.name === addon.name && a._groupId === groupId) ? { ...a, quantity: (a.quantity || 1) + 1 } : a
       ));
     } else {
-      setSelectedAddons([...selectedAddons, { ...addon, quantity: 1, _groupId: groupId, _groupName: group?.name || null }]);
+      setSelectedAddons([...selectedAddons, { ...addon, quantity: 1, _groupId: groupId }]);
     }
   };
 
