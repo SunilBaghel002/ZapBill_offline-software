@@ -1,3 +1,0 @@
-there is problem in this software like whenever i install a new version i have to do it manually by uninstalling older version and install new install so sometime there is a error occur of older version is not uninstall properly and tell me to retry by retry button older version will uninstall and if i change the location of db during installation then it install current version
-by this issue there is new problem occur of that data of previous assigned addons lost which is not correct means all the add-ons assignment of all items reset to default which is not correct at all 
-so tell me solution of problem and what is the problem as clarify this 

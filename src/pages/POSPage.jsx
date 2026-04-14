@@ -2339,9 +2339,9 @@ const AddonSelectionModal = ({
             onClick={() => {
               if (!isSatisfied()) return;
               
-              // Flatten addons for cart state
+              // Flatten addons for cart state (ensure each element gets quantity: 1 to avoid squaring in DB)
               const flattenedAddons = selectedAddons.flatMap(addon => {
-                return Array(addon.quantity).fill({ ...addon });
+                return Array(addon.quantity).fill({ ...addon, quantity: 1 });
               });
               
               let appliedDiscount = activeItemDiscounts.find(d => d.menu_item_id === item.id && (!d.variant_name || d.variant_name === ''));

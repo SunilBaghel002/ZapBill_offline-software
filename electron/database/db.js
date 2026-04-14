@@ -355,6 +355,9 @@ class Database {
     // Add report_settings to email_config
     try { this.db.run("ALTER TABLE email_config ADD COLUMN report_settings TEXT"); } catch (e) {}
 
+    // Auto-migrate old inline addons to the new master_addons global format
+    this.migrateLegacyAddons();
+
     // Seed sample products with variants
     this.seedSampleProducts();
   }
@@ -608,6 +611,119 @@ class Database {
       }
     } catch (error) {
       console.log('Orders table migration note:', error.message);
+    }
+  }
+
+  migrateLegacyAddons() {
+    try {
+      const items = this.execute("SELECT id, name, addons, variants, master_addon_ids FROM menu_items WHERE (master_addon_ids IS NULL OR master_addon_ids = '' OR master_addon_ids = '[]') AND is_deleted = 0");
+      if (items.length === 0) return;
+
+      let migrationNeeded = false;
+      for (const item of items) {
+        if (item.addons && item.addons !== '[]' && item.addons !== '') migrationNeeded = true;
+        if (item.variants && item.variants.includes('"addons"')) migrationNeeded = true;
+      }
+      if (!migrationNeeded) return;
+
+      console.log('Migrating legacy inline addons to global master_addons format...');
+
+      this.db.run('BEGIN TRANSACTION');
+
+      const existingGlobalAddons = this.execute("SELECT * FROM addons WHERE is_deleted = 0");
+      const globalAddonMap = new Map();
+      for (const ga of existingGlobalAddons) {
+         globalAddonMap.set(`${ga.name.toLowerCase()}_${ga.price}`, ga.id);
+      }
+
+      const existingMasterGroups = this.execute("SELECT id, name, addon_ids FROM master_addons WHERE is_deleted = 0");
+      const masterGroupMap = new Map();
+      for (const mg of existingMasterGroups) {
+          try {
+             const ids = JSON.parse(mg.addon_ids || '[]');
+             if (ids.length > 0) {
+                 masterGroupMap.set(ids.sort().join(','), mg.id);
+             }
+          } catch(e) {}
+      }
+
+      const processLegacyAddonArray = (legacyAddonsArr, itemName) => {
+        if (!Array.isArray(legacyAddonsArr) || legacyAddonsArr.length === 0) return null;
+        
+        const globalIds = [];
+        for (const addon of legacyAddonsArr) {
+           if (!addon.name) continue;
+           const price = parseFloat(addon.price) || 0;
+           const key = `${addon.name.toLowerCase()}_${price}`;
+           let gaId = globalAddonMap.get(key);
+           
+           if (!gaId) {
+             const type = addon.type && ['veg', 'non-veg'].includes(addon.type) ? addon.type : 'veg';
+             gaId = uuidv4();
+             this.db.run(`INSERT INTO addons (id, name, price, type, is_available) VALUES (?, ?, ?, ?, 1)`, [gaId, addon.name, price, type]);
+             globalAddonMap.set(key, gaId);
+           }
+           if (!globalIds.includes(gaId)) globalIds.push(gaId);
+        }
+
+        if (globalIds.length === 0) return null;
+
+        const sig = globalIds.sort().join(',');
+        let masterGroupId = masterGroupMap.get(sig);
+        if (!masterGroupId) {
+           masterGroupId = uuidv4();
+           const groupName = `Migrated Addons (${itemName})`;
+           this.db.run(`INSERT INTO master_addons (id, name, addon_ids, selection_type) VALUES (?, ?, ?, 'multi')`, [masterGroupId, groupName, JSON.stringify(globalIds)]);
+           masterGroupMap.set(sig, masterGroupId);
+        }
+        return masterGroupId;
+      };
+
+      for (const item of items) {
+        let rootMasterGroupId = null;
+        
+        try {
+           const legacyAddons = typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons;
+           rootMasterGroupId = processLegacyAddonArray(legacyAddons, item.name);
+        } catch (e) {}
+
+        let variantsArr = [];
+        let variantsChanged = false;
+        try {
+          if (item.variants) {
+            variantsArr = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants;
+            if (Array.isArray(variantsArr)) {
+              variantsArr.forEach(v => {
+                if (v.addons && Array.isArray(v.addons) && v.addons.length > 0) {
+                   const vMasterId = processLegacyAddonArray(v.addons, `${item.name} - ${v.name}`);
+                   if (vMasterId) {
+                     v.master_addon_ids = [vMasterId];
+                     variantsChanged = true;
+                   }
+                }
+                // Avoid deleting v.addons yet to prevent data loss if migration is retried, POS reads master_addon_ids first.
+              });
+            }
+          }
+        } catch (e) {}
+
+        const masterAddonIdsArr = rootMasterGroupId ? [rootMasterGroupId] : [];
+        const strMasterParams = masterAddonIdsArr.length > 0 ? JSON.stringify(masterAddonIdsArr) : null;
+        const strVariants = variantsChanged ? JSON.stringify(variantsArr) : item.variants;
+
+        if (strMasterParams || variantsChanged) {
+          this.db.run(
+            'UPDATE menu_items SET master_addon_ids = ?, variants = ? WHERE id = ?',
+            [strMasterParams, strVariants, item.id]
+          );
+        }
+      }
+
+      this.db.run('COMMIT');
+      this.save();
+    } catch (err) {
+      try { this.db.run('ROLLBACK'); } catch (e) {}
+      console.log('Legacy Addon Migration Note:', err.message);
     }
   }
 
