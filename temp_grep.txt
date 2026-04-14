@@ -47,3 +47,8 @@
 971: <div class="row"><span class="label">Cash Withdrawal:</span><span class="bold">₹${(sales.withdrawal_total || 0).toFixed(2)}</span></div>
 972: <div class="row"><span class="label">Other Expenses:</span><span class="bold">₹${((sales.total_expenses || 0) - (sales.staff_advance_total || 0) - (sales.withdrawal_total || 0)).toFixed(2)}</span></div>
 973: <div class="row bold" style="margin-top: 4px; border-top: 1px dotted #000;"><span class="label">Total Expenses:</span><span>₹${((sales.total_expenses || 0)).toFixed(2)}</span></div>
+
+
+
+
+taskkill /F /IM "ZapBill POS.exe"

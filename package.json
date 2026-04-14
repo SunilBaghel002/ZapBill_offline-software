@@ -1,6 +1,6 @@
 {
   "name": "restaurant-pos",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Offline-first Restaurant POS System",
   "main": "electron/main.js",
   "scripts": {
@@ -73,7 +73,10 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh"
     }
   },
   "author": "Restaurant POS Team",

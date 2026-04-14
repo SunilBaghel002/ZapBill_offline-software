@@ -25,25 +25,30 @@ let printerService = null;
 let syncService = null;
 let qrServerService = null;
 let emailService = null;
+let isQuitting = false; // Flag to distinguish X (hide) vs actual quit
+
+// Determine if in development mode
+const isDev = !app.isPackaged;
 
 // Enforce single instance to prevent duplicate cron jobs (e.g. multiple emails sent per hour)
 const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
+if (!gotTheLock && !isDev) {
   app.quit();
   process.exit(0);
 } else {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
-    // Someone tried to run a second instance, focus our window
+    // Someone tried to run a second instance, restore and focus our window
     if (mainWindow) {
+      if (!mainWindow.isVisible()) mainWindow.show();
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
+    } else {
+      // Window was destroyed somehow, recreate it
+      createWindow();
     }
   });
 }
 
-
-// Determine if in development mode
-const isDev = !app.isPackaged;
 
 function createWindow() {
   // Create the browser window
@@ -84,7 +89,15 @@ function createWindow() {
     }
   });
 
-  // Handle window closed
+  // Intercept window close: hide to tray instead of destroying
+  mainWindow.on('close', (event) => {
+    if (!isQuitting && !isDev) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
+  // Handle window actually destroyed (only during quit)
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -115,7 +128,10 @@ function createTray() {
         click: () => {
           if (mainWindow) {
             mainWindow.show();
+            if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
+          } else {
+            createWindow();
           }
         }
       },
@@ -123,17 +139,19 @@ function createTray() {
       { 
         label: 'Quit', 
         click: () => {
+          isQuitting = true;
           app.quit();
         }
       }
     ]);
     
-    tray.setToolTip('Restaurant POS');
+    tray.setToolTip('ZapBill POS');
     tray.setContextMenu(contextMenu);
     
     tray.on('double-click', () => {
       if (mainWindow) {
         mainWindow.show();
+        if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.focus();
       }
     });
@@ -1733,14 +1751,20 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  // On macOS, keep app running in tray
-  if (process.platform !== 'darwin') {
-    // Keep running in background on Windows
-    // app.quit();
+  if (isDev) {
+    app.quit();
+    return;
   }
+  // Windows: don't quit, stay in tray (window is hidden, not destroyed)
+  // macOS: standard behavior
+  if (process.platform === 'darwin') {
+    // macOS keeps running by convention
+  }
+  // On Windows we do nothing here; the hidden window keeps the app alive
 });
 
 app.on('before-quit', async () => {
+  isQuitting = true; // Allow window.close() to actually destroy the window
   // Stop QR server
   if (qrServerService) {
     try {
