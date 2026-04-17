@@ -20,12 +20,22 @@ import {
   Send,
   Search,
   X,
-  ChevronDown
+  ChevronDown,
+  MonitorSmartphone,
+  Key,
+  Globe
 } from 'lucide-react';
+
+import NetworkTab from '../components/settings/NetworkTab';
 import { useAlertStore } from '../stores/alertStore';
+import { useLicenseStore } from '../stores/licenseStore';
+import FeatureGate from '../components/common/FeatureGate';
+import { RouteFallback } from '../App';
+import WebsiteOrdersTab from '../components/settings/WebsiteOrdersTab';
 
 const SettingsPage = () => {
   const { showAlert } = useAlertStore();
+  const { license, hardwareId, sync } = useLicenseStore();
   const [settings, setSettings] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -240,6 +250,9 @@ const SettingsPage = () => {
     { id: 'email', label: 'Email Reports', icon: Mail, desc: 'Automated daily reports', color: '#0ea5e9', bg: '#e0f2fe' },
     { id: 'import', label: 'Data Import', icon: Upload, desc: 'Import menu & inventory', color: 'var(--warning-600)', bg: 'var(--warning-50)' },
     { id: 'database', label: 'Database', icon: Database, desc: 'Storage & backup', color: 'var(--info-500)', bg: 'var(--info-50)' },
+    { id: 'network', label: 'Network & Devices', icon: Globe, desc: 'Ports, Sync & Devices', color: '#14b8a6', bg: '#ccfbf1' },
+    { id: 'website-orders', label: 'Website Orders', icon: Globe, desc: 'Connect orders from your site', color: '#0ea5e9', bg: '#e0f2fe' },
+    { id: 'devices', label: 'License & Devices', icon: MonitorSmartphone, desc: 'Manage your connected devices', color: '#8b5cf6', bg: '#ede9fe' },
     { id: 'about', label: 'About', icon: Info, desc: 'System information', color: 'var(--gray-500)', bg: 'var(--gray-100)' }
   ];
 
@@ -343,7 +356,14 @@ const SettingsPage = () => {
           </div>
 
           {/* Content Body */}
-          <div style={{ padding: '28px', overflowY: 'auto', flex: 1 }}>
+          <div style={{ padding: activeTab === 'network' ? '0px' : '28px', overflowY: activeTab === 'network' ? 'hidden' : 'auto', flex: 1 }}>
+
+            {activeTab === 'network' && <NetworkTab />}
+            {activeTab === 'website-orders' && (
+              <FeatureGate featureKey="website_orders" fallback={<RouteFallback featureName="Website Orders Integration" />}>
+                <WebsiteOrdersTab />
+              </FeatureGate>
+            )}
 
             {/* ═══════════ TAB: Restaurant Info ═══════════ */}
             {activeTab === 'restaurant' && (
@@ -484,6 +504,7 @@ const SettingsPage = () => {
               );
 
               return (
+              <FeatureGate featureKey="email_reports" fallback={<RouteFallback featureName="Automated Email Reports" />}>
               <div style={{ display: 'grid', gap: '28px' }}>
                 <div style={{ display: 'flex', gap: '14px', padding: '16px 20px', background: '#e0f2fe', borderRadius: '12px', border: '1px solid #bae6fd', alignItems: 'flex-start' }}>
                   <Mail size={22} style={{ color: '#0ea5e9', flexShrink: 0, marginTop: '2px' }} />
@@ -571,7 +592,6 @@ const SettingsPage = () => {
 
                     {(rs.items_mode === 'custom' || rs.items_mode === 'mixed') && (() => {
                       const selectedIds = new Set(rs.items_custom_ids || []);
-                      // Group items by category
                       const categorizedItems = {};
                       filteredItems.forEach(item => {
                         const catName = item.category_name || 'Uncategorized';
@@ -583,10 +603,8 @@ const SettingsPage = () => {
                         const catItemIds = catItems.map(i => i.id);
                         const allSelected = catItemIds.every(id => selectedIds.has(id));
                         if (allSelected) {
-                          // Deselect all in this category
                           updateReportSetting('items_custom_ids', (rs.items_custom_ids || []).filter(id => !catItemIds.includes(id)));
                         } else {
-                          // Select all in this category
                           const newIds = [...(rs.items_custom_ids || [])];
                           catItemIds.forEach(id => { if (!newIds.includes(id)) newIds.push(id); });
                           updateReportSetting('items_custom_ids', newIds);
@@ -601,7 +619,6 @@ const SettingsPage = () => {
                             style={{ width: '100%', padding: '8px 8px 8px 32px', borderRadius: '8px', border: '1px solid var(--gray-300)', fontSize: '12px', boxSizing: 'border-box' }} />
                         </div>
 
-                        {/* Selected items chips */}
                         {(rs.items_custom_ids || []).length > 0 && (
                           <div style={{ marginBottom: '10px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -628,14 +645,12 @@ const SettingsPage = () => {
                           </div>
                         )}
 
-                        {/* Category-grouped items list */}
                         <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: '8px', background: 'white' }}>
                           {Object.entries(categorizedItems).map(([catName, catItems]) => {
                             const allCatSelected = catItems.every(i => selectedIds.has(i.id));
                             const someCatSelected = catItems.some(i => selectedIds.has(i.id));
                             return (
                               <div key={catName}>
-                                {/* Category header with Select All */}
                                 <div onClick={() => toggleCategory(catItems)} style={{
                                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                                   padding: '8px 12px', background: '#f1f5f9', borderBottom: '1px solid var(--gray-200)',
@@ -654,7 +669,6 @@ const SettingsPage = () => {
                                   </div>
                                   <span style={{ fontSize: '10px', color: 'var(--gray-400)', fontWeight: '500' }}>{catItems.length} items</span>
                                 </div>
-                                {/* Individual items */}
                                 {catItems.map(item => {
                                   const isSelected = selectedIds.has(item.id);
                                   return (
@@ -806,6 +820,7 @@ const SettingsPage = () => {
                   </button>
                 </div>
               </div>
+              </FeatureGate>
               );
             })()}
 
@@ -1143,6 +1158,79 @@ const SettingsPage = () => {
                     <div style={{ padding: '18px 20px', background: 'var(--gray-50)', borderRadius: '12px', border: '1px solid var(--gray-200)' }}>
                       <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--gray-400)', fontWeight: '600', letterSpacing: '0.5px' }}>Mode</div>
                       <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--success-600)', marginTop: '6px' }}>Fully Offline</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══════════ TAB: Devices & Licensing ═══════════ */}
+            {activeTab === 'devices' && (
+              <div style={{ display: 'grid', gap: '28px' }}>
+                <div style={{ display: 'flex', gap: '14px', padding: '16px 20px', background: '#ede9fe', borderRadius: '12px', border: '1px solid #ddd6fe', alignItems: 'flex-start' }}>
+                  <Key size={22} style={{ color: '#8b5cf6', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong style={{ color: '#6d28d9', fontSize: '14px' }}>License Information</strong>
+                    <p style={{ color: '#8b5cf6', fontSize: '13px', marginTop: '4px', lineHeight: '1.5' }}>
+                      View your current licensing status, AMC validity, and registered devices below.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h4 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--gray-800)' }}>Current License</h4>
+                    <button onClick={() => sync()} className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                      <RefreshCw size={14} style={{ marginRight: '6px' }} /> Sync Now
+                    </button>
+                  </div>
+
+                  <div style={{ border: '1px solid var(--gray-200)', borderRadius: '12px', overflow: 'hidden' }}>
+                    {[
+                      { label: 'License Key', value: license?.license_key || 'Unknown' },
+                      { label: 'Hardware ID', value: hardwareId || 'Unknown' },
+                      { label: 'AMC Status', value: <span style={{ color: license?.amc_status === 'active' ? 'var(--success-600)' : 'var(--danger-600)', fontWeight: 'bold', textTransform: 'uppercase' }}>{license?.amc_status || 'Unknown'}</span> },
+                      { label: 'AMC valid until', value: license?.amc_end_date ? new Date(license.amc_end_date).toLocaleDateString() : 'N/A' },
+                      { label: 'Activated At', value: license?.activated_at ? new Date(license.activated_at).toLocaleDateString() : 'N/A' },
+                    ].map((item, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '14px 20px', borderBottom: idx < 4 ? '1px solid var(--gray-100)' : 'none',
+                        background: idx % 2 === 0 ? 'white' : 'var(--gray-50)'
+                      }}>
+                        <span style={{ fontSize: '14px', color: 'var(--gray-600)' }}>{item.label}</span>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--gray-800)' }}>{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: 'var(--gray-800)' }}>Registered Devices</h4>
+                  <div style={{ border: '1px solid var(--gray-200)', borderRadius: '12px', overflow: 'hidden', padding: '16px', background: 'white' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid var(--gray-100)', paddingBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '40px', height: '40px', background: '#dbeafe', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <MonitorSmartphone size={20} style={{ color: '#2563eb' }} />
+                        </div>
+                        <div>
+                          <p style={{ margin: 0, fontWeight: '600', fontSize: '14px', color: 'var(--gray-800)' }}>This Device (Primary)</p>
+                          <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--gray-500)' }}>Hardware ID: {hardwareId}</p>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ display: 'inline-block', padding: '4px 10px', background: 'var(--success-50)', color: 'var(--success-700)', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>Active</span>
+                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--gray-400)' }}>Last Sync: {license?.last_sync ? new Date(license.last_sync).toLocaleString() : 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--gray-50)', padding: '12px 16px', borderRadius: '8px', marginTop: '16px' }}>
+                       <div>
+                         <p style={{ margin: 0, fontWeight: '600', fontSize: '13px' }}>Your Plan: Standard</p>
+                         <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--gray-500)' }}>Devices Used: 1</p>
+                       </div>
+                       <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => showAlert('Please contact your provider to add more devices.', 'info')}>
+                         Request Additional Device
+                       </button>
                     </div>
                   </div>
                 </div>

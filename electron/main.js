@@ -10,6 +10,8 @@ const SyncService = require('./services/sync.service');
 const QRServerService = require('./services/qr-server.service');
 const NetworkService = require('./services/network.service');
 const EmailService = require('./services/email.service');
+const LicenseService = require('./services/license.service');
+const WebsiteOrdersService = require('./services/website-orders.service');
 const fs = require('fs');
 
 // Configure logging
@@ -25,6 +27,8 @@ let printerService = null;
 let syncService = null;
 let qrServerService = null;
 let emailService = null;
+let licenseService = null;
+let websiteOrdersService = null;
 let isQuitting = false; // Flag to distinguish X (hide) vs actual quit
 
 // Determine if in development mode
@@ -85,7 +89,7 @@ function createWindow() {
 
     // Initialize email service
     if (db && !emailService) {
-      emailService = new EmailService(db, mainWindow);
+      emailService = new EmailService(db, mainWindow, licenseService);
     }
   });
 
@@ -177,10 +181,39 @@ async function initializeServices() {
   // QR Server will be started after window is created
   qrServerService = new QRServerService(db, null);
   
+  licenseService = new LicenseService(db);
+  qrServerService.setLicenseService(licenseService);
+
+  // Website Orders Service
+  websiteOrdersService = new WebsiteOrdersService(db, null);
+  
   log.info('Services initialized successfully');
 }
 
 function setupIpcHandlers() {
+  ipcMain.handle('app:restart', () => {
+    app.relaunch();
+    app.exit(0);
+  });
+
+  // ============ LICENSE & HARDWARE ============
+  ipcMain.handle('license:getHardwareId', () => {
+    return licenseService ? licenseService.getHardwareId() : null;
+  });
+  
+  ipcMain.handle('license:getLicense', () => {
+    return licenseService ? licenseService.getLicense() : null;
+  });
+  
+  ipcMain.handle('license:activate', async (event, data) => {
+    return await licenseService.activate(data);
+  });
+  
+  ipcMain.handle('license:sync', async () => {
+    if(licenseService) await licenseService.performHeartbeat();
+    return licenseService ? licenseService.getLicense() : null;
+  });
+
   // ============ AUTHENTICATION ============
   ipcMain.handle('auth:login', async (event, { username, password }) => {
     try {
@@ -311,6 +344,7 @@ function setupIpcHandlers() {
   // Email Config IPCs
   ipcMain.handle('email:getConfig', async () => db.getEmailConfig());
   ipcMain.handle('email:saveConfig', async (event, config) => db.saveEmailConfig(config));
+  ipcMain.handle('email:getLogs', async () => db.getEmailLogs());
   ipcMain.handle('email:checkInternet', async () => {
     if (emailService) return await emailService.checkInternet();
     return false;
@@ -319,6 +353,67 @@ function setupIpcHandlers() {
     if (emailService) return await emailService.generateAndSendDailyReport();
     return { success: false, error: 'Email service not initialized' };
   });
+
+  // Network IPCs
+  const networkService = require('./services/network.service.js');
+  ipcMain.handle('network:getConfig', () => networkService.loadConfig());
+  ipcMain.handle('network:saveConfig', (event, newConfig) => networkService.saveConfig(newConfig));
+  ipcMain.handle('network:checkPorts', (event, ports) => networkService.checkMultiplePorts(ports));
+  ipcMain.handle('network:scanPortConflicts', (event, ports) => networkService.scanPortConflicts(ports));
+  ipcMain.handle('network:getInterfaces', () => networkService.getNetworkInterfaces());
+
+  // ============ WEBSITE ORDERS ============
+  ipcMain.handle('websiteOrders:getConfig', () => {
+    return websiteOrdersService ? websiteOrdersService.loadConfig() : {};
+  });
+  ipcMain.handle('websiteOrders:saveConfig', (event, newConfig) => {
+    if (!websiteOrdersService) return {};
+    const result = websiteOrdersService.saveConfig(newConfig);
+    // Restart polling with new config
+    websiteOrdersService.stopPolling();
+    if (result.polling?.enabled && result.server?.url) {
+      websiteOrdersService.startPolling();
+    }
+    return result;
+  });
+  ipcMain.handle('websiteOrders:testConnection', async () => {
+    return websiteOrdersService ? await websiteOrdersService.testConnection() : { success: false, message: 'Service not initialized' };
+  });
+  ipcMain.handle('websiteOrders:getOrders', (event, filters) => {
+    return websiteOrdersService ? websiteOrdersService.getOrders(filters) : [];
+  });
+  ipcMain.handle('websiteOrders:getCounts', () => {
+    return websiteOrdersService ? websiteOrdersService.getOrderCounts() : { pending: 0, accepted: 0, rejected: 0, completed: 0 };
+  });
+  ipcMain.handle('websiteOrders:getPollingStatus', () => {
+    return websiteOrdersService ? websiteOrdersService.getPollingStatus() : {};
+  });
+  ipcMain.handle('websiteOrders:getLogs', (event, limit) => {
+    return websiteOrdersService ? websiteOrdersService.getLogs(limit) : [];
+  });
+  ipcMain.handle('websiteOrders:clearLogs', () => {
+    if (websiteOrdersService) websiteOrdersService.clearLogs();
+    return true;
+  });
+  ipcMain.handle('websiteOrders:acknowledge', async (event, orderId, action, message, reason) => {
+    return websiteOrdersService ? await websiteOrdersService.acknowledgeOrder(orderId, action, message, reason) : { success: false };
+  });
+  ipcMain.handle('websiteOrders:updateStatus', async (event, orderId, status, message) => {
+    return websiteOrdersService ? await websiteOrdersService.updateOrderStatus(orderId, status, message) : { success: false };
+  });
+  ipcMain.handle('websiteOrders:startPolling', () => {
+    if (websiteOrdersService) websiteOrdersService.startPolling();
+    return true;
+  });
+  ipcMain.handle('websiteOrders:stopPolling', () => {
+    if (websiteOrdersService) websiteOrdersService.stopPolling();
+    return true;
+  });
+  ipcMain.handle('websiteOrders:pollNow', async () => {
+    if (websiteOrdersService) await websiteOrdersService._pollOnce();
+    return true;
+  });
+
 
   // Fetch menu items for report settings picker — from ACTIVE MENU only
   ipcMain.handle('email:getMenuItemsForPicker', async () => {
@@ -1736,6 +1831,12 @@ app.whenReady().then(async () => {
     } else {
       log.warn('QR Server failed to start:', result.error);
     }
+  }
+
+  // Initialize Website Orders Service
+  if (websiteOrdersService && mainWindow) {
+    websiteOrdersService.setMainWindow(mainWindow);
+    websiteOrdersService.initialize();
   }
 
   app.on('activate', () => {

@@ -15,7 +15,9 @@ import {
   RefreshCw,
   Wallet,
   Tag,
-  QrCode
+  QrCode,
+  Mail,
+  Globe
 } from 'lucide-react';
 import { useQROrderStore } from '../../stores/qrOrderStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -36,14 +38,44 @@ const Sidebar = () => {
   const isAdmin = user?.role === 'admin';
 
   const [activeOrdersCount, setActiveOrdersCount] = React.useState(0);
+  const [websiteOrdersCount, setWebsiteOrdersCount] = React.useState(0);
 
-  // ... useEffect for order count
+  React.useEffect(() => {
+    const fetchOrdersCount = async () => {
+      try {
+        const orders = await window.electronAPI.invoke('orders:getActiveCount');
+        setActiveOrdersCount(orders || 0);
+        
+        const websiteCounts = await window.electronAPI.invoke('websiteOrders:getCounts');
+        setWebsiteOrdersCount(websiteCounts.pending || 0);
+      } catch (error) {
+        console.error('Error fetching order counts:', error);
+      }
+    };
+
+    fetchOrdersCount();
+    const interval = setInterval(fetchOrdersCount, 10000);
+
+    // Listen for new website orders
+    if (window.electronAPI?.on) {
+      const unsub = window.electronAPI.on('websiteOrders:newOrder', () => {
+        fetchOrdersCount();
+      });
+      return () => {
+        clearInterval(interval);
+        if (typeof unsub === 'function') unsub();
+      };
+    }
+
+    return () => clearInterval(interval);
+  }, []);
 
   const allNavItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', adminOnly: false },
     { path: '/pos', icon: ShoppingCart, label: 'POS / Billing', adminOnly: false },
     { path: '/orders', icon: ClipboardList, label: 'Orders', badge: activeOrdersCount > 0 ? activeOrdersCount : null, adminOnly: false },
     { path: '/qr-orders', icon: QrCode, label: 'QR Orders', badge: pendingCount > 0 ? pendingCount : null, adminOnly: false },
+    { path: '/website-orders', icon: Globe, label: 'Website Orders', badge: websiteOrdersCount > 0 ? websiteOrdersCount : null, adminOnly: false },
     { path: '/menu', icon: UtensilsCrossed, label: 'Menu', adminOnly: true },
     { path: '/kot', icon: ChefHat, label: 'Kitchen (KOT)', adminOnly: false },
     { path: '/inventory', icon: Package, label: 'Inventory', adminOnly: false },
@@ -61,6 +93,7 @@ const Sidebar = () => {
       ]
     },
     { path: '/expenses', icon: Wallet, label: 'Expenses', adminOnly: false },
+    { path: '/email-reports', icon: Mail, label: 'Email Reports', adminOnly: true },
     { path: '/discounts', icon: Tag, label: 'Discounts', adminOnly: true },
     { path: '/users', icon: Users, label: 'Users', adminOnly: true },
     { path: '/printers', icon: Printer, label: 'Printers', adminOnly: false },

@@ -1,7 +1,14 @@
 const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 // Define valid channels for security
+// Define valid channels for security
 const validInvokeChannels = [
+  // License
+  'license:getHardwareId',
+  'license:getLicense',
+  'license:activate',
+  'license:sync',
+  
   // Auth
   'auth:login',
   'auth:loginWithPin',
@@ -140,6 +147,7 @@ const validInvokeChannels = [
   // App
   'app:getVersion',
   'app:checkForUpdates',
+  'app:restart',
   // Discounts
   'discounts:getAll',
   'discounts:getActive',
@@ -158,17 +166,43 @@ const validInvokeChannels = [
   // Email Reports
   'email:getConfig',
   'email:saveConfig',
+  'email:getLogs',
   'email:checkInternet',
   'email:sendReportNow',
   'email:getMenuItemsForPicker',
   'email:getCategoriesForPicker',
   'email:getAddonsForPicker',
+  'network:getConfig',
+  'network:saveConfig',
+  'network:checkPorts',
+  'network:scanPortConflicts',
+  'network:getInterfaces',
+  'websiteOrders:getConfig',
+  'websiteOrders:saveConfig',
+  'websiteOrders:testConnection',
+  'websiteOrders:getOrders',
+  'websiteOrders:getCounts',
+  'websiteOrders:getPollingStatus',
+  'websiteOrders:getLogs',
+  'websiteOrders:clearLogs',
+  'websiteOrders:acknowledge',
+  'websiteOrders:updateStatus',
+  'websiteOrders:startPolling',
+  'websiteOrders:stopPolling',
+  'websiteOrders:pollNow'
 ];
 
 const validOnChannels = [
   'update:available',
   'update:downloaded',
   'qr:newOrder',
+  'websiteOrders:newOrder',
+  'websiteOrders:connectionError',
+  'admin:forceLogout',
+  'admin:amcUpdated',
+  'admin:activated',
+  'license:revoked',
+  'license:updated',
 ];
 
 // Expose protected APIs to renderer

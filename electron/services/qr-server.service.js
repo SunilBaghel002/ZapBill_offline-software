@@ -1,4 +1,4 @@
-/**
+ /**
  * QR Server Service
  * Express.js + Socket.io server running inside Electron main process
  * Serves mobile customer menu and handles QR order API
@@ -19,6 +19,11 @@ class QRServerService {
     this.io = null;
     this.port = 3000;
     this.running = false;
+    this.licenseService = null;
+  }
+
+  setLicenseService(licenseService) {
+    this.licenseService = licenseService;
   }
 
   /**
@@ -53,8 +58,9 @@ class QRServerService {
       });
     });
 
-    // Try to start on port 3000, fallback to 3001, 3002, etc.
-    return this._tryListen(3000);
+    // Try to start on the configured network port, fallback to next if busy
+    const port = NetworkService.config?.server?.qr_port || 3000;
+    return this._tryListen(port);
   }
 
   /**
@@ -64,7 +70,8 @@ class QRServerService {
     return new Promise((resolve) => {
       let attempts = 0;
       const tryPort = (p) => {
-        this.server.listen(p, '0.0.0.0', () => {
+        const bindAddress = NetworkService.config?.server?.bind_address || '0.0.0.0';
+        this.server.listen(p, bindAddress, () => {
           this.port = p;
           this.running = true;
           const ip = NetworkService.getLocalIP();
@@ -146,6 +153,11 @@ class QRServerService {
 
     // Serve static mobile menu app
     const menuDir = path.join(__dirname, '..', 'qr-menu');
+
+    // Redirect root to /menu automatically
+    this.app.get('/', (req, res) => {
+      res.redirect('/menu');
+    });
 
     // Serve /menu — send index.html explicitly
     this.app.get('/menu', (req, res) => {
@@ -269,6 +281,76 @@ class QRServerService {
       } catch (error) {
         log.error('QR API /api/orders/reject error:', error);
         res.status(500).json({ success: false, error: 'Server error' });
+      }
+    });
+
+    // POST /api/admin/command — Admin Panel Bridge webhook
+    this.app.post('/api/admin/command', (req, res) => {
+      try {
+        const { command, payload, source } = req.body;
+        if (source !== 'admin_panel') {
+          return res.status(403).json({ success: false, error: 'Unauthorized source' });
+        }
+
+        log.info(`Received admin command: ${command}`);
+
+        // Verify hardware and license key to ensure command is for this machine
+        if (this.licenseService) {
+          const hardwareId = this.licenseService.getHardwareId();
+          const license = this.licenseService.getLicense();
+          const { license_key, hardware_id } = payload;
+          
+          // Verify identity matches
+          if (license_key && license && license_key !== license.license_key) {
+            return res.status(400).json({ success: false, error: 'License key mismatch' });
+          }
+          if (hardware_id && hardwareId !== hardware_id) {
+            return res.status(400).json({ success: false, error: 'Hardware ID mismatch' });
+          }
+        }
+
+        switch (command) {
+          case 'force_logout':
+          case 'suspend':
+            if (this.licenseService && this.licenseService.licenseData) {
+              this.licenseService.licenseData.amc_status = 'suspended';
+              this.licenseService.saveLicense(this.licenseService.licenseData);
+            }
+            if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+              this.mainWindow.webContents.send('admin:forceLogout', { message: payload.message || 'Suspended by admin' });
+            }
+            break;
+
+          case 'update_amc':
+            if (this.licenseService && this.licenseService.licenseData) {
+              this.licenseService.licenseData.amc_status = payload.amc_status;
+              this.licenseService.licenseData.amc_end_date = payload.amc_end_date;
+              this.licenseService.saveLicense(this.licenseService.licenseData);
+              if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('admin:amcUpdated');
+              }
+            }
+            break;
+
+          case 'activate':
+            if (this.licenseService && this.licenseService.licenseData) {
+              this.licenseService.licenseData.amc_status = 'active';
+              this.licenseService.saveLicense(this.licenseService.licenseData);
+              if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+                this.mainWindow.webContents.send('admin:activated', { message: payload.message });
+              }
+            }
+            break;
+            
+          default:
+            log.warn(`Unknown admin command: ${command}`);
+            return res.status(400).json({ success: false, error: 'Unknown command' });
+        }
+
+        res.json({ success: true, message: `Command ${command} processed` });
+      } catch (error) {
+        log.error('QR API /api/admin/command error:', error);
+        res.status(500).json({ success: false, error: 'Server error processing admin command' });
       }
     });
   }

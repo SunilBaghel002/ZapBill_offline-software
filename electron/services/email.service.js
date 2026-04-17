@@ -5,9 +5,10 @@ const path = require('path');
 const { app } = require('electron');
 
 class EmailService {
-  constructor(db, mainWindow) {
+  constructor(db, mainWindow, licenseService) {
     this.db = db;
     this.mainWindow = mainWindow;
+    this.licenseService = licenseService;
     this.queueInterval = null;
     this.dailyJobInterval = null;
     this.lastReportSentKey = null;
@@ -123,6 +124,14 @@ class EmailService {
     if (this.dailyJobInterval) clearInterval(this.dailyJobInterval);
 
     this.dailyJobInterval = setInterval(() => {
+      // Hardware-level feature lock check
+      if (this.licenseService) {
+        const license = this.licenseService.getLicense();
+        if (license && license.features && !license.features.includes('email_reports')) {
+          return;
+        }
+      }
+
       const config = this.db.getEmailConfig();
       if (!config || !config.is_active) return;
 

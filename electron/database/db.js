@@ -3408,8 +3408,8 @@ class Database {
         const adminUser = {
           id: uuidv4(),
           username: 'admin',
-          // Hash for 'admin'
-          password_hash: '$2a$10$Fi0vUmfTcmW3dejG4clk5.neWpsyPF9Tsi8Y6eG4kcHpugmwDplX.',
+          // Hash for 'admin123'
+          password_hash: '$2a$10$ebMT6/RD0syc3eaOIh41Yu/d2W0tPV8ZJHFsq.2nMXtS2jRm8wvrC',
           full_name: 'Administrator',
           role: 'admin',
           is_active: 1,
@@ -4672,6 +4672,15 @@ class Database {
     } catch (e) {
       console.error('Error updating email status:', e);
       return { success: false, error: e.message };
+    }
+  }
+
+  getEmailLogs(limit = 100) {
+    try {
+      return this.execute(`SELECT id, subject, status, created_at, last_retry_at, retry_count FROM email_queue ORDER BY created_at DESC LIMIT ${limit}`);
+    } catch (e) {
+      console.error('Error getting email logs:', e);
+      return [];
     }
   }
 }
