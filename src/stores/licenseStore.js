@@ -7,14 +7,32 @@ export const useLicenseStore = create((set, get) => ({
   amcExpiredFlag: false,
 
   init: async () => {
+    // don't re-initialize if already done
+    if (get().isInitialized) return;
+
     try {
-      const hwId = await window.electronAPI.invoke('license:getHardwareId');
+      // Try to get hardware ID and license status in parallel
+      const [hwId, status] = await Promise.all([
+        window.electronAPI ? window.electronAPI.invoke('license:getHardwareId') : Promise.resolve(null),
+        window.zapbillCloud ? window.zapbillCloud.getLicenseStatus() : (window.electronAPI ? window.electronAPI.invoke('license:getLicense') : Promise.resolve(null))
+      ]);
+
+      console.log('License Init - Status:', status);
       
       let lic = null;
-      if (window.zapbillCloud?.getLicenseStatus) {
-        lic = await window.zapbillCloud.getLicenseStatus();
+      // If we got an object from zapbillCloud, check is_activated
+      if (status && typeof status === 'object') {
+        if (status.is_activated) {
+          lic = status;
+        } else if (Object.keys(status).length > 0) {
+          // It's the status object but not activated yet
+          lic = null;
+        } else {
+          // Possibly raw license data (fallback)
+          lic = status.license_key ? status : null;
+        }
       } else {
-        lic = await window.electronAPI.invoke('license:getLicense');
+        lic = status; // Likely null from electronAPI
       }
       
       let isAmcExpired = false;
@@ -24,24 +42,29 @@ export const useLicenseStore = create((set, get) => ({
         }
       }
 
-      set({ license: lic, hardwareId: hwId, isInitialized: true, amcExpiredFlag: isAmcExpired });
+      set({ 
+        license: lic, 
+        hardwareId: hwId, 
+        isInitialized: true, 
+        amcExpiredFlag: isAmcExpired 
+      });
 
-      // Listen for live updates from heartbeat
+      // Listen for live updates
       if (window.zapbillCloud?.onFeaturesChanged) {
         window.zapbillCloud.onFeaturesChanged(async () => {
-          const freshLicense = await window.zapbillCloud.getLicenseStatus();
-          if (freshLicense) {
+          const freshStatus = await window.zapbillCloud.getLicenseStatus();
+          if (freshStatus && freshStatus.is_activated) {
             let expired = false;
-            if (freshLicense.amc_end_date && new Date(freshLicense.amc_end_date) < new Date()) {
+            if (freshStatus.amc_end_date && new Date(freshStatus.amc_end_date) < new Date()) {
               expired = true;
             }
-            set({ license: freshLicense, amcExpiredFlag: expired });
+            set({ license: freshStatus, amcExpiredFlag: expired });
           }
         });
       }
     } catch (error) {
       console.error('Failed to init license store:', error);
-      set({ isInitialized: true });
+      set({ isInitialized: true, license: null });
     }
   },
 

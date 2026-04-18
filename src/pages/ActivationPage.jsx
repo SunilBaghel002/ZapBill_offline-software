@@ -8,8 +8,14 @@ const ActivationPage = () => {
   const [licenseSecret, setLicenseSecret] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { activate, hardwareId } = useLicenseStore();
+  const { activate, hardwareId, isInitialized, init } = useLicenseStore();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (!isInitialized) {
+      init();
+    }
+  }, [isInitialized, init]);
 
   const handleActivate = async (e) => {
     e.preventDefault();

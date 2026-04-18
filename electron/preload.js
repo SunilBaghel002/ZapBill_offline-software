@@ -189,7 +189,13 @@ const validInvokeChannels = [
   'websiteOrders:updateStatus',
   'websiteOrders:startPolling',
   'websiteOrders:stopPolling',
-  'websiteOrders:pollNow'
+  'websiteOrders:pollNow',
+  // Device Sync
+  'sync:generatePin',
+  'sync:getDeviceInfo',
+  'sync:connect',
+  'sync:pullAll',
+  'sync:pullTable'
 ];
 
 const validOnChannels = [

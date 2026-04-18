@@ -196,6 +196,10 @@ async function initializeServices() {
   // Website Orders Service
   websiteOrdersService = new WebsiteOrdersService(db, null);
   websiteOrdersService.initialize();
+
+  // Data Sync Service (device-to-device)
+  const dataSyncService = require('./services/dataSyncService');
+  dataSyncService.setDb(db);
   
   log.info('Services initialized successfully');
 }

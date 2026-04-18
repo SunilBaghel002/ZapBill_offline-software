@@ -32,6 +32,7 @@ import { useLicenseStore } from '../stores/licenseStore';
 import FeatureGate from '../components/common/FeatureGate';
 import { RouteFallback } from '../App';
 import WebsiteOrdersTab from '../components/settings/WebsiteOrdersTab';
+import DeviceSyncTab from '../components/settings/DeviceSyncTab';
 
 const SettingsPage = () => {
   const { showAlert } = useAlertStore();
@@ -253,6 +254,7 @@ const SettingsPage = () => {
     { id: 'network', label: 'Network & Devices', icon: Globe, desc: 'Ports, Sync & Devices', color: '#14b8a6', bg: '#ccfbf1' },
     { id: 'website-orders', label: 'Website Orders', icon: Globe, desc: 'Connect orders from your site', color: '#0ea5e9', bg: '#e0f2fe' },
     { id: 'devices', label: 'License & Devices', icon: MonitorSmartphone, desc: 'Manage your connected devices', color: '#8b5cf6', bg: '#ede9fe' },
+    { id: 'device-sync', label: 'Device Sync', icon: RefreshCw, desc: 'Transfer data between devices', color: '#f59e0b', bg: '#fef3c7' },
     { id: 'about', label: 'About', icon: Info, desc: 'System information', color: 'var(--gray-500)', bg: 'var(--gray-100)' }
   ];
 
@@ -356,7 +358,7 @@ const SettingsPage = () => {
           </div>
 
           {/* Content Body */}
-          <div style={{ padding: activeTab === 'network' ? '0px' : '28px', overflowY: activeTab === 'network' ? 'hidden' : 'auto', flex: 1 }}>
+          <div style={{ padding: (activeTab === 'network' || activeTab === 'device-sync') ? '0px' : '28px', overflowY: (activeTab === 'network' || activeTab === 'device-sync') ? 'hidden' : 'auto', flex: 1 }}>
 
             {activeTab === 'network' && <NetworkTab />}
             {activeTab === 'website-orders' && (
@@ -1236,6 +1238,9 @@ const SettingsPage = () => {
                 </div>
               </div>
             )}
+
+            {/* ═══════════ TAB: Device Sync ═══════════ */}
+            {activeTab === 'device-sync' && <DeviceSyncTab />}
 
             {/* ═══════════ TAB: About ═══════════ */}
             {activeTab === 'about' && (

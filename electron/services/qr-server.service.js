@@ -353,6 +353,90 @@ class QRServerService {
         res.status(500).json({ success: false, error: 'Server error processing admin command' });
       }
     });
+
+    // ─── DEVICE SYNC ROUTES ─────────────────────────
+    const dataSyncService = require('./dataSyncService');
+
+    // POST /api/sync/auth — authenticate with PIN
+    this.app.post('/api/sync/auth', (req, res) => {
+      try {
+        const { pin } = req.body;
+        if (!pin) return res.status(400).json({ success: false, error: 'PIN is required' });
+
+        if (!dataSyncService.validatePin(pin)) {
+          return res.status(401).json({ success: false, error: 'Invalid or expired PIN' });
+        }
+
+        // Generate a session token for this sync
+        const token = require('crypto').randomBytes(32).toString('hex');
+        dataSyncService._syncToken = token;
+        dataSyncService._syncTokenExpiry = Date.now() + 30 * 60 * 1000; // 30 min
+
+        res.json({
+          success: true,
+          token,
+          deviceName: require('os').hostname(),
+          tables: dataSyncService.getTableManifest()
+        });
+      } catch (error) {
+        log.error('Sync auth error:', error);
+        res.status(500).json({ success: false, error: 'Auth failed' });
+      }
+    });
+
+    // Middleware: validate sync token for all /api/sync/* routes (except /auth)
+    const validateSyncToken = (req, res, next) => {
+      const token = req.headers['x-sync-token'];
+      if (!token || token !== dataSyncService._syncToken) {
+        return res.status(401).json({ success: false, error: 'Invalid sync token' });
+      }
+      if (Date.now() > (dataSyncService._syncTokenExpiry || 0)) {
+        return res.status(401).json({ success: false, error: 'Sync session expired' });
+      }
+      next();
+    };
+
+    // GET /api/sync/manifest — get table list with row counts
+    this.app.get('/api/sync/manifest', validateSyncToken, (req, res) => {
+      try {
+        res.json({ success: true, tables: dataSyncService.getTableManifest() });
+      } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
+    // GET /api/sync/export/:tableName — export a single table
+    this.app.get('/api/sync/export/:tableName', validateSyncToken, (req, res) => {
+      try {
+        const data = dataSyncService.exportTable(req.params.tableName);
+        res.json({ success: true, data });
+      } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+      }
+    });
+
+    // GET /api/sync/export-all — export everything in one shot
+    this.app.get('/api/sync/export-all', validateSyncToken, (req, res) => {
+      try {
+        const data = dataSyncService.exportAll();
+        // Mark PIN as consumed after full export
+        dataSyncService.consumePin(Object.keys(dataSyncService.activePins || {})[0]);
+        res.json({ success: true, data });
+      } catch (error) {
+        log.error('Full export error:', error);
+        res.status(500).json({ success: false, error: error.message });
+      }
+    });
+
+    // GET /api/sync/info — public endpoint: shows this device is sync-capable
+    this.app.get('/api/sync/info', (req, res) => {
+      res.json({
+        app: 'ZapBill POS',
+        syncVersion: '1.0',
+        deviceName: require('os').hostname(),
+        ready: true
+      });
+    });
   }
 
   /**
