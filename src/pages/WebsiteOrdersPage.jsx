@@ -42,8 +42,8 @@ const WebsiteOrdersPage = () => {
     loadData();
 
     // Listen for new orders from backend
-    if (window.zapbillCloud?.onNewOrder) {
-      const unsub = window.zapbillCloud.onNewOrder((order) => {
+    if (window.flashbillCloud?.onNewOrder) {
+      const unsub = window.flashbillCloud.onNewOrder((order) => {
         setNewOrderBanner(order);
         loadData();
         setTimeout(() => setNewOrderBanner(null), 30000);
@@ -83,7 +83,7 @@ const WebsiteOrdersPage = () => {
         ...dateRange
       };
       const [orderData, countData, statusData] = await Promise.all([
-        window.zapbillCloud.checkOrdersNow(),
+        window.flashbillCloud.checkOrdersNow(),
         window.electronAPI.invoke('websiteOrders:getCounts'),
         window.electronAPI.invoke('websiteOrders:getPollingStatus')
       ]);
@@ -123,7 +123,7 @@ const WebsiteOrdersPage = () => {
 
   const handleAccept = async (orderId) => {
     try {
-      await window.zapbillCloud.acceptOrder(orderId, 30, 'Order accepted');
+      await window.flashbillCloud.acceptOrder(orderId, 30, 'Order accepted');
       showAlert('Order accepted!', 'success');
       loadData();
       if (selectedOrder?.order_id === orderId) setSelectedOrder(null);
@@ -139,7 +139,7 @@ const WebsiteOrdersPage = () => {
 
   const confirmReject = async () => {
     try {
-      await window.zapbillCloud.rejectOrder(rejectingOrderId, rejectReason, 'Order rejected');
+      await window.flashbillCloud.rejectOrder(rejectingOrderId, rejectReason, 'Order rejected');
       showAlert('Order rejected', 'info');
       setShowRejectModal(false);
       setRejectReason('');
@@ -153,7 +153,7 @@ const WebsiteOrdersPage = () => {
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
-      await window.zapbillCloud.updateOrderStatus(orderId, newStatus, '');
+      await window.flashbillCloud.updateOrderStatus(orderId, newStatus, '');
       showAlert(`Order status updated to ${newStatus}`, 'success');
       loadData();
     } catch (e) {
@@ -164,9 +164,9 @@ const WebsiteOrdersPage = () => {
   const togglePolling = async () => {
     try {
       if (isPaused) {
-        await window.zapbillCloud.resumeOrderPolling();
+        await window.flashbillCloud.resumeOrderPolling();
       } else {
-        await window.zapbillCloud.pauseOrderPolling();
+        await window.flashbillCloud.pauseOrderPolling();
       }
       setIsPaused(!isPaused);
       loadData();
@@ -177,7 +177,7 @@ const WebsiteOrdersPage = () => {
 
   const checkNow = async () => {
     try {
-      await window.zapbillCloud.checkOrdersNow();
+      await window.flashbillCloud.checkOrdersNow();
       loadData();
     } catch (e) {
       showAlert('Check failed: ' + e.message, 'error');

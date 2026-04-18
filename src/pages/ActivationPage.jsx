@@ -77,7 +77,7 @@ const ActivationPage = () => {
             margin: '0 0 8px 0',
             letterSpacing: '-0.5px'
           }}>
-            ⚡ ZapBill Activation
+            ⚡ FlashBill Activation
           </h2>
           <p style={{
             fontSize: '14px',

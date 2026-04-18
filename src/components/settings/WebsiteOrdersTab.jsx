@@ -132,7 +132,7 @@ const WebsiteOrdersTab = () => {
       <div style={{ padding: '20px 24px', background: 'white', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: '700', color: '#0f172a' }}>Website Orders</h2>
-          <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Configure how ZapBill fetches and processes online orders from your website.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Configure how FlashBill fetches and processes online orders from your website.</p>
         </div>
         <button onClick={handleSave} disabled={isSaving} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1 }}>
           <Save size={18} />
@@ -287,10 +287,10 @@ const WebsiteOrdersTab = () => {
                 </SectionCard>
 
                 <SectionCard title="Visual Notifications" icon={Bell} color="#8b5cf6">
-                  <SettingRow label="Desktop notification popup" desc="Shows system popup even when ZapBill is minimized">
+                  <SettingRow label="Desktop notification popup" desc="Shows system popup even when FlashBill is minimized">
                     <Toggle checked={config.notifications.desktop_notification} onChange={(v) => updateConfig('notifications', 'desktop_notification', v)} />
                   </SettingRow>
-                  <SettingRow label="Flash taskbar icon" desc="Flashes ZapBill icon in taskbar on new order">
+                  <SettingRow label="Flash taskbar icon" desc="Flashes FlashBill icon in taskbar on new order">
                     <Toggle checked={config.notifications.flash_taskbar} onChange={(v) => updateConfig('notifications', 'flash_taskbar', v)} />
                   </SettingRow>
                   <SettingRow label="Show order count badge" desc="Red badge with pending count on Website Orders tab">

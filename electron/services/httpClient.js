@@ -37,12 +37,15 @@ const handleError = (error) => {
   }
   if (error.response) {
     const status = error.response.status;
-    const msg = error.response.data?.error || error.response.data?.message || `HTTP_${status}`;
+    let msg = error.response.data?.error || error.response.data?.message || `HTTP_${status}`;
+    if (typeof msg === 'object') {
+      try { msg = JSON.stringify(msg); } catch(e) {}
+    }
     if (status === 401) throw new Error('INVALID_LICENSE');
     if (status === 403) throw new Error(msg);
     if (status === 429) throw new Error('RATE_LIMITED');
     if (status === 500) throw new Error(`SERVER_ERROR: ${msg}`);
-    throw new Error(msg);
+    throw new Error(String(msg));
   }
   throw new Error('UNKNOWN_ERROR');
 };

@@ -51,7 +51,7 @@
   },
   "build": {
     "appId": "com.restaurant.pos",
-    "productName": "ZapBill POS",
+    "productName": "FlashBill POS",
     "directories": {
       "output": "dist-electron",
       "buildResources": "public"

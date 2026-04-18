@@ -1,7 +1,7 @@
-# ZapBill POS - Offline Restaurant Management System
+# FlashBill POS - Offline Restaurant Management System
 
 ## Overview
-ZapBill POS is a robust, offline-first desktop application tailored for comprehensive restaurant management. It empowers you to streamline operations, manage orders, track inventory, and generate detailed reports seamlessly without requiring an active internet connection.
+FlashBill POS is a robust, offline-first desktop application tailored for comprehensive restaurant management. It empowers you to streamline operations, manage orders, track inventory, and generate detailed reports seamlessly without requiring an active internet connection.
 
 ## 🚀 Key Features
 
@@ -27,9 +27,9 @@ ZapBill POS is a robust, offline-first desktop application tailored for comprehe
 ## 💻 Installation & Offline Usage
 
 ### How to Install
-1. **Download**: Secure the latest installer (e.g., `ZapBill-POS-Setup-2.0.0.exe`) from the official release source.
-2. **Install**: Run the installer executable. The application will elegantly install to your local machine (typically within `AppData/Local/Programs/ZapBill`).
-3. **Run**: Launch "ZapBill POS" explicitly from your desktop shortcut or start menu.
+1. **Download**: Secure the latest installer (e.g., `FlashBill-POS-Setup-2.0.0.exe`) from the official release source.
+2. **Install**: Run the installer executable. The application will elegantly install to your local machine (typically within `AppData/Local/Programs/FlashBill`).
+3. **Run**: Launch "FlashBill POS" explicitly from your desktop shortcut or start menu.
 
 ### Offline Capabilities
 - **Uninterrupted Operations**: Core capabilities like billing, configuring local menus, standard KOT processing, and viewing local reports operate completely free from cloud reliance. Core operations execute instantly through the localized database.
@@ -44,7 +44,7 @@ ZapBill POS is a robust, offline-first desktop application tailored for comprehe
 
 ### Data Persistence Principles
 - Master databases alongside error logs and precise application configurations strictly reside inside your operating system's localized user data directory:
-  - **Windows Reference Path**: `C:\Users\<YourUser>\AppData\Roaming\ZapBill POS`
+  - **Windows Reference Path**: `C:\Users\<YourUser>\AppData\Roaming\FlashBill POS`
 - **Critical Guarantee**: Installing fresh patches/updates (or issuing a generic uninstallation via control panels) will **NOT** forcibly scrub this directory, heavily guaranteeing menu logic, configuration templates, and sales histories remain impeccably secure.
 
 ## ⚙️ Advanced Configuration

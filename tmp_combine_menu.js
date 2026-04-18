@@ -23,7 +23,7 @@ function parseAddonsCSV(content) {
     return data;
 }
 
-const addonData = parseAddonsCSV(fs.readFileSync('c:/Users/lenovo/OneDrive/Desktop/Projects/ZapBill_offline-software/menu/client_add_ons.csv', 'utf8'));
+const addonData = parseAddonsCSV(fs.readFileSync('c:/Users/lenovo/OneDrive/Desktop/Projects/FlashBill_offline-software/menu/client_add_ons.csv', 'utf8'));
 
 // Group by name
 const addonGroups = {};
@@ -60,7 +60,7 @@ function parseMenuCSV(content) {
     return data;
 }
 
-const menuItems = parseMenuCSV(fs.readFileSync('c:/Users/lenovo/OneDrive/Desktop/Projects/ZapBill_offline-software/menu/zapbill_menu_import.csv', 'utf8'));
+const menuItems = parseMenuCSV(fs.readFileSync('c:/Users/lenovo/OneDrive/Desktop/Projects/FlashBill_offline-software/menu/flashbill_menu_import.csv', 'utf8'));
 
 // 3. Mapping Logic
 const updatedMenu = menuItems.map(item => {
@@ -103,7 +103,7 @@ updatedMenu.forEach(item => {
     output += row.join(',') + '\n';
 });
 
-fs.writeFileSync('c:/Users/lenovo/OneDrive/Desktop/Projects/ZapBill_offline-software/menu/zapbill_menu_import_combined.csv', output);
+fs.writeFileSync('c:/Users/lenovo/OneDrive/Desktop/Projects/FlashBill_offline-software/menu/flashbill_menu_import_combined.csv', output);
 
 // 5. Output Group Seeding Code for user
 console.log('--- ADDON GROUPS DEFINITIONS ---');

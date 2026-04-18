@@ -7,7 +7,7 @@ const { exec } = require('child_process');
 
 class NetworkService {
   constructor() {
-    this.configPath = path.join(app.getPath('userData'), 'zapbill-network-config.json');
+    this.configPath = path.join(app.getPath('userData'), 'flashbill-network-config.json');
     this.config = this.loadConfig();
   }
 
@@ -48,7 +48,7 @@ class NetworkService {
         approved_devices: []
       },
       cloud_sync: {
-        server_url: "https://api.zapbill.com",
+        server_url: "https://api.flashbill.com",
         heartbeat_interval_minutes: 30,
         order_check_interval_seconds: 15,
         menu_sync_mode: "on_change",

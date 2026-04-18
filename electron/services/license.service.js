@@ -28,7 +28,7 @@ class LicenseService {
   }
 
   deriveKey(hardwareId) {
-    return crypto.scryptSync(hardwareId, 'zapbill-salt', 32);
+    return crypto.scryptSync(hardwareId, 'flashbill-salt', 32);
   }
 
   encrypt(jsonData) {

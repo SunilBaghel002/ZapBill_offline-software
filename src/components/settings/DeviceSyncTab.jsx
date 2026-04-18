@@ -135,7 +135,7 @@ const DeviceSyncTab = () => {
           <strong style={{ color: '#6d28d9', fontSize: '14px' }}>Device Data Sync</strong>
           <p style={{ color: '#7c3aed', fontSize: '13px', marginTop: '4px', lineHeight: '1.5', margin: '4px 0 0' }}>
             Transfer your menu, orders, settings, and all data between devices on the same WiFi network.
-            Both devices must be running ZapBill POS.
+            Both devices must be running FlashBill POS.
           </p>
         </div>
       </div>

@@ -4,53 +4,53 @@ const heartbeatService = require('../services/heartbeatService');
 const menuSyncService = require('../services/menuSyncService');
 
 module.exports = function registerIpcHandlers(websiteOrdersService) {
-  ipcMain.handle('zapbillCloud:activateLicense', async (_, { licenseKey, licenseSecret }) => {
+  ipcMain.handle('flashbillCloud:activateLicense', async (_, { licenseKey, licenseSecret }) => {
     return await licenseService.activate(licenseKey, licenseSecret);
   });
 
-  ipcMain.handle('zapbillCloud:getLicenseStatus', () => {
+  ipcMain.handle('flashbillCloud:getLicenseStatus', () => {
     return licenseService.getLicenseStatus();
   });
 
-  ipcMain.handle('zapbillCloud:heartbeatNow', async () => {
+  ipcMain.handle('flashbillCloud:heartbeatNow', async () => {
     return await heartbeatService.runHeartbeat();
   });
 
-  ipcMain.handle('zapbillCloud:testConnection', async () => {
+  ipcMain.handle('flashbillCloud:testConnection', async () => {
     return await licenseService.testConnection();
   });
 
-  ipcMain.handle('zapbillCloud:checkOrdersNow', async () => {
+  ipcMain.handle('flashbillCloud:checkOrdersNow', async () => {
     if (websiteOrdersService && websiteOrdersService.isPolling === false) {
       await websiteOrdersService._pollOnce();
     }
     return websiteOrdersService ? websiteOrdersService.getOrders({ status: 'pending' }) : [];
   });
 
-  ipcMain.handle('zapbillCloud:acceptOrder', async (_, { orderId, estimatedMinutes, message }) => {
+  ipcMain.handle('flashbillCloud:acceptOrder', async (_, { orderId, estimatedMinutes, message }) => {
     if (!websiteOrdersService) return { success: false, error: 'Service not initialized' };
     return await websiteOrdersService.acknowledgeOrder(orderId, 'accepted', message);
   });
 
-  ipcMain.handle('zapbillCloud:rejectOrder', async (_, { orderId, reason, message }) => {
+  ipcMain.handle('flashbillCloud:rejectOrder', async (_, { orderId, reason, message }) => {
     if (!websiteOrdersService) return { success: false, error: 'Service not initialized' };
     return await websiteOrdersService.acknowledgeOrder(orderId, 'rejected', message, reason);
   });
 
-  ipcMain.handle('zapbillCloud:updateOrderStatus', async (_, { orderId, status, message }) => {
+  ipcMain.handle('flashbillCloud:updateOrderStatus', async (_, { orderId, status, message }) => {
     if (!websiteOrdersService) return { success: false, error: 'Service not initialized' };
     return await websiteOrdersService.updateOrderStatus(orderId, status, message);
   });
 
-  ipcMain.handle('zapbillCloud:syncMenuNow', async (_, { menuData }) => {
+  ipcMain.handle('flashbillCloud:syncMenuNow', async (_, { menuData }) => {
     return await menuSyncService.syncMenuToCloud(menuData);
   });
 
-  ipcMain.handle('zapbillCloud:syncCouponsNow', async (_, { couponsData }) => {
+  ipcMain.handle('flashbillCloud:syncCouponsNow', async (_, { couponsData }) => {
     return await menuSyncService.syncCouponsToCloud(couponsData);
   });
 
-  ipcMain.handle('zapbillCloud:getNetworkStatus', () => {
+  ipcMain.handle('flashbillCloud:getNetworkStatus', () => {
     return {
       is_online: heartbeatService.consecutiveFailures < 3,
       last_heartbeat: licenseService.licenseData?.last_sync,
@@ -63,12 +63,12 @@ module.exports = function registerIpcHandlers(websiteOrdersService) {
     };
   });
 
-  ipcMain.handle('zapbillCloud:pauseOrderPolling', () => {
+  ipcMain.handle('flashbillCloud:pauseOrderPolling', () => {
     if (websiteOrdersService) websiteOrdersService.stopPolling();
     return { success: true };
   });
 
-  ipcMain.handle('zapbillCloud:resumeOrderPolling', () => {
+  ipcMain.handle('flashbillCloud:resumeOrderPolling', () => {
     if (websiteOrdersService) websiteOrdersService.startPolling();
     return { success: true };
   });
@@ -122,7 +122,7 @@ module.exports = function registerIpcHandlers(websiteOrdersService) {
         serverUrl: url
       };
     } catch (e) {
-      const msg = e.code === 'ECONNREFUSED' ? 'Could not connect to device. Check IP and ensure ZapBill is running.'
+      const msg = e.code === 'ECONNREFUSED' ? 'Could not connect to device. Check IP and ensure FlashBill is running.'
                 : e.code === 'ECONNABORTED' ? 'Connection timed out. Are both devices on the same WiFi?'
                 : e.response?.data?.error || e.message;
       return { success: false, error: msg };

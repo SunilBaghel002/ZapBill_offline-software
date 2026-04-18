@@ -268,28 +268,28 @@ contextBridge.exposeInMainWorld('platform', {
   isLinux: process.platform === 'linux',
 });
 
-// ZapBill Cloud specific APIs
-contextBridge.exposeInMainWorld('zapbillCloud', {
+// FlashBill Cloud specific APIs
+contextBridge.exposeInMainWorld('flashbillCloud', {
   // License methods
-  activateLicense: (licenseKey, licenseSecret) => ipcRenderer.invoke('zapbillCloud:activateLicense', { licenseKey, licenseSecret }),
-  getLicenseStatus: () => ipcRenderer.invoke('zapbillCloud:getLicenseStatus'),
-  testConnection: () => ipcRenderer.invoke('zapbillCloud:testConnection'),
-  heartbeatNow: () => ipcRenderer.invoke('zapbillCloud:heartbeatNow'),
+  activateLicense: (licenseKey, licenseSecret) => ipcRenderer.invoke('flashbillCloud:activateLicense', { licenseKey, licenseSecret }),
+  getLicenseStatus: () => ipcRenderer.invoke('flashbillCloud:getLicenseStatus'),
+  testConnection: () => ipcRenderer.invoke('flashbillCloud:testConnection'),
+  heartbeatNow: () => ipcRenderer.invoke('flashbillCloud:heartbeatNow'),
 
   // Order methods
-  checkOrdersNow: () => ipcRenderer.invoke('zapbillCloud:checkOrdersNow'),
-  acceptOrder: (orderId, estimatedMinutes, message) => ipcRenderer.invoke('zapbillCloud:acceptOrder', { orderId, estimatedMinutes, message }),
-  rejectOrder: (orderId, reason, message) => ipcRenderer.invoke('zapbillCloud:rejectOrder', { orderId, reason, message }),
-  updateOrderStatus: (orderId, status, message) => ipcRenderer.invoke('zapbillCloud:updateOrderStatus', { orderId, status, message }),
-  pauseOrderPolling: () => ipcRenderer.invoke('zapbillCloud:pauseOrderPolling'),
-  resumeOrderPolling: () => ipcRenderer.invoke('zapbillCloud:resumeOrderPolling'),
+  checkOrdersNow: () => ipcRenderer.invoke('flashbillCloud:checkOrdersNow'),
+  acceptOrder: (orderId, estimatedMinutes, message) => ipcRenderer.invoke('flashbillCloud:acceptOrder', { orderId, estimatedMinutes, message }),
+  rejectOrder: (orderId, reason, message) => ipcRenderer.invoke('flashbillCloud:rejectOrder', { orderId, reason, message }),
+  updateOrderStatus: (orderId, status, message) => ipcRenderer.invoke('flashbillCloud:updateOrderStatus', { orderId, status, message }),
+  pauseOrderPolling: () => ipcRenderer.invoke('flashbillCloud:pauseOrderPolling'),
+  resumeOrderPolling: () => ipcRenderer.invoke('flashbillCloud:resumeOrderPolling'),
 
   // Menu/Coupon sync
-  syncMenuNow: (menuData) => ipcRenderer.invoke('zapbillCloud:syncMenuNow', { menuData }),
-  syncCouponsNow: (couponsData) => ipcRenderer.invoke('zapbillCloud:syncCouponsNow', { couponsData }),
+  syncMenuNow: (menuData) => ipcRenderer.invoke('flashbillCloud:syncMenuNow', { menuData }),
+  syncCouponsNow: (couponsData) => ipcRenderer.invoke('flashbillCloud:syncCouponsNow', { couponsData }),
 
   // Network methods
-  getNetworkStatus: () => ipcRenderer.invoke('zapbillCloud:getNetworkStatus'),
+  getNetworkStatus: () => ipcRenderer.invoke('flashbillCloud:getNetworkStatus'),
 
   // Event listeners
   onNewOrder: (callback) => {

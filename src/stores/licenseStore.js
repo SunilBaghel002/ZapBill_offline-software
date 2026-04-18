@@ -14,13 +14,13 @@ export const useLicenseStore = create((set, get) => ({
       // Try to get hardware ID and license status in parallel
       const [hwId, status] = await Promise.all([
         window.electronAPI ? window.electronAPI.invoke('license:getHardwareId') : Promise.resolve(null),
-        window.zapbillCloud ? window.zapbillCloud.getLicenseStatus() : (window.electronAPI ? window.electronAPI.invoke('license:getLicense') : Promise.resolve(null))
+        window.flashbillCloud ? window.flashbillCloud.getLicenseStatus() : (window.electronAPI ? window.electronAPI.invoke('license:getLicense') : Promise.resolve(null))
       ]);
 
       console.log('License Init - Status:', status);
       
       let lic = null;
-      // If we got an object from zapbillCloud, check is_activated
+      // If we got an object from flashbillCloud, check is_activated
       if (status && typeof status === 'object') {
         if (status.is_activated) {
           lic = status;
@@ -50,9 +50,9 @@ export const useLicenseStore = create((set, get) => ({
       });
 
       // Listen for live updates
-      if (window.zapbillCloud?.onFeaturesChanged) {
-        window.zapbillCloud.onFeaturesChanged(async () => {
-          const freshStatus = await window.zapbillCloud.getLicenseStatus();
+      if (window.flashbillCloud?.onFeaturesChanged) {
+        window.flashbillCloud.onFeaturesChanged(async () => {
+          const freshStatus = await window.flashbillCloud.getLicenseStatus();
           if (freshStatus && freshStatus.is_activated) {
             let expired = false;
             if (freshStatus.amc_end_date && new Date(freshStatus.amc_end_date) < new Date()) {
@@ -71,14 +71,14 @@ export const useLicenseStore = create((set, get) => ({
   activate: async (credentials) => {
     try {
       let response;
-      if (window.zapbillCloud?.activateLicense) {
-        response = await window.zapbillCloud.activateLicense(credentials.licenseKey, credentials.licenseSecret);
+      if (window.flashbillCloud?.activateLicense) {
+        response = await window.flashbillCloud.activateLicense(credentials.licenseKey, credentials.licenseSecret);
       } else {
         response = await window.electronAPI.invoke('license:activate', credentials);
       }
       
       if (response.success) {
-        const lic = await window.zapbillCloud.getLicenseStatus();
+        const lic = await window.flashbillCloud.getLicenseStatus();
         let isAmcExpired = false;
         if (lic?.amc_end_date && new Date(lic.amc_end_date) < new Date()) {
           isAmcExpired = true;
@@ -94,9 +94,9 @@ export const useLicenseStore = create((set, get) => ({
 
   sync: async () => {
     try {
-      if (window.zapbillCloud?.heartbeatNow) {
-        await window.zapbillCloud.heartbeatNow();
-        const lic = await window.zapbillCloud.getLicenseStatus();
+      if (window.flashbillCloud?.heartbeatNow) {
+        await window.flashbillCloud.heartbeatNow();
+        const lic = await window.flashbillCloud.getLicenseStatus();
         if (lic) {
           let isAmcExpired = false;
           if (lic.amc_end_date && new Date(lic.amc_end_date) < new Date()) {

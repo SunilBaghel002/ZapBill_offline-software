@@ -1,6 +1,6 @@
 # How to Release Your Software on GitHub (Free)
 
-This guide explains how to build your ZapBill POS installer and host it on GitHub so clients can download it for free.
+This guide explains how to build your FlashBill POS installer and host it on GitHub so clients can download it for free.
 
 ## Prerequisites
 - A GitHub account.
@@ -16,9 +16,9 @@ First, you need to generate the `.exe` file on your computer.
    ```
 3. Wait for the process to finish. It may take a few minutes.
 4. Once done, locate the installer file:
-   - Go to your project folder: `ZapBill_offline-software`
+   - Go to your project folder: `FlashBill_offline-software`
    - Open the `dist-electron` folder.
-   - Look for a file named roughly `ZapBill POS Setup 1.0.0.exe`.
+   - Look for a file named roughly `FlashBill POS Setup 1.0.0.exe`.
 
 ## Step 2: Create a Release on GitHub
 Now you will upload this file to GitHub.
@@ -34,7 +34,7 @@ Now you will upload this file to GitHub.
    - Type a version number, e.g., `v1.0.0`.
    - Click "Create new tag: v1.0.0".
 5. **Fill in Details**:
-   - **Release title**: Enter a name, e.g., "ZapBill POS v1.0.0".
+   - **Release title**: Enter a name, e.g., "FlashBill POS v1.0.0".
    - **Description**: Describe changes (e.g., "Initial release with offline database support").
 6. **Upload the Installer**:
    - Drag and drop your `.exe` file (from Step 1) into the box that says "Attach binaries by dropping them here or selecting them".

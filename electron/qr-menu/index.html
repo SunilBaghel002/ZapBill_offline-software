@@ -350,7 +350,7 @@
           fetch(API + '/api/settings').then(r => r.json()),
           fetch(API + '/api/menu').then(r => r.json())
         ]);
-        state.settings = sets.success ? sets : { restaurant_name: 'ZapBill' };
+        state.settings = sets.success ? sets : { restaurant_name: 'FlashBill' };
         state.categories = menu.categories || [];
         state.items = menu.items || [];
         state.masterAddonGroups = menu.masterAddonGroups || [];

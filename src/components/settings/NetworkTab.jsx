@@ -191,7 +191,7 @@ const NetworkTab = () => {
          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
            <div>
              <h4 style={{ margin: '0 0 4px', fontSize: '15px', fontWeight: '600', color: '#1e293b' }}>Access Control</h4>
-             <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Manage who can connect to this ZapBill server.</p>
+             <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Manage who can connect to this FlashBill server.</p>
            </div>
          </div>
          <div style={{ display: 'grid', gap: '12px' }}>

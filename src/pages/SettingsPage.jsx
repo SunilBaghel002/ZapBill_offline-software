@@ -524,7 +524,7 @@ const SettingsPage = () => {
                       </div>
                     </div>
                     <p style={{ color: '#0284c7', fontSize: '13px', marginTop: '4px', lineHeight: '1.5' }}>
-                      ZapBill sends <strong>one consolidated email per hour</strong> with sales, items, add-ons, and a screenshot.
+                      FlashBill sends <strong>one consolidated email per hour</strong> with sales, items, add-ons, and a screenshot.
                       Customize what appears in each section below.
                     </p>
                   </div>
@@ -834,7 +834,7 @@ const SettingsPage = () => {
                   <div>
                     <strong style={{ color: 'var(--warning-700)', fontSize: '14px' }}>Import Data from Excel/CSV</strong>
                     <p style={{ color: 'var(--warning-600)', fontSize: '13px', marginTop: '4px', lineHeight: '1.5' }}>
-                      Import menu items or inventory data from spreadsheet files. Make sure the column names match ZapBill's expected format.
+                      Import menu items or inventory data from spreadsheet files. Make sure the column names match FlashBill's expected format.
                     </p>
                   </div>
                 </div>
@@ -1256,7 +1256,7 @@ const SettingsPage = () => {
                     Fully Offline POS System
                   </h3>
                   <p style={{ fontSize: '14px', color: 'var(--success-600)', margin: 0, lineHeight: '1.6' }}>
-                    ZapBill works completely offline. All data is stored locally on your device.
+                    FlashBill works completely offline. All data is stored locally on your device.
                     <br />No internet connection required for any functionality.
                   </p>
                 </div>
@@ -1265,7 +1265,7 @@ const SettingsPage = () => {
                   <h4 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px', color: 'var(--gray-800)' }}>System Details</h4>
                   <div style={{ border: '1px solid var(--gray-200)', borderRadius: '12px', overflow: 'hidden' }}>
                     {[
-                      { label: 'Application', value: 'ZapBill POS' },
+                      { label: 'Application', value: 'FlashBill POS' },
                       { label: 'Platform', value: 'Electron (Desktop)' },
                       { label: 'Database', value: 'SQLite' },
                       { label: 'Data Storage', value: 'Local (Offline)' },

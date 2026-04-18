@@ -4,7 +4,7 @@ const path = require('path');
 
 async function inspect() {
     const SQL = await initSqlJs();
-    const dbPath = 'c:\\Users\\lenovo\\OneDrive\\Desktop\\Projects\\ZapBill_offline-software\\electron\\database\\restaurant.db';
+    const dbPath = 'c:\\Users\\lenovo\\OneDrive\\Desktop\\Projects\\FlashBill_offline-software\\electron\\database\\restaurant.db';
     
     if (!fs.existsSync(dbPath)) {
         console.log('DB not found at', dbPath);

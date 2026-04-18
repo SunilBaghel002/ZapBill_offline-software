@@ -71,10 +71,10 @@ const LoginPage = () => {
             justifyContent: 'center',
             margin: '0 auto var(--spacing-4)',
           }}>
-            <img src={logoImg} alt="ZapBill Logo" style={{ width: '120px', height: '120px', objectFit: 'contain' }} />
+            <img src={logoImg} alt="FlashBill Logo" style={{ width: '120px', height: '120px', objectFit: 'contain' }} />
           </div>
           <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--spacing-2)' }}>
-            ZapBill POS
+            FlashBill POS
           </h1>
           <p style={{ opacity: 0.9, fontSize: 'var(--font-size-sm)' }}>
             Sign in to continue

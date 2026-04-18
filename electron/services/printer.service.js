@@ -664,7 +664,7 @@ class PrinterService {
           <p style="font-size: 12px; color: #000;">${new Date().toLocaleString()}</p>
           <p style="font-size: 11px; color: #000; margin-top: 4px;">Printer: ${printerName || 'default'}</p>
           <div class="divider-solid"></div>
-          <p style="font-size: 11px; color: #000; margin-top: 8px;">ZapBill POS System</p>
+          <p style="font-size: 11px; color: #000; margin-top: 8px;">FlashBill POS System</p>
         </div>
       `;
 
@@ -981,7 +981,7 @@ class PrinterService {
           <img src="${qrData}" style="width: 100%; height: 100%;" />
         </div>
         
-        <div style="font-size: 14px; font-weight: 600; margin-top: 15px;">ZapBill Digital POS</div>
+        <div style="font-size: 14px; font-weight: 600; margin-top: 15px;">FlashBill Digital POS</div>
         <div style="font-size: 11px; margin-top: 5px;">Scan to view menu & order</div>
         
         <div class="line-dashed" style="margin-top: 20px;"></div>

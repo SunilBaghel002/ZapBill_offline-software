@@ -5,7 +5,7 @@
 
 /* CSS Variables / Design Tokens */
 :root {
-  /* Primary Colors - ZapBill Blue (#0096FF) */
+  /* Primary Colors - FlashBill Blue (#0096FF) */
   --primary-50: #e0f2fe;
   --primary-100: #bae6fd;
   --primary-200: #7dd3fc;
@@ -149,7 +149,7 @@
   --content-max-width: 100%;
   /* Full width */
 
-  /* ZapBill Specific Colors */
+  /* FlashBill Specific Colors */
   --pp-red: #0096FF; /* Primary Blue */
   /* Main Action / Header */
   --pp-dark-red: #007ACC;
@@ -1606,7 +1606,7 @@ h4 {
   flex-shrink: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border-bottom: 3px solid #E49B0F;
-  /* ZapBill Orange accent line */
+  /* FlashBill Orange accent line */
   z-index: 20;
 }
 
@@ -3643,7 +3643,7 @@ h4 {
 }
 
 .addon-item.selected {
-  border: 2px solid #E49B0F; /* ZapBill Orange */
+  border: 2px solid #E49B0F; /* FlashBill Orange */
   background: #FFFDE7;
   position: relative;
 }
@@ -3840,7 +3840,7 @@ input:focus + .slider {
 }
 
 .addon-item.selected {
-  border: 2px solid #E49B0F; /* ZapBill Orange */
+  border: 2px solid #E49B0F; /* FlashBill Orange */
   background: #FFFDE7;
   position: relative;
 }

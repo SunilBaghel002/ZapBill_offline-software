@@ -34,7 +34,7 @@ function parseCSV(content) {
     return data;
 }
 
-const addonCSV = fs.readFileSync('c:/Users/lenovo/OneDrive/Desktop/Projects/ZapBill_offline-software/menu/client_add_ons.csv', 'utf8');
+const addonCSV = fs.readFileSync('c:/Users/lenovo/OneDrive/Desktop/Projects/FlashBill_offline-software/menu/client_add_ons.csv', 'utf8');
 const addons = parseCSV(addonCSV);
 
 const groups = {};

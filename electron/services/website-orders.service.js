@@ -1,7 +1,7 @@
 /**
  * Website Orders Service
  * Polls a cloud server for online orders placed via the restaurant's website.
- * Acts as a temporary postbox: once ZapBill pulls and acknowledges an order,
+ * Acts as a temporary postbox: once FlashBill pulls and acknowledges an order,
  * the cloud server deletes the order data for privacy.
  */
 const fs = require('fs');
@@ -15,7 +15,7 @@ class WebsiteOrdersService {
   constructor(db, mainWindow) {
     this.db = db;
     this.mainWindow = mainWindow;
-    this.configPath = path.join(app.getPath('userData'), 'zapbill-website-orders-config.json');
+    this.configPath = path.join(app.getPath('userData'), 'flashbill-website-orders-config.json');
     this.config = this.loadConfig();
     this.pollingTimer = null;
     this.isPolling = false;

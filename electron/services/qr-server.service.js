@@ -431,7 +431,7 @@ class QRServerService {
     // GET /api/sync/info — public endpoint: shows this device is sync-capable
     this.app.get('/api/sync/info', (req, res) => {
       res.json({
-        app: 'ZapBill POS',
+        app: 'FlashBill POS',
         syncVersion: '1.0',
         deviceName: require('os').hostname(),
         ready: true

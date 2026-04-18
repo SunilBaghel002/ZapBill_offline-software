@@ -62,7 +62,7 @@ function createWindow() {
     height: 900,
     minWidth: 1200,
     minHeight: 700,
-    title: 'ZapBill POS',
+    title: 'FlashBill POS',
     icon: path.join(__dirname, '../public/icon.png'),
     webPreferences: {
       nodeIntegration: false,
@@ -159,7 +159,7 @@ function createTray() {
       }
     ]);
     
-    tray.setToolTip('ZapBill POS');
+    tray.setToolTip('FlashBill POS');
     tray.setContextMenu(contextMenu);
     
     tray.on('double-click', () => {

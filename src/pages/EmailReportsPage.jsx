@@ -422,7 +422,7 @@ const EmailReportsPage = () => {
                         {new Date(log.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                       </td>
                       <td style={{ padding: '12px 20px', color: '#334155', fontSize: '13px', fontWeight: 500 }}>
-                        {log.subject.replace('ZapBill ', '')}
+                        {log.subject.replace('FlashBill ', '')}
                       </td>
                       <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                         <span style={{ 

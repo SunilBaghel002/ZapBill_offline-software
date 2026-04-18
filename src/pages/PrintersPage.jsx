@@ -595,7 +595,7 @@ const PrintersPage = () => {
                     )}
                   </div>
                   <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '12px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <Info size={14} /> ZapBill automatically detects any USB, Wi-Fi, Ethernet, or Bluetooth printer connected to your operating system.
+                    <Info size={14} /> FlashBill automatically detects any USB, Wi-Fi, Ethernet, or Bluetooth printer connected to your operating system.
                   </p>
                 </div>
               </div>
