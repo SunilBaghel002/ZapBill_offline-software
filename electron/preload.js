@@ -261,3 +261,54 @@ contextBridge.exposeInMainWorld('platform', {
   isMac: process.platform === 'darwin',
   isLinux: process.platform === 'linux',
 });
+
+// ZapBill Cloud specific APIs
+contextBridge.exposeInMainWorld('zapbillCloud', {
+  // License methods
+  activateLicense: (licenseKey, licenseSecret) => ipcRenderer.invoke('zapbillCloud:activateLicense', { licenseKey, licenseSecret }),
+  getLicenseStatus: () => ipcRenderer.invoke('zapbillCloud:getLicenseStatus'),
+  testConnection: () => ipcRenderer.invoke('zapbillCloud:testConnection'),
+  heartbeatNow: () => ipcRenderer.invoke('zapbillCloud:heartbeatNow'),
+
+  // Order methods
+  checkOrdersNow: () => ipcRenderer.invoke('zapbillCloud:checkOrdersNow'),
+  acceptOrder: (orderId, estimatedMinutes, message) => ipcRenderer.invoke('zapbillCloud:acceptOrder', { orderId, estimatedMinutes, message }),
+  rejectOrder: (orderId, reason, message) => ipcRenderer.invoke('zapbillCloud:rejectOrder', { orderId, reason, message }),
+  updateOrderStatus: (orderId, status, message) => ipcRenderer.invoke('zapbillCloud:updateOrderStatus', { orderId, status, message }),
+  pauseOrderPolling: () => ipcRenderer.invoke('zapbillCloud:pauseOrderPolling'),
+  resumeOrderPolling: () => ipcRenderer.invoke('zapbillCloud:resumeOrderPolling'),
+
+  // Menu/Coupon sync
+  syncMenuNow: (menuData) => ipcRenderer.invoke('zapbillCloud:syncMenuNow', { menuData }),
+  syncCouponsNow: (couponsData) => ipcRenderer.invoke('zapbillCloud:syncCouponsNow', { couponsData }),
+
+  // Network methods
+  getNetworkStatus: () => ipcRenderer.invoke('zapbillCloud:getNetworkStatus'),
+
+  // Event listeners
+  onNewOrder: (callback) => {
+    const subscription = (event, order) => callback(order);
+    ipcRenderer.on('websiteOrders:newOrder', subscription);
+    return () => ipcRenderer.removeListener('websiteOrders:newOrder', subscription);
+  },
+  onFeaturesChanged: (callback) => {
+    const subscription = (event, features) => callback(features);
+    ipcRenderer.on('features-changed', subscription);
+    return () => ipcRenderer.removeListener('features-changed', subscription);
+  },
+  onServerMessages: (callback) => {
+    const subscription = (event, messages) => callback(messages);
+    ipcRenderer.on('server-messages', subscription);
+    return () => ipcRenderer.removeListener('server-messages', subscription);
+  },
+  onGoingOffline: (callback) => {
+    const subscription = () => callback(true);
+    ipcRenderer.on('gone-offline', subscription);
+    return () => ipcRenderer.removeListener('gone-offline', subscription);
+  },
+  onBackOnline: (callback) => {
+    const subscription = () => callback(true);
+    ipcRenderer.on('back-online', subscription);
+    return () => ipcRenderer.removeListener('back-online', subscription);
+  }
+});

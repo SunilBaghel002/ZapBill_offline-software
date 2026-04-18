@@ -10,8 +10,10 @@ const SyncService = require('./services/sync.service');
 const QRServerService = require('./services/qr-server.service');
 const NetworkService = require('./services/network.service');
 const EmailService = require('./services/email.service');
-const LicenseService = require('./services/license.service');
+const licenseService = require('./services/license.service');
+const heartbeatService = require('./services/heartbeatService');
 const WebsiteOrdersService = require('./services/website-orders.service');
+const registerCloudIpcHandlers = require('./ipc/handlers');
 const fs = require('fs');
 
 // Configure logging
@@ -27,7 +29,6 @@ let printerService = null;
 let syncService = null;
 let qrServerService = null;
 let emailService = null;
-let licenseService = null;
 let websiteOrdersService = null;
 let isQuitting = false; // Flag to distinguish X (hide) vs actual quit
 
@@ -91,6 +92,15 @@ function createWindow() {
     if (db && !emailService) {
       emailService = new EmailService(db, mainWindow, licenseService);
     }
+    
+    // Inject into services
+    websiteOrdersService.setMainWindow(mainWindow);
+    
+    // Start heartbeat
+    heartbeatService.start();
+
+    // Setup Cloud IPC
+    registerCloudIpcHandlers(websiteOrdersService);
   });
 
   // Intercept window close: hide to tray instead of destroying
@@ -181,11 +191,11 @@ async function initializeServices() {
   // QR Server will be started after window is created
   qrServerService = new QRServerService(db, null);
   
-  licenseService = new LicenseService(db);
   qrServerService.setLicenseService(licenseService);
 
   // Website Orders Service
   websiteOrdersService = new WebsiteOrdersService(db, null);
+  websiteOrdersService.initialize();
   
   log.info('Services initialized successfully');
 }
@@ -198,20 +208,19 @@ function setupIpcHandlers() {
 
   // ============ LICENSE & HARDWARE ============
   ipcMain.handle('license:getHardwareId', () => {
-    return licenseService ? licenseService.getHardwareId() : null;
+    return licenseService.getHardwareId();
   });
   
   ipcMain.handle('license:getLicense', () => {
-    return licenseService ? licenseService.getLicense() : null;
+    return licenseService.licenseData;
   });
   
   ipcMain.handle('license:activate', async (event, data) => {
-    return await licenseService.activate(data);
+    return await licenseService.activate(data.licenseKey, data.licenseSecret);
   });
   
   ipcMain.handle('license:sync', async () => {
-    if(licenseService) await licenseService.performHeartbeat();
-    return licenseService ? licenseService.getLicense() : null;
+    return await heartbeatService.runHeartbeat();
   });
 
   // ============ AUTHENTICATION ============

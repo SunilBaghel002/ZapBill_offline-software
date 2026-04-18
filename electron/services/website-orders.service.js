@@ -8,6 +8,8 @@ const fs = require('fs');
 const path = require('path');
 const { app } = require('electron');
 const log = require('electron-log');
+const httpClient = require('./httpClient');
+const licenseService = require('./license.service');
 
 class WebsiteOrdersService {
   constructor(db, mainWindow) {
@@ -206,26 +208,22 @@ class WebsiteOrdersService {
     const url = this.config.server.url + this.config.server.endpoints.fetch_orders;
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), (this.config.polling.connection_timeout_seconds || 10) * 1000);
+      const authHeaders = licenseService.getAuthHeaders();
+      // Add custom restaurant headers if present in local config
+      if (this.config.server.api_key) authHeaders['x-api-key'] = this.config.server.api_key;
+      if (this.config.server.restaurant_id) authHeaders['x-restaurant-id'] = this.config.server.restaurant_id;
 
-      const headers = { 'Content-Type': 'application/json' };
-      if (this.config.server.api_key) headers['x-api-key'] = this.config.server.api_key;
-      if (this.config.server.restaurant_id) headers['x-restaurant-id'] = this.config.server.restaurant_id;
+      // Ensure URL starts with / for relative path since httpClient uses baseURL
+      let endpoint = this.config.server.endpoints.fetch_orders;
+      if (!endpoint.startsWith('/')) endpoint = '/' + endpoint;
 
-      const response = await fetch(url, { method: 'GET', headers, signal: controller.signal });
-      clearTimeout(timeout);
+      const data = await httpClient.get('/v1/wo/internal/poll', authHeaders);
 
       const elapsed = Date.now() - startTime;
       this.stats.responseTimes.push(elapsed);
       if (this.stats.responseTimes.length > 100) this.stats.responseTimes.shift();
       this.stats.avgResponseTime = Math.round(this.stats.responseTimes.reduce((a, b) => a + b, 0) / this.stats.responseTimes.length);
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
       this.stats.successfulChecks++;
       this.stats.consecutiveFailures = 0;
 
@@ -334,17 +332,15 @@ class WebsiteOrdersService {
   // ─── Order Actions ─────────────────────────────────────────
 
   async acknowledgeOrder(orderId, action, message, reason) {
-    const url = this.config.server.url + this.config.server.endpoints.acknowledge_order;
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (this.config.server.api_key) headers['x-api-key'] = this.config.server.api_key;
-    if (this.config.server.restaurant_id) headers['x-restaurant-id'] = this.config.server.restaurant_id;
+    const authHeaders = licenseService.getAuthHeaders();
+    if (this.config.server.api_key) authHeaders['x-api-key'] = this.config.server.api_key;
+    if (this.config.server.restaurant_id) authHeaders['x-restaurant-id'] = this.config.server.restaurant_id;
 
     const body = { order_id: orderId, action, message: message || '' };
     if (reason) body.reason = reason;
 
     try {
-      await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+      await httpClient.post('/v1/wo/internal/acknowledge', body, authHeaders);
     } catch (e) {
       log.warn('WebsiteOrders: Acknowledge failed (order still saved locally):', e.message);
     }
@@ -355,14 +351,12 @@ class WebsiteOrdersService {
   }
 
   async updateOrderStatus(orderId, status, message) {
-    const url = this.config.server.url + this.config.server.endpoints.update_status;
-
-    const headers = { 'Content-Type': 'application/json' };
-    if (this.config.server.api_key) headers['x-api-key'] = this.config.server.api_key;
-    if (this.config.server.restaurant_id) headers['x-restaurant-id'] = this.config.server.restaurant_id;
+    const authHeaders = licenseService.getAuthHeaders();
+    if (this.config.server.api_key) authHeaders['x-api-key'] = this.config.server.api_key;
+    if (this.config.server.restaurant_id) authHeaders['x-restaurant-id'] = this.config.server.restaurant_id;
 
     try {
-      await fetch(url, { method: 'POST', headers, body: JSON.stringify({ order_id: orderId, status, message: message || '' }) });
+      await httpClient.post('/v1/wo/internal/status', { order_id: orderId, status, message: message || '' }, authHeaders);
     } catch (e) {
       log.warn('WebsiteOrders: Status update to cloud failed:', e.message);
     }
@@ -498,28 +492,15 @@ class WebsiteOrdersService {
 
     const start = Date.now();
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-
-      const headers = { 'Content-Type': 'application/json' };
-      if (this.config.server.api_key) headers['x-api-key'] = this.config.server.api_key;
-      if (this.config.server.restaurant_id) headers['x-restaurant-id'] = this.config.server.restaurant_id;
-
-      const response = await fetch(this.config.server.url + this.config.server.endpoints.fetch_orders, {
-        method: 'GET', headers, signal: controller.signal
-      });
-      clearTimeout(timeout);
+      const authHeaders = licenseService.getAuthHeaders();
+      
+      await httpClient.get('/ping', authHeaders);
 
       const latency = Date.now() - start;
-
-      if (response.ok) {
-        return { success: true, latency, message: `Connected successfully (${latency}ms)` };
-      } else {
-        return { success: false, latency, message: `Server returned HTTP ${response.status}` };
-      }
+      return { success: true, latency, message: `Connected successfully (${latency}ms)` };
     } catch (e) {
       const latency = Date.now() - start;
-      return { success: false, latency, message: e.name === 'AbortError' ? 'Connection timed out' : e.message };
+      return { success: false, latency, message: e.message };
     }
   }
 

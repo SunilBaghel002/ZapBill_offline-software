@@ -9,7 +9,13 @@ export const useLicenseStore = create((set, get) => ({
   init: async () => {
     try {
       const hwId = await window.electronAPI.invoke('license:getHardwareId');
-      const lic = await window.electronAPI.invoke('license:getLicense');
+      
+      let lic = null;
+      if (window.zapbillCloud?.getLicenseStatus) {
+        lic = await window.zapbillCloud.getLicenseStatus();
+      } else {
+        lic = await window.electronAPI.invoke('license:getLicense');
+      }
       
       let isAmcExpired = false;
       if (lic && lic.amc_end_date) {
@@ -21,9 +27,9 @@ export const useLicenseStore = create((set, get) => ({
       set({ license: lic, hardwareId: hwId, isInitialized: true, amcExpiredFlag: isAmcExpired });
 
       // Listen for live updates from heartbeat
-      if (window.electronAPI?.on) {
-        window.electronAPI.on('license:updated', async () => {
-          const freshLicense = await window.electronAPI.invoke('license:getLicense');
+      if (window.zapbillCloud?.onFeaturesChanged) {
+        window.zapbillCloud.onFeaturesChanged(async () => {
+          const freshLicense = await window.zapbillCloud.getLicenseStatus();
           if (freshLicense) {
             let expired = false;
             if (freshLicense.amc_end_date && new Date(freshLicense.amc_end_date) < new Date()) {
@@ -41,13 +47,20 @@ export const useLicenseStore = create((set, get) => ({
 
   activate: async (credentials) => {
     try {
-      const response = await window.electronAPI.invoke('license:activate', credentials);
+      let response;
+      if (window.zapbillCloud?.activateLicense) {
+        response = await window.zapbillCloud.activateLicense(credentials.licenseKey, credentials.licenseSecret);
+      } else {
+        response = await window.electronAPI.invoke('license:activate', credentials);
+      }
+      
       if (response.success) {
+        const lic = await window.zapbillCloud.getLicenseStatus();
         let isAmcExpired = false;
-        if (response.license?.amc_end_date && new Date(response.license.amc_end_date) < new Date()) {
+        if (lic?.amc_end_date && new Date(lic.amc_end_date) < new Date()) {
           isAmcExpired = true;
         }
-        set({ license: response.license, amcExpiredFlag: isAmcExpired });
+        set({ license: lic, amcExpiredFlag: isAmcExpired });
         return { success: true };
       }
       return { success: false, error: response.error };
@@ -58,13 +71,25 @@ export const useLicenseStore = create((set, get) => ({
 
   sync: async () => {
     try {
-      const lic = await window.electronAPI.invoke('license:sync');
-      if (lic) {
-        let isAmcExpired = false;
-        if (lic.amc_end_date && new Date(lic.amc_end_date) < new Date()) {
-          isAmcExpired = true;
+      if (window.zapbillCloud?.heartbeatNow) {
+        await window.zapbillCloud.heartbeatNow();
+        const lic = await window.zapbillCloud.getLicenseStatus();
+        if (lic) {
+          let isAmcExpired = false;
+          if (lic.amc_end_date && new Date(lic.amc_end_date) < new Date()) {
+            isAmcExpired = true;
+          }
+          set({ license: lic, amcExpiredFlag: isAmcExpired });
         }
-        set({ license: lic, amcExpiredFlag: isAmcExpired });
+      } else {
+        const lic = await window.electronAPI.invoke('license:sync');
+        if (lic) {
+          let isAmcExpired = false;
+          if (lic.amc_end_date && new Date(lic.amc_end_date) < new Date()) {
+            isAmcExpired = true;
+          }
+          set({ license: lic, amcExpiredFlag: isAmcExpired });
+        }
       }
     } catch (e) {
       console.error('License sync failed', e);

@@ -4,19 +4,16 @@ const path = require('path');
 const { app } = require('electron');
 const { machineIdSync } = require('node-machine-id');
 const log = require('electron-log');
+const httpClient = require('./httpClient');
 
 const ALGORITHM = 'aes-256-gcm';
 
 class LicenseService {
-  constructor(db) {
-    this.db = db;
+  constructor() {
     this.licenseData = null;
     this.hardwareId = this.generateHardwareFingerprint();
     this.encryptionKey = this.deriveKey(this.hardwareId);
     this.licensePath = path.join(app.getPath('userData'), 'license.dat');
-    this.apiUrl = process.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
-    this.heartbeatInterval = null;
-    
     this.loadLicense();
   }
 
@@ -78,8 +75,6 @@ class LicenseService {
           log.warn('License file found but could not be decrypted.');
         } else {
           log.info('License loaded successfully');
-          // Auto-start heartbeat on load if license exists
-          this.startHeartbeat();
         }
       } catch (e) {
         log.error('Failed to load license file:', e);
@@ -105,12 +100,6 @@ class LicenseService {
     if (fs.existsSync(this.licensePath)) {
       fs.unlinkSync(this.licensePath);
     }
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
-    const { BrowserWindow } = require('electron');
-    BrowserWindow.getAllWindows().forEach(w => w.webContents.send('license:revoked'));
   }
 
   getHardwareId() {
@@ -121,30 +110,45 @@ class LicenseService {
     return this.licenseData;
   }
 
-  async activate({ licenseKey, licenseSecret, deviceName }) {
-    try {
-      if (!licenseKey || !licenseSecret) {
-        throw new Error('Invalid credentials');
-      }
+  getAuthHeaders() {
+    if (!this.licenseData?.license_key) {
+      return { 'X-Hardware-ID': this.hardwareId };
+    }
+    return {
+      'X-License-Key': this.licenseData.license_key,
+      'X-License-Secret': this.licenseData.license_secret || '',
+      'X-Hardware-ID': this.hardwareId
+    };
+  }
 
+  getLicenseStatus() {
+    const isActivated = !!this.licenseData?.license_key;
+    return {
+      is_activated: isActivated,
+      license_key: isActivated ? `ZB-XXXX-****-****-${this.licenseData.license_key.substr(-4)}` : null,
+      features: this.licenseData?.features || [],
+      amc_status: this.licenseData?.amc_status || 'inactive',
+      amc_end_date: this.licenseData?.amc_end_date || null,
+      last_sync: this.licenseData?.last_sync || null
+    };
+  }
+
+  async activate(licenseKey, licenseSecret) {
+    try {
       log.info('Activating license for key:', licenseKey);
       
-      const response = await fetch(`${this.apiUrl}/sync/activate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          license_key: licenseKey,
-          license_secret: licenseSecret,
-          hardware_id: this.hardwareId,
-          device_name: deviceName || 'Main Register'
-        })
-      });
+      const payload = {
+        license_key: licenseKey,
+        license_secret: licenseSecret,
+        hardware_id: this.hardwareId,
+        device_name: require('os').hostname() || 'Main Register'
+      };
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Activation failed');
+      const data = await httpClient.post('/sync/activate', payload);
 
       this.saveLicense({
         license_key: licenseKey,
+        license_secret: licenseSecret,
         hardware_id: this.hardwareId,
         features: data.features || [],
         amc_status: data.license?.amc_status || 'active',
@@ -154,48 +158,34 @@ class LicenseService {
         activated_at: new Date().toISOString()
       });
 
-      this.startHeartbeat();
-      return { success: true, license: this.licenseData, messages: data.messages };
+      return { success: true, features: data.features, amc_status: data.license?.amc_status, messages: data.messages };
     } catch (error) {
       log.error('Activation error:', error);
       return { success: false, error: error.message };
     }
   }
 
-  async performHeartbeat() {
-    if (!this.licenseData || !this.licenseData.license_key) return;
+  async heartbeat() {
+    if (!this.licenseData || !this.licenseData.license_key) {
+      throw new Error('Not activated');
+    }
 
+    log.info('Performing license sync heartbeat...');
     try {
-      log.info('Performing license sync...');
-      
-      const response = await fetch(`${this.apiUrl}/sync/heartbeat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          license_key: this.licenseData.license_key,
-          hardware_id: this.hardwareId
-        })
-      });
+      const payload = {
+        device_name: require('os').hostname() || 'Main Register',
+        app_version: require('../../package.json').version,
+        license_key: this.licenseData.license_key,
+        hardware_id: this.hardwareId
+      };
 
-      const data = await response.json();
+      const data = await httpClient.post('/sync/heartbeat', payload, this.getAuthHeaders());
 
-      // Handle revoked/deleted/deactivated license
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403 || response.status === 404) {
-          this.revokeLicense();
-          return;
-        }
-        throw new Error(data.error || 'Heartbeat failed');
-      }
-
-      // Check if license was marked invalid in the response body
       if (data.license && data.license.valid === false) {
         this.revokeLicense();
-        return;
+        return { status: 'revoked', features: [], amc_status: 'revoked', messages: [] };
       }
 
-      // ── Update ALL fields from server response ──
-      // This is the KEY part: features array from server overwrites local copy
       this.licenseData.features = data.features || [];
       this.licenseData.amc_status = data.license?.amc_status || this.licenseData.amc_status;
       this.licenseData.amc_end_date = data.license?.amc_end_date || this.licenseData.amc_end_date;
@@ -204,25 +194,26 @@ class LicenseService {
       this.licenseData.messages = data.messages || [];
       
       this.saveLicense(this.licenseData);
-      log.info('License synced. Active features:', this.licenseData.features.join(', '));
-
-      // Notify renderer to refresh its state
-      const { BrowserWindow } = require('electron');
-      BrowserWindow.getAllWindows().forEach(w => w.webContents.send('license:updated'));
-      
+      return { status: 'success', features: this.licenseData.features, amc_status: this.licenseData.amc_status, messages: data.messages };
     } catch (error) {
-      log.warn('Heartbeat failed (Offline?):', error.message);
+      if (error.message === 'INVALID_LICENSE' || error.message.includes('revoked')) {
+        this.revokeLicense();
+        return { status: 'revoked', features: [], amc_status: 'revoked', messages: [] };
+      }
+      log.warn('Heartbeat failed:', error.message);
+      throw error;
     }
   }
 
-  startHeartbeat() {
-    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
-    const intervalMinutes = process.env.VITE_HEARTBEAT_INTERVAL_MINUTES || 30;
-    this.heartbeatInterval = setInterval(() => {
-      this.performHeartbeat();
-    }, intervalMinutes * 60 * 1000);
-    this.performHeartbeat();
+  async testConnection() {
+    const start = Date.now();
+    try {
+      await httpClient.get('/ping');
+      return { connected: true, latency_ms: Date.now() - start };
+    } catch (e) {
+      return { connected: false, latency_ms: Date.now() - start, error: e.message };
+    }
   }
 }
 
-module.exports = LicenseService;
+module.exports = new LicenseService();
