@@ -122,6 +122,14 @@ export const useLicenseStore = create((set, get) => ({
   hasFeature: (featureKey) => {
     const { license } = get();
     if (!license || !license.features) return false;
+    
+    if (featureKey === 'expense_management') {
+      return license.features.includes('expense_management') || 
+             license.features.includes('expense') || 
+             license.features.includes('expenses') || 
+             license.features.includes('expense-management');
+    }
+
     // Simple check: is the feature_key in the features array?
     return license.features.includes(featureKey);
   },
